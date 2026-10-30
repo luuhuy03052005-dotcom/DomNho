@@ -149,12 +149,7 @@ export default function DomNhoHomePage() {
       try {
         const parsed = filterTrustedSpots(JSON.parse(savedRealSpots) as DomSpot[]);
         if (parsed.length > 0) {
-          const specIds = new Set(INITIAL_DOM_SPOTS.slice(0, 2).map((s) => s.id));
-          const merged = [
-            ...INITIAL_DOM_SPOTS.slice(0, 2),
-            ...parsed.filter((s) => !specIds.has(s.id)),
-          ];
-          setSpots(merged);
+          setSpots(parsed);
         }
       } catch {
         window.localStorage.removeItem(REAL_SPOTS_STORAGE_KEY);
@@ -276,9 +271,7 @@ export default function DomNhoHomePage() {
         if (data.ok && trusted.length > 0) {
           updateSpotsAndPersist((prev) => {
             const userPosts = prev.filter((s) => s.sourceType === 'USER_POST');
-            const specPosts = prev.filter((s) => s.id.startsWith('featured-'));
-            const otherUserPosts = userPosts.filter((s) => !s.id.startsWith('featured-'));
-            return [...specPosts, ...otherUserPosts, ...trusted];
+            return [...userPosts, ...trusted];
           });
           if (
             Array.isArray(data.savedGoogleMapsPlaces) &&

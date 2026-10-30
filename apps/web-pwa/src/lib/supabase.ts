@@ -3,7 +3,10 @@ import { maskPhoneNumber } from './security';
 import { UserSession } from './types';
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+const SUPABASE_ANON_KEY =
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+  process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
+  '';
 
 export const AUTH_STORAGE_KEY = 'dom_nho_permanent_auth';
 export const DEVICE_TOKEN_KEY = 'dom_nho_device_secret_token';
