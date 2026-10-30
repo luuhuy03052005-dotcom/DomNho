@@ -125,6 +125,11 @@ export default function PetCard({
           referrerPolicy="no-referrer"
           className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-102"
         />
+        {spot.images && spot.images.length > 1 && (
+          <span className="absolute bottom-2.5 right-2.5 px-2 py-0.5 rounded-md bg-black/65 text-white text-[11px] font-bold backdrop-blur-md flex items-center gap-1 shadow-sm">
+            <span>{spot.images.length} ảnh</span>
+          </span>
+        )}
       </div>
 
       <div className="pet-card__body p-4 sm:p-4.5 flex-1 flex flex-col justify-between gap-2">

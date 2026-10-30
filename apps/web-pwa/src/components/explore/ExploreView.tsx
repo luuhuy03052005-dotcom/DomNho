@@ -38,6 +38,8 @@ interface ExploreViewProps {
   onChangeOriginFilter: (origin: OriginFilter) => void;
   isSavedView?: boolean;
   onBackToExplore?: () => void;
+  onTriggerUpdate?: () => void;
+  isUpdating?: boolean;
 }
 
 type SortOption = 'NEAREST' | 'NEWEST' | 'URGENT';
@@ -59,6 +61,8 @@ export default function ExploreView({
   onChangeOriginFilter: _onChangeOriginFilter,
   isSavedView = false,
   onBackToExplore,
+  onTriggerUpdate,
+  isUpdating = false,
 }: ExploreViewProps) {
   const [category, setCategory] = useState<ExploreCategory>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
@@ -203,6 +207,25 @@ export default function ExploreView({
                   </button>
                 )}
               </div>
+
+              {onTriggerUpdate && (
+                <button
+                  type="button"
+                  onClick={onTriggerUpdate}
+                  disabled={isUpdating}
+                  className="h-12 px-3 sm:px-4 rounded-[10px] bg-[#0E513B] hover:bg-[#0A412F] text-white text-xs sm:text-sm font-bold flex items-center justify-center gap-1.5 sm:gap-2 shadow-sm active:scale-95 transition-all shrink-0 disabled:opacity-75"
+                  title="Cập nhật bài viết mới nhất từ cộng đồng"
+                  aria-label="Cập nhật tin mới"
+                >
+                  <RotateCcw className={`w-4 h-4 ${isUpdating ? 'animate-spin' : ''}`} />
+                  <span className="hidden sm:inline">
+                    {isUpdating ? 'Đang cập nhật...' : 'Cập nhật tin mới'}
+                  </span>
+                  <span className="sm:hidden">
+                    {isUpdating ? '...' : 'Cập nhật'}
+                  </span>
+                </button>
+              )}
 
               <button
                 type="button"

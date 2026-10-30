@@ -21,7 +21,10 @@ import {
   Send,
   Unlock,
   X,
+  Maximize2,
+  ZoomIn,
 } from 'lucide-react';
+import ImageLightboxModal from '@/components/modals/ImageLightboxModal';
 import {
   DomSpot,
   SightingItem,
@@ -72,6 +75,7 @@ export default function SpotDetailModal({
 }: SpotDetailModalProps) {
   const theme = DOM_THEMES[themeId];
   const [imageIndex, setImageIndex] = useState(0);
+  const [isLightboxOpen, setIsLightboxOpen] = useState(false);
   const [activeSubPanel, setActiveSubPanel] = useState<
     | 'NONE'
     | 'REPORT_SIGHTING'
@@ -237,12 +241,15 @@ export default function SpotDetailModal({
             color: theme.textHex,
           }}
         >
-          <div className="relative w-full aspect-[4/3] max-h-[245px] bg-black/10 shrink-0 overflow-hidden">
+          <div
+            onClick={() => setIsLightboxOpen(true)}
+            className="relative w-full aspect-[4/3] max-h-[245px] bg-black/10 shrink-0 overflow-hidden cursor-pointer group"
+          >
             <img
               src={spot.images[imageIndex] || spot.images[0]}
               alt={spot.title}
               referrerPolicy="no-referrer"
-              className="w-full h-full object-cover"
+              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
             />
             <div
               className="absolute inset-0"
@@ -254,11 +261,27 @@ export default function SpotDetailModal({
 
             <button
               type="button"
-              onClick={onClose}
+              onClick={(e) => {
+                e.stopPropagation();
+                onClose();
+              }}
               className="absolute top-3.5 right-3.5 w-9 h-9 rounded-full bg-black/50 text-white backdrop-blur-md flex items-center justify-center transition-transform active:scale-90"
               aria-label="Đóng"
             >
               <X className="w-4 h-4" />
+            </button>
+
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsLightboxOpen(true);
+              }}
+              className="absolute top-3.5 right-14 h-9 px-3 rounded-full bg-black/50 text-white backdrop-blur-md flex items-center gap-1.5 text-xs font-semibold hover:bg-black/70 transition-colors"
+              title="Phóng to ảnh để xem rõ hơn"
+            >
+              <ZoomIn className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Xem rõ ảnh</span>
             </button>
 
             <div className="absolute top-3.5 left-3.5 flex items-center gap-1.5 flex-wrap pr-12">
@@ -339,6 +362,37 @@ export default function SpotDetailModal({
               </button>
             </div>
           </div>
+
+          {spot.images.length > 1 && (
+            <div className="flex items-center gap-2 px-4 py-2.5 bg-[#FAF7F1] border-b border-[#DDDCD4] overflow-x-auto no-scrollbar shrink-0">
+              {spot.images.map((img, idx) => (
+                <button
+                  key={`${img}-${idx}`}
+                  type="button"
+                  onClick={() => setImageIndex(idx)}
+                  className={`relative w-14 h-14 rounded-xl overflow-hidden shrink-0 border-2 transition-all ${
+                    idx === imageIndex
+                      ? 'border-[#0E513B] shadow-sm scale-105'
+                      : 'border-[#DDDCD4] opacity-70 hover:opacity-100'
+                  }`}
+                >
+                  <img
+                    src={img}
+                    alt={`Ảnh ${idx + 1}`}
+                    className="w-full h-full object-cover"
+                  />
+                </button>
+              ))}
+              <button
+                type="button"
+                onClick={() => setIsLightboxOpen(true)}
+                className="h-14 px-3 rounded-xl border border-dashed border-[#DDDCD4] hover:border-[#0E513B] text-[#52605A] hover:text-[#0E513B] flex flex-col items-center justify-center text-[10px] font-bold shrink-0 transition-colors bg-white"
+              >
+                <Maximize2 className="w-3.5 h-3.5 mb-0.5" />
+                <span>Xem rõ</span>
+              </button>
+            </div>
+          )}
 
           <div className="p-5 overflow-y-auto no-scrollbar space-y-4">
             <div>
@@ -822,6 +876,14 @@ export default function SpotDetailModal({
             )}
           </div>
         </motion.div>
+
+        <ImageLightboxModal
+          images={spot.images}
+          initialIndex={imageIndex}
+          isOpen={isLightboxOpen}
+          onClose={() => setIsLightboxOpen(false)}
+          title={spot.title}
+        />
       </motion.div>
     </AnimatePresence>
   );

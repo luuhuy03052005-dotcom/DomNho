@@ -98,6 +98,7 @@ export default function DomNhoHomePage() {
   const [memorySnaps, setMemorySnaps] =
     useState<MemorySnap[]>(INITIAL_MEMORY_SNAPS);
   const [savedSpotIds, setSavedSpotIds] = useState<Set<string>>(new Set());
+  const [isUpdatingFeed, setIsUpdatingFeed] = useState<boolean>(false);
 
   const [userSession, setUserSession] = useState<UserSession | null>(null);
   const [patrolModeActive, setPatrolModeActive] = useState<boolean>(true);
@@ -254,11 +255,14 @@ export default function DomNhoHomePage() {
   );
 
   const handleTriggerLiveCrawl = useCallback(
-    async (targetPlatform: PlatformFilter = 'ALL') => {
-      showToast(
-        'Đang tìm kiếm thông tin mới...',
-        'Hệ thống đang kết nối dữ liệu từ cộng đồng và các kênh cứu hộ.'
-      );
+    async (targetPlatform: PlatformFilter = 'ALL', isAuto: boolean = false) => {
+      setIsUpdatingFeed(true);
+      if (!isAuto) {
+        showToast(
+          'Đang cập nhật tin mới...',
+          'Hệ thống đang kết nối dữ liệu từ cộng đồng và các kênh cứu hộ.'
+        );
+      }
       try {
         const res = await fetch('/api/crawl-live', {
           method: 'POST',
@@ -303,21 +307,36 @@ export default function DomNhoHomePage() {
             `Đã cập nhật ${trusted.length} bài viết mới`,
             'Dữ liệu đã được kiểm duyệt và sẵn sàng hỗ trợ.'
           );
-        } else {
+        } else if (!isAuto) {
           showToast(
-            'Chưa có tin mới',
+            'Đã đồng bộ đầy đủ',
             data?.error || 'Các trạm cứu trợ hiện đều đã được cập nhật đầy đủ.'
           );
         }
       } catch {
-        showToast(
-          'Không thể kết nối mạng',
-          'Vui lòng kiểm tra lại đường truyền internet của bạn.'
-        );
+        if (!isAuto) {
+          showToast(
+            'Không thể kết nối mạng',
+            'Vui lòng kiểm tra lại đường truyền internet của bạn.'
+          );
+        }
+      } finally {
+        setIsUpdatingFeed(false);
       }
     },
     [updateSpotsAndPersist, showToast]
   );
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const AUTO_UPDATE_INTERVAL_MS = 10 * 60 * 1000;
+    const lastAutoUpdate = window.sessionStorage.getItem('dom_nho_last_auto_update');
+    const now = Date.now();
+    if (!lastAutoUpdate || now - Number(lastAutoUpdate) > AUTO_UPDATE_INTERVAL_MS) {
+      window.sessionStorage.setItem('dom_nho_last_auto_update', String(now));
+      handleTriggerLiveCrawl('ALL', true);
+    }
+  }, [handleTriggerLiveCrawl]);
 
   const ensureAuthenticated = useCallback(
     (actionLabel: string, callback: (session: UserSession) => void) => {
@@ -369,11 +388,13 @@ export default function DomNhoHomePage() {
       breed: string;
       coatColor: string;
       traits: string[];
-      imageUrl: string;
+      images: string[];
       compressedSizeKB: number;
       allowFoster: boolean;
       hasExactLocation: boolean;
       customAddress: string;
+      pinnedLat?: number;
+      pinnedLng?: number;
     }) => {
       ensureAuthenticated('Đăng tin tìm kiếm hoặc cứu hộ thú cưng', (session) => {
         const rateCheck = checkAndIncrementDeviceRateLimit();
@@ -386,9 +407,17 @@ export default function DomNhoHomePage() {
         }
 
         const exactLoc = payload.hasExactLocation;
-        const coordsToUse = exactLoc
-          ? fuzzCoordinates(coords.lat, coords.lng)
-          : { publicLat: 0, publicLng: 0, fuzzRadiusMeters: 0 };
+        let coordsToUse = { publicLat: 0, publicLng: 0, fuzzRadiusMeters: 0 };
+
+        if (payload.pinnedLat && payload.pinnedLng) {
+          coordsToUse = {
+            publicLat: payload.pinnedLat,
+            publicLng: payload.pinnedLng,
+            fuzzRadiusMeters: 50,
+          };
+        } else if (exactLoc) {
+          coordsToUse = fuzzCoordinates(coords.lat, coords.lng);
+        }
 
         const newSpot: DomSpot = {
           id: `spot-${Date.now()}`,
@@ -403,7 +432,12 @@ export default function DomNhoHomePage() {
           breed: payload.breed || 'Chưa rõ giống',
           coatColor: payload.coatColor || 'Chưa rõ màu lông',
           traits: payload.traits,
-          images: [payload.imageUrl],
+          images:
+            payload.images.length > 0
+              ? payload.images
+              : [
+                  'https://images.unsplash.com/photo-1543852786-1cf6624b9987?auto=format&fit=crop&w=800&q=80',
+                ],
           publicLat: coordsToUse.publicLat,
           publicLng: coordsToUse.publicLng,
           fuzzRadiusMeters: coordsToUse.fuzzRadiusMeters,
@@ -428,7 +462,7 @@ export default function DomNhoHomePage() {
         updateSpotsAndPersist((prev) => [newSpot, ...prev]);
         setIsCameraModalOpen(false);
 
-        if (exactLoc) {
+        if (exactLoc && coordsToUse.publicLat > 0) {
           const matched = findDoubleMatchesWithin3Km(newSpot, spots);
           if (matched.length > 0) {
             setDoubleMatches(matched);
@@ -441,7 +475,7 @@ export default function DomNhoHomePage() {
 
         showToast(
           'Đăng tin thành công',
-          'Thông tin của bé đã được chia sẻ đến cộng đồng Đốm Nhỏ.'
+          `Đã chia sẻ thông tin của bé kèm ${payload.images.length} ảnh đến cộng đồng Đốm Nhỏ.`
         );
       });
     },
@@ -718,6 +752,8 @@ export default function DomNhoHomePage() {
             onChangeOriginFilter={setOriginFilter}
             isSavedView={mainTab === 'saved'}
             onBackToExplore={() => setMainTab('explore')}
+            onTriggerUpdate={() => handleTriggerLiveCrawl('ALL')}
+            isUpdating={isUpdatingFeed}
           />
         )}
       </main>
