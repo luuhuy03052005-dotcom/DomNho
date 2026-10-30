@@ -1,0 +1,13 @@
+{
+  "name": "dom-nho-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Đốm Nhỏ — Mạng Xã Hội Bản Đồ Cứu Hộ & Lưu Giữ Kỷ Niệm Thú Cưng (Geo-Spatial SNS PWA)",
+  "scripts": {
+    "dev": "npm --prefix apps/web-pwa run dev",
+    "build": "npm --prefix apps/web-pwa run build",
+    "start": "npm --prefix apps/web-pwa run start",
+    "lint": "npm --prefix apps/web-pwa run lint",
+    "crawler": "node services/crawler-worker/live_crawler.mjs"
+  }
+}

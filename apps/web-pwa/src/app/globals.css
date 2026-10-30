@@ -1,0 +1,91 @@
+@import 'maplibre-gl/dist/maplibre-gl.css';
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --dom-bg: #F7F4EF;
+  --dom-text: #2C2623;
+}
+
+* {
+  box-sizing: border-box;
+  border-width: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100dvh;
+  overflow: hidden;
+  background-color: var(--dom-bg);
+  color: var(--dom-text);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue',
+    Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Hiệu ứng nhịp tim & sóng radar cho Marker thật trên Google Maps */
+@keyframes domPulseRing {
+  0% {
+    transform: translate(-50%, -50%) scale(0.8);
+    opacity: 0.75;
+  }
+  75% {
+    transform: translate(-50%, -50%) scale(2.35);
+    opacity: 0.12;
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(2.7);
+    opacity: 0;
+  }
+}
+
+@keyframes domHeartbeat {
+  0%, 100% {
+    transform: scale(1);
+  }
+  25% {
+    transform: scale(1.12);
+  }
+  45% {
+    transform: scale(0.97);
+  }
+  65% {
+    transform: scale(1.08);
+  }
+}
+
+.dom-marker-ring {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  border-radius: 9999px;
+  pointer-events: none;
+  animation: domPulseRing 2.6s cubic-bezier(0.16, 1, 0.3, 1) infinite;
+}
+
+.dom-marker-core-sos {
+  animation: domHeartbeat 1.8s ease-in-out infinite;
+}
+
+.maplibregl-ctrl-attrib {
+  font-size: 10px !important;
+  opacity: 0.65;
+  background: rgba(255, 252, 246, 0.75) !important;
+  border-radius: 999px !important;
+  padding: 2px 8px !important;
+  margin: 4px !important;
+}
