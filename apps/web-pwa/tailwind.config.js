@@ -9,19 +9,46 @@ module.exports = {
   theme: {
     extend: {
       colors: {
+        canvas: '#FAF7F1',
+        surface: {
+          DEFAULT: '#FFFFFF',
+          muted: '#F1EFE8',
+        },
+        ink: {
+          DEFAULT: '#142820',
+          secondary: '#52605A',
+        },
+        brand: {
+          DEFAULT: '#0E513B',
+          hover: '#0A412F',
+          soft: '#E8EFE6',
+        },
+        rescue: {
+          DEFAULT: '#AF421F',
+          soft: '#FFF0E5',
+        },
+        lost: {
+          DEFAULT: '#80570D',
+          soft: '#FFF3D8',
+        },
+        accent: '#D8724D',
+        border: '#DDDCD4',
+        focus: '#176CBA',
         dom: {
-          morning: '#F7F4EF',
+          morning: '#FAF7F1',
           pine: '#ECF2EE',
           sunset: '#FCEEE9',
           twilight: '#232730',
-          coffee: '#2C2623',
-          red: '#E63946',
-          orange: '#E07A5F',
-          yellow: '#F4A261',
-          green: '#2A9D8F',
+          coffee: '#142820',
+          red: '#AF421F',
+          orange: '#D8724D',
+          yellow: '#80570D',
+          green: '#0E513B',
         },
       },
       borderRadius: {
+        btn: '10px',
+        card: '14px',
         '4xl': '32px',
       },
       keyframes: {

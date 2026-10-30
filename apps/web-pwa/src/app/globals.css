@@ -4,13 +4,27 @@
 @tailwind utilities;
 
 :root {
-  --dom-bg: #F7F4EF;
-  --dom-text: #2C2623;
+  --canvas: #FAF7F1;
+  --surface: #FFFFFF;
+  --surface-muted: #F1EFE8;
+  --ink: #142820;
+  --ink-secondary: #52605A;
+  --brand: #0E513B;
+  --brand-hover: #0A412F;
+  --brand-soft: #E8EFE6;
+  --rescue: #AF421F;
+  --rescue-soft: #FFF0E5;
+  --lost: #80570D;
+  --lost-soft: #FFF3D8;
+  --accent: #D8724D;
+  --border: #DDDCD4;
+  --focus: #176CBA;
+  --dom-bg: #FAF7F1;
+  --dom-text: #142820;
 }
 
 * {
   box-sizing: border-box;
-  border-width: 0;
   -webkit-tap-highlight-color: transparent;
 }
 
@@ -19,11 +33,11 @@ body {
   margin: 0;
   padding: 0;
   width: 100%;
-  height: 100dvh;
-  overflow: hidden;
+  min-height: 100vh;
+  min-height: 100dvh;
   background-color: var(--dom-bg);
   color: var(--dom-text);
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue',
+  font-family: 'Be Vietnam Pro', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue',
     Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
 }

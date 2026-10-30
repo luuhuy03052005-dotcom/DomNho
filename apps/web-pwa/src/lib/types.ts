@@ -32,6 +32,10 @@ export type EntityCategory = 'RESCUE_CENTER' | 'INDIVIDUAL_PET';
 
 export type ViewMode = 'map' | 'list';
 
+export type MainTab = 'explore' | 'map' | 'stories' | 'saved' | 'profile';
+
+export type ExploreCategory = 'ALL' | 'RESCUE' | 'LOST' | 'ADOPT';
+
 export type OriginFilter = 'ALL' | 'USER_POST' | 'EXTERNAL';
 
 export type RegionFilter = 'ALL' | 'SOUTH' | 'CENTRAL' | 'NORTH';
