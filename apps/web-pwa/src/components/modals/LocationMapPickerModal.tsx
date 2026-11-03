@@ -255,7 +255,7 @@ export default function LocationMapPickerModal({
   return (
     <AnimatePresence>
       <div
-        className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4 select-none"
+        className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4 select-none"
         role="dialog"
         aria-modal="true"
         aria-label="Ghim địa chỉ trên Google Map"

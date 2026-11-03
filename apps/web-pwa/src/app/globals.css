@@ -51,6 +51,25 @@ body {
   scrollbar-width: none;
 }
 
+.font-serif-letter {
+  font-family: 'Lora', Georgia, Cambria, 'Times New Roman', serif;
+}
+
+.letter-paper-surface {
+  background: linear-gradient(165deg, #FFFDF9 0%, #FAF5EB 52%, #F4ECE0 100%);
+  box-shadow:
+    0 12px 32px -8px rgba(20, 40, 32, 0.08),
+    0 2px 6px rgba(20, 40, 32, 0.04),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.7);
+}
+
+.hero-sanctuary-surface {
+  background:
+    radial-gradient(circle at 92% 14%, rgba(216, 114, 77, 0.12) 0%, transparent 45%),
+    radial-gradient(circle at 8% 88%, rgba(14, 81, 59, 0.08) 0%, transparent 50%),
+    linear-gradient(135deg, #FFFDF9 0%, #F8F4EC 100%);
+}
+
 /* Hiệu ứng nhịp tim & sóng radar cho Marker thật trên Google Maps */
 @keyframes domPulseRing {
   0% {

@@ -711,10 +711,11 @@ export default function DomNhoHomePage() {
           onOpenCreatePost={() => setIsCameraModalOpen(true)}
           onOpenProfile={() => setIsProfileModalOpen(true)}
           userSession={userSession}
+          savedCount={savedSpotIds.size}
         />
       )}
 
-      <main className="flex-1 w-full pb-16 md:pb-0">
+      <main className="flex-1 w-full">
         {mainTab === 'map' ? (
           <FullMapView
             spots={spots}
@@ -763,7 +764,7 @@ export default function DomNhoHomePage() {
             initial={{ opacity: 0, y: -20, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -20, scale: 0.95 }}
-            className="fixed top-20 sm:top-24 left-1/2 -translate-x-1/2 z-50 w-[92vw] max-w-md rounded-2xl px-4 py-3 bg-white border border-[#DDDCD4] shadow-xl flex items-start gap-3 pointer-events-none"
+            className="fixed top-20 sm:top-24 left-1/2 -translate-x-1/2 z-[90] w-[92vw] max-w-md rounded-2xl px-4 py-3 bg-white border border-[#DDDCD4] shadow-xl flex items-start gap-3 pointer-events-none"
           >
             <div className="w-8 h-8 rounded-full bg-[#E8EFE6] text-[#0E513B] flex items-center justify-center shrink-0 mt-0.5">
               <BellRing className="w-4 h-4" />

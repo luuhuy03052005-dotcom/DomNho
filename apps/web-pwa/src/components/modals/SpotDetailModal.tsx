@@ -227,15 +227,15 @@ export default function SpotDetailModal({
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         onClick={onClose}
-        className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4"
+        className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-2.5 sm:p-4"
       >
         <motion.div
-          initial={{ scale: 0.92, y: 24, opacity: 0 }}
+          initial={{ scale: 0.94, y: 20, opacity: 0 }}
           animate={{ scale: 1, y: 0, opacity: 1 }}
-          exit={{ scale: 0.92, y: 24, opacity: 0 }}
+          exit={{ scale: 0.94, y: 20, opacity: 0 }}
           transition={{ type: 'spring', stiffness: 280, damping: 26 }}
           onClick={(e) => e.stopPropagation()}
-          className="relative w-full max-w-lg max-h-[90dvh] rounded-[32px] shadow-2xl backdrop-blur-2xl overflow-hidden flex flex-col"
+          className="relative w-full max-w-lg max-h-[90dvh] rounded-[24px] sm:rounded-[28px] shadow-2xl border border-[#DDDCD4] overflow-hidden flex flex-col"
           style={{
             backgroundColor: theme.frostedSheetBg,
             color: theme.textHex,
@@ -243,7 +243,7 @@ export default function SpotDetailModal({
         >
           <div
             onClick={() => setIsLightboxOpen(true)}
-            className="relative w-full aspect-[4/3] max-h-[245px] bg-black/10 shrink-0 overflow-hidden cursor-pointer group"
+            className="relative w-full h-48 sm:h-60 bg-black/10 shrink-0 overflow-hidden cursor-pointer group"
           >
             <img
               src={spot.images[imageIndex] || spot.images[0]}

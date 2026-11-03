@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { BookOpen, Feather, Heart, Sparkles } from 'lucide-react';
 
 interface SuccessStoryCardProps {
   onOpenStory: () => void;
@@ -10,31 +11,60 @@ export default function SuccessStoryCard({ onOpenStory }: SuccessStoryCardProps)
   return (
     <div
       onClick={onOpenStory}
-      className="bg-white rounded-[14px] border border-[#DDDCD4] p-3.5 shadow-[0_2px_12px_rgba(20,40,32,0.04)] flex items-start gap-3.5 hover:shadow-[0_4px_16px_rgba(20,40,32,0.08)] transition-all cursor-pointer group"
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onOpenStory();
+        }
+      }}
+      className="letter-paper-surface relative rounded-[20px] border border-[#E2DACB] p-5 sm:p-6 transition-all duration-300 hover:-translate-y-0.5 hover:border-[#0E513B]/40 cursor-pointer group overflow-hidden"
     >
-      <div className="w-20 h-20 shrink-0 rounded-[10px] overflow-hidden bg-[#F1EFE8] border border-[#DDDCD4]/60">
-        <img
-          src="https://images.unsplash.com/photo-1574158622682-e40e69881006?auto=format&fit=crop&w=300&q=80"
-          alt="Milo đã tìm được nhà"
-          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-        />
+      <div className="absolute -right-6 -top-6 w-24 h-24 rounded-full bg-[#AF421F]/8 pointer-events-none" />
+      <div className="absolute -left-6 -bottom-6 w-24 h-24 rounded-full bg-[#0E513B]/6 pointer-events-none" />
+
+      <div className="relative flex items-center justify-between gap-2 pb-3.5 border-b border-dashed border-[#D8CFC0]">
+        <div className="flex items-center gap-2">
+          <span className="w-8 h-8 rounded-full bg-[#FFF0E5] border border-[#AF421F]/25 text-[#AF421F] flex items-center justify-center shadow-sm">
+            <Feather className="w-4 h-4" />
+          </span>
+          <div>
+            <span className="text-[10px] font-extrabold tracking-widest text-[#AF421F] uppercase block">
+              Tâm thư dự án
+            </span>
+            <span className="text-xs font-bold text-[#142820]">
+              Ý nghĩa &amp; Mục đích của Đốm Nhỏ
+            </span>
+          </div>
+        </div>
+
+        <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-[#E8EFE6] text-[#0E513B] border border-[#0E513B]/15">
+          Lá thư ngỏ
+        </span>
       </div>
 
-      <div className="flex-1 min-w-0">
-        <span className="text-[10px] font-bold tracking-wider text-[#AF421F] uppercase">
-          Một tin vui nhỏ
-        </span>
-        <h4 className="text-sm font-bold text-[#142820] mt-0.5 group-hover:text-[#0E513B] transition-colors truncate">
-          Milo đã tìm được nhà
-        </h4>
-        <p className="text-xs text-[#52605A] mt-1 leading-snug line-clamp-2">
-          Từ một bé bị bỏ rơi, giờ đây Milo đã có gia đình yêu thương.
+      <div className="relative mt-4 space-y-2.5">
+        <p className="font-serif-letter italic text-[15px] sm:text-base font-semibold text-[#142820] leading-snug">
+          &ldquo;Gửi bạn — người vừa dừng bước vì một sinh linh nhỏ...&rdquo;
         </p>
-        <span className="text-xs font-semibold text-[#142820] group-hover:text-[#0E513B] mt-1.5 inline-block group-hover:underline">
-          Đọc câu chuyện →
+
+        <p className="font-serif-letter text-xs sm:text-[13.5px] text-[#3F4E47] leading-relaxed">
+          Mỗi ngày, giữa hàng ngàn thông tin vội vã, biết bao lời cầu cứu của những chú chó, chú mèo đi lạc hay bị bỏ rơi lặng lẽ trôi vào quên lãng. <strong className="font-semibold text-[#142820]">Đốm Nhỏ</strong> ra đời như một tấm bản đồ của lòng nhân ái — gom từng đốm sáng hy vọng có thật để dẫn lối các bé về nhà...
+        </p>
+      </div>
+
+      <div className="relative mt-4 pt-3.5 border-t border-[#E6DFD3] flex items-center justify-between gap-2">
+        <div className="flex items-center gap-1.5 text-[11px] font-medium text-[#52605A] font-serif-letter italic">
+          <Heart className="w-3.5 h-3.5 text-[#AF421F] fill-[#AF421F] shrink-0" />
+          <span>Thương gửi từ Đốm Nhỏ</span>
+        </div>
+
+        <span className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-[#0E513B] group-hover:bg-[#0A412F] text-white text-xs font-bold shadow-sm transition-colors">
+          <BookOpen className="w-3.5 h-3.5" />
+          <span>Đọc trọn lá thư →</span>
         </span>
       </div>
     </div>
   );
 }
-

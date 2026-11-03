@@ -46,7 +46,7 @@ export default function DomNhoLogo({
       </div>
 
       {showSlogan && (
-        <div className="hidden sm:flex items-center gap-2 pl-1">
+        <div className="hidden xl:flex items-center gap-2 pl-1">
           <span className="text-[#DDDCD4] font-light">|</span>
           <span className="text-[11px] font-bold uppercase tracking-wider text-[#52605A]">
             Kết nối những điều tử tế

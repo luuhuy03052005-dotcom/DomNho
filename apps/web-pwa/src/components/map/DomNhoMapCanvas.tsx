@@ -676,12 +676,11 @@ export default function DomNhoMapCanvas({
         }}
       />
 
-      <div className="fixed right-2.5 sm:right-4 top-1/2 -translate-y-1/2 z-20 flex flex-col gap-1.5">
+      <div className="absolute right-3 sm:right-4 bottom-28 sm:bottom-8 z-20 flex flex-col gap-2">
         <button
           type="button"
           onClick={handleZoomIn}
-          className="w-9 h-9 rounded-full flex items-center justify-center shadow-md backdrop-blur-xl transition-transform active:scale-90"
-          style={{ backgroundColor: theme.frostedBg, color: theme.textHex }}
+          className="w-10 h-10 rounded-full flex items-center justify-center shadow-lg border border-[#DDDCD4] bg-white/95 text-[#142820] hover:border-[#0E513B] transition-transform active:scale-90"
           title="Phóng to bản đồ"
         >
           <Plus className="w-4 h-4" />
@@ -690,8 +689,7 @@ export default function DomNhoMapCanvas({
         <button
           type="button"
           onClick={handleZoomOut}
-          className="w-9 h-9 rounded-full flex items-center justify-center shadow-md backdrop-blur-xl transition-transform active:scale-90"
-          style={{ backgroundColor: theme.frostedBg, color: theme.textHex }}
+          className="w-10 h-10 rounded-full flex items-center justify-center shadow-lg border border-[#DDDCD4] bg-white/95 text-[#142820] hover:border-[#0E513B] transition-transform active:scale-90"
           title="Thu nhỏ bản đồ"
         >
           <Minus className="w-4 h-4" />
@@ -702,12 +700,11 @@ export default function DomNhoMapCanvas({
           onClick={() =>
             setMapLayerMode((m) => (m === 'roadmap' ? 'hybrid' : 'roadmap'))
           }
-          className="w-9 h-9 rounded-full flex items-center justify-center shadow-md backdrop-blur-xl transition-transform active:scale-90"
-          style={{
-            backgroundColor:
-              mapLayerMode === 'hybrid' ? '#E07A5F' : theme.frostedBg,
-            color: mapLayerMode === 'hybrid' ? '#FFFFFF' : theme.textHex,
-          }}
+          className={`w-10 h-10 rounded-full flex items-center justify-center shadow-lg border transition-transform active:scale-90 ${
+            mapLayerMode === 'hybrid'
+              ? 'bg-[#0E513B] text-white border-[#0E513B]'
+              : 'bg-white/95 text-[#142820] border-[#DDDCD4]'
+          }`}
           title="Chuyển đổi Bản đồ Đường phố / Vệ tinh"
         >
           <Layers className="w-4 h-4" />
@@ -716,24 +713,10 @@ export default function DomNhoMapCanvas({
         <button
           type="button"
           onClick={handleCenterOnUser}
-          className="w-9 h-9 rounded-full flex items-center justify-center shadow-md backdrop-blur-xl transition-transform active:scale-90"
-          style={{ backgroundColor: theme.frostedBg, color: '#2A9D8F' }}
+          className="w-10 h-10 rounded-full flex items-center justify-center shadow-lg border border-[#DDDCD4] bg-white/95 text-[#0E513B] hover:border-[#0E513B] transition-transform active:scale-90"
           title="Định vị GPS của bạn"
         >
           <LocateFixed className="w-4 h-4" />
-        </button>
-
-        <button
-          type="button"
-          onClick={() => onStepPatrolWalk()}
-          className="w-9 h-9 rounded-full flex items-center justify-center shadow-md backdrop-blur-xl transition-transform active:scale-90"
-          style={{
-            backgroundColor: patrolModeActive ? '#2A9D8F' : theme.frostedBg,
-            color: patrolModeActive ? '#FFFFFF' : theme.textHex,
-          }}
-          title="Đi dạo tuần tra quanh 500m"
-        >
-          <Footprints className="w-4 h-4" />
         </button>
       </div>
     </div>

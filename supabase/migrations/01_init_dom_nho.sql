@@ -515,6 +515,7 @@ ALTER TABLE public.private_contacts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.contact_unlock_requests ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.spot_sightings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.memory_snaps ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.vet_stations ENABLE ROW LEVEL SECURITY;
 
 -- Chính sách đọc đốm sáng công khai (ẩn bài PRIVATE_COUPLE của người khác)
 DROP POLICY IF EXISTS "Public can view public active spots" ON public.dom_nho_posts;
@@ -526,6 +527,49 @@ CREATE POLICY "Public can view public active spots"
         AND status IN ('ACTIVE', 'MATCHED', 'RESOLVED')
     );
 
+-- Cho phép đăng bài viết mới
+DROP POLICY IF EXISTS "Public can insert spots" ON public.dom_nho_posts;
+CREATE POLICY "Public can insert spots"
+    ON public.dom_nho_posts
+    FOR INSERT
+    WITH CHECK (true);
+
+-- Cho phép cập nhật điểm truyền lửa (boost_count, light_power)
+DROP POLICY IF EXISTS "Public can update spot light power" ON public.dom_nho_posts;
+CREATE POLICY "Public can update spot light power"
+    ON public.dom_nho_posts
+    FOR UPDATE
+    USING (true);
+
+-- Chính sách bảng trạm thú y: Ai cũng có thể xem
+DROP POLICY IF EXISTS "Anyone can view vet stations" ON public.vet_stations;
+CREATE POLICY "Anyone can view vet stations"
+    ON public.vet_stations
+    FOR SELECT
+    USING (true);
+
+DROP POLICY IF EXISTS "Allow insert vet stations" ON public.vet_stations;
+CREATE POLICY "Allow insert vet stations"
+    ON public.vet_stations
+    FOR INSERT
+    WITH CHECK (true);
+
+-- Chính sách hồ sơ người dùng
+DROP POLICY IF EXISTS "Public can read and write profiles" ON public.profiles;
+CREATE POLICY "Public can read and write profiles"
+    ON public.profiles
+    FOR ALL
+    USING (true)
+    WITH CHECK (true);
+
+-- Chính sách phòng cặp đôi
+DROP POLICY IF EXISTS "Public can read and write couple rooms" ON public.couple_rooms;
+CREATE POLICY "Public can read and write couple rooms"
+    ON public.couple_rooms
+    FOR ALL
+    USING (true)
+    WITH CHECK (true);
+
 -- Chính sách bảo vệ bảng private_contacts: Chỉ chủ bài đăng mới đọc được raw_phone trực tiếp
 DROP POLICY IF EXISTS "Only owner can read private raw contact" ON public.private_contacts;
 CREATE POLICY "Only owner can read private raw contact"
@@ -533,16 +577,26 @@ CREATE POLICY "Only owner can read private raw contact"
     FOR SELECT
     USING (auth.uid() = owner_id);
 
+-- Cho phép xem và gửi yêu cầu mở khóa liên hệ
+DROP POLICY IF EXISTS "Anyone can view and insert unlock requests" ON public.contact_unlock_requests;
+CREATE POLICY "Anyone can view and insert unlock requests"
+    ON public.contact_unlock_requests
+    FOR ALL
+    USING (true)
+    WITH CHECK (true);
+
 -- Cho phép xem các dấu vết bắt gặp (Sightings) và Kỷ niệm công khai
 DROP POLICY IF EXISTS "Anyone can view sightings" ON public.spot_sightings;
 CREATE POLICY "Anyone can view sightings"
     ON public.spot_sightings
-    FOR SELECT
-    USING (true);
+    FOR ALL
+    USING (true)
+    WITH CHECK (true);
 
 DROP POLICY IF EXISTS "Anyone can view public memory snaps" ON public.memory_snaps;
 CREATE POLICY "Anyone can view public memory snaps"
     ON public.memory_snaps
-    FOR SELECT
-    USING (true);
+    FOR ALL
+    USING (true)
+    WITH CHECK (true);
 
