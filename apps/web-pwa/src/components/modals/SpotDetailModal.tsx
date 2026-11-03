@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   BookmarkPlus,
@@ -76,6 +76,7 @@ export default function SpotDetailModal({
   const theme = DOM_THEMES[themeId];
   const [imageIndex, setImageIndex] = useState(0);
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
+  const [failedImages, setFailedImages] = useState<Record<number, boolean>>({});
   const [activeSubPanel, setActiveSubPanel] = useState<
     | 'NONE'
     | 'REPORT_SIGHTING'
@@ -83,6 +84,13 @@ export default function SpotDetailModal({
     | 'QR_POSTER'
     | 'GOOGLE_MAP_EMBED'
   >('NONE');
+
+  useEffect(() => {
+    setImageIndex(0);
+    setIsLightboxOpen(false);
+    setFailedImages({});
+    setActiveSubPanel('NONE');
+  }, [spot?.id]);
 
   const [sightingNote, setSightingNote] = useState('');
   const [sightingEmotion] = useState('Vừa bắt gặp • Khỏe mạnh');
@@ -243,19 +251,26 @@ export default function SpotDetailModal({
         >
           <div
             onClick={() => setIsLightboxOpen(true)}
-            className="relative w-full h-48 sm:h-60 bg-black/10 shrink-0 overflow-hidden cursor-pointer group"
+            className="relative w-full h-56 sm:h-64 bg-[#F1EFE8] shrink-0 overflow-hidden cursor-zoom-in group"
           >
             <img
-              src={spot.images[imageIndex] || spot.images[0]}
+              src={
+                failedImages[imageIndex]
+                  ? 'https://images.unsplash.com/photo-1543852786-1cf6624b9987?auto=format&fit=crop&w=800&q=80'
+                  : spot.images[imageIndex] || spot.images[0]
+              }
               alt={spot.title}
               referrerPolicy="no-referrer"
-              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+              onError={() =>
+                setFailedImages((prev) => ({ ...prev, [imageIndex]: true }))
+              }
+              className="w-full h-full object-cover"
             />
             <div
-              className="absolute inset-0"
+              className="absolute inset-0 pointer-events-none"
               style={{
                 background:
-                  'linear-gradient(180deg, rgba(0,0,0,0.45) 0%, transparent 42%, rgba(0,0,0,0.75) 100%)',
+                  'linear-gradient(180deg, rgba(0,0,0,0.4) 0%, transparent 40%, rgba(0,0,0,0.7) 100%)',
               }}
             />
 
@@ -265,7 +280,7 @@ export default function SpotDetailModal({
                 e.stopPropagation();
                 onClose();
               }}
-              className="absolute top-3.5 right-3.5 w-9 h-9 rounded-full bg-black/50 text-white backdrop-blur-md flex items-center justify-center transition-transform active:scale-90"
+              className="absolute top-3.5 right-3.5 w-9 h-9 rounded-full bg-black/60 text-white flex items-center justify-center hover:bg-black/80 transition-colors"
               aria-label="Đóng"
             >
               <X className="w-4 h-4" />
@@ -277,55 +292,50 @@ export default function SpotDetailModal({
                 e.stopPropagation();
                 setIsLightboxOpen(true);
               }}
-              className="absolute top-3.5 right-14 h-9 px-3 rounded-full bg-black/50 text-white backdrop-blur-md flex items-center gap-1.5 text-xs font-semibold hover:bg-black/70 transition-colors"
+              className="absolute top-3.5 right-14 h-9 px-3 rounded-full bg-black/60 text-white flex items-center gap-1.5 text-xs font-semibold hover:bg-black/80 transition-colors"
               title="Phóng to ảnh để xem rõ hơn"
             >
               <ZoomIn className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Xem rõ ảnh</span>
+              <span>Xem ảnh rõ</span>
             </button>
 
-            <div className="absolute top-3.5 left-3.5 flex items-center gap-1.5 flex-wrap pr-12">
+            <div className="absolute top-3.5 left-3.5 flex items-center gap-1.5 flex-wrap pr-28 pointer-events-none">
               {isUserPost ? (
-                <span className="px-3 py-1 rounded-full text-[11px] font-bold bg-[#2A9D8F] text-white shadow-sm">
+                <span className="px-2.5 py-1 rounded-md text-[11px] font-bold bg-[#0E513B] text-white">
                   Tự đăng trên Web
                 </span>
               ) : (
-                <span className="px-3 py-1 rounded-full text-[11px] font-bold bg-black/75 text-white backdrop-blur-md flex items-center gap-1">
-                  <span className="opacity-90">{platformBadge.shortLabel}</span>
-                  <span className="opacity-60">•</span>
+                <span className="px-2.5 py-1 rounded-md text-[11px] font-bold bg-black/70 text-white flex items-center gap-1">
+                  <span>{platformBadge.shortLabel}</span>
+                  <span>•</span>
                   <span>{sourceName}</span>
                 </span>
               )}
-
-              <span
-                className="px-3 py-1 rounded-full text-[11px] font-bold text-white shadow-sm"
-                style={{
-                  backgroundColor: isRescueCenter ? '#0F766E' : dotHex,
-                }}
-              >
-                {isRescueCenter ? categoryLabel : meta.shortName}
-              </span>
             </div>
 
             {spot.images.length > 1 && (
               <>
                 <button
                   type="button"
-                  onClick={() =>
+                  onClick={(e) => {
+                    e.stopPropagation();
                     setImageIndex(
                       (i) => (i - 1 + spot.images.length) % spot.images.length
-                    )
-                  }
-                  className="absolute left-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/40 text-white flex items-center justify-center"
+                    );
+                  }}
+                  className="absolute left-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-black/60 hover:bg-black/80 text-white flex items-center justify-center"
+                  aria-label="Ảnh trước"
                 >
                   <ChevronLeft className="w-4 h-4" />
                 </button>
                 <button
                   type="button"
-                  onClick={() =>
-                    setImageIndex((i) => (i + 1) % spot.images.length)
-                  }
-                  className="absolute right-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/40 text-white flex items-center justify-center"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setImageIndex((i) => (i + 1) % spot.images.length);
+                  }}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-black/60 hover:bg-black/80 text-white flex items-center justify-center"
+                  aria-label="Ảnh tiếp theo"
                 >
                   <ChevronRight className="w-4 h-4" />
                 </button>
@@ -333,20 +343,20 @@ export default function SpotDetailModal({
             )}
 
             <div className="absolute bottom-3 inset-x-4 flex items-center justify-between gap-2 text-white">
-              <div className="flex items-center gap-2 truncate">
+              <div className="flex items-center gap-2 truncate pointer-events-none">
                 {distanceMeters !== null ? (
-                  <span className="px-3 py-1 rounded-full text-xs font-black bg-[#D2673B] text-white shadow-md flex items-center gap-1 ring-1 ring-white/30">
-                    <MapPin className="w-3.5 h-3.5 fill-current" />
+                  <span className="px-2.5 py-1 rounded-md text-xs font-bold bg-black/70 text-white flex items-center gap-1">
+                    <MapPin className="w-3.5 h-3.5" />
                     <span>Cách bạn {formatDistanceVi(distanceMeters)}</span>
                   </span>
                 ) : (
-                  <span className="px-2.5 py-1 rounded-full text-[11px] font-bold bg-[#133E35] text-white shadow-sm flex items-center gap-1">
+                  <span className="px-2.5 py-1 rounded-md text-[11px] font-bold bg-black/70 text-white flex items-center gap-1">
                     <MapPin className="w-3 h-3" />
                     <span>{spot.areaLabel}</span>
                   </span>
                 )}
                 {publishedLabel && (
-                  <span className="text-xs font-semibold opacity-90 truncate hidden sm:inline">
+                  <span className="text-xs font-medium opacity-90 truncate hidden sm:inline">
                     {publishedLabel}
                   </span>
                 )}
@@ -354,11 +364,14 @@ export default function SpotDetailModal({
 
               <button
                 type="button"
-                onClick={() => onBoostLight(spot.id)}
-                className="px-3 py-1 rounded-full text-xs font-bold bg-[#E07A5F] text-white shadow flex items-center gap-1 active:scale-95 transition-transform shrink-0"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onBoostLight(spot.id);
+                }}
+                className="px-3 py-1 rounded-md text-xs font-bold bg-[#AF421F] text-white flex items-center gap-1 active:scale-95 transition-transform shrink-0"
               >
                 <Flame className="w-3.5 h-3.5 fill-current" />
-                Truyền Lửa • {spot.lightPower}%
+                <span>Quan tâm ({spot.boostCount || 1})</span>
               </button>
             </div>
           </div>
@@ -370,15 +383,22 @@ export default function SpotDetailModal({
                   key={`${img}-${idx}`}
                   type="button"
                   onClick={() => setImageIndex(idx)}
-                  className={`relative w-14 h-14 rounded-xl overflow-hidden shrink-0 border-2 transition-all ${
+                  className={`relative w-14 h-14 rounded-lg overflow-hidden shrink-0 border-2 transition-all ${
                     idx === imageIndex
-                      ? 'border-[#0E513B] shadow-sm scale-105'
+                      ? 'border-[#0E513B]'
                       : 'border-[#DDDCD4] opacity-70 hover:opacity-100'
                   }`}
                 >
                   <img
-                    src={img}
+                    src={
+                      failedImages[idx]
+                        ? 'https://images.unsplash.com/photo-1543852786-1cf6624b9987?auto=format&fit=crop&w=800&q=80'
+                        : img
+                    }
                     alt={`Ảnh ${idx + 1}`}
+                    onError={() =>
+                      setFailedImages((prev) => ({ ...prev, [idx]: true }))
+                    }
                     className="w-full h-full object-cover"
                   />
                 </button>
@@ -386,10 +406,10 @@ export default function SpotDetailModal({
               <button
                 type="button"
                 onClick={() => setIsLightboxOpen(true)}
-                className="h-14 px-3 rounded-xl border border-dashed border-[#DDDCD4] hover:border-[#0E513B] text-[#52605A] hover:text-[#0E513B] flex flex-col items-center justify-center text-[10px] font-bold shrink-0 transition-colors bg-white"
+                className="h-14 px-3 rounded-lg border border-[#DDDCD4] hover:border-[#0E513B] text-[#142820] flex flex-col items-center justify-center text-[10px] font-bold shrink-0 transition-colors bg-white"
               >
                 <Maximize2 className="w-3.5 h-3.5 mb-0.5" />
-                <span>Xem rõ</span>
+                <span>Phóng to</span>
               </button>
             </div>
           )}
@@ -876,15 +896,16 @@ export default function SpotDetailModal({
             )}
           </div>
         </motion.div>
-
-        <ImageLightboxModal
-          images={spot.images}
-          initialIndex={imageIndex}
-          isOpen={isLightboxOpen}
-          onClose={() => setIsLightboxOpen(false)}
-          title={spot.title}
-        />
       </motion.div>
+
+      <ImageLightboxModal
+        key="spot-detail-lightbox"
+        images={spot.images}
+        initialIndex={imageIndex}
+        isOpen={isLightboxOpen}
+        onClose={() => setIsLightboxOpen(false)}
+        title={spot.title}
+      />
     </AnimatePresence>
   );
 }

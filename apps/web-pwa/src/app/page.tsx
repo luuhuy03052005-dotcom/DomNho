@@ -7,8 +7,8 @@ import DomNhoHeader from '@/components/navigation/DomNhoHeader';
 import MobileBottomNav from '@/components/navigation/MobileBottomNav';
 import ExploreView from '@/components/explore/ExploreView';
 import FullMapView from '@/components/map/FullMapView';
+import StoryPageView from '@/components/story/StoryPageView';
 import SpotDetailModal from '@/components/modals/SpotDetailModal';
-import StoryDetailModal from '@/components/modals/StoryDetailModal';
 import LocationPickerModal from '@/components/modals/LocationPickerModal';
 import FilterModal from '@/components/modals/FilterModal';
 import CameraQuickModal from '@/components/camera-modal/CameraQuickModal';
@@ -57,10 +57,11 @@ import {
   filterTrustedSpots,
   isSpotPinAllowedOnMap,
 } from '@/lib/spot-validation';
+import { rankSpotsByVisualSimilarity } from '@/lib/visual-matcher';
 
-const REAL_SPOTS_STORAGE_KEY = 'dom_nho_real_verified_spots_v8';
-const SAVED_GMAPS_STORAGE_KEY = 'dom_nho_saved_gmaps_places_v8';
-const MEMORY_STORAGE_KEY = 'dom_nho_real_memories_v8';
+const REAL_SPOTS_STORAGE_KEY = 'dom_nho_real_verified_spots_v9';
+const SAVED_GMAPS_STORAGE_KEY = 'dom_nho_saved_gmaps_places_v9';
+const MEMORY_STORAGE_KEY = 'dom_nho_real_memories_v9';
 const SAVED_SPOT_IDS_KEY = 'dom_nho_saved_spot_ids_v1';
 
 const LEGACY_STORAGE_KEYS = [
@@ -81,6 +82,9 @@ const LEGACY_STORAGE_KEYS = [
   'dom_nho_real_verified_spots_v7',
   'dom_nho_saved_gmaps_places_v7',
   'dom_nho_real_memories_v7',
+  'dom_nho_real_verified_spots_v8',
+  'dom_nho_saved_gmaps_places_v8',
+  'dom_nho_real_memories_v8',
 ];
 
 export default function DomNhoHomePage() {
@@ -104,7 +108,6 @@ export default function DomNhoHomePage() {
   const [patrolModeActive, setPatrolModeActive] = useState<boolean>(true);
   const [selectedSpot, setSelectedSpot] = useState<DomSpot | null>(null);
 
-  const [isStoryModalOpen, setIsStoryModalOpen] = useState<boolean>(false);
   const [isLocationPickerOpen, setIsLocationPickerOpen] = useState<boolean>(false);
   const [isFilterModalOpen, setIsFilterModalOpen] = useState<boolean>(false);
   const [isCameraModalOpen, setIsCameraModalOpen] = useState<boolean>(false);
@@ -455,7 +458,38 @@ export default function DomNhoHomePage() {
         updateSpotsAndPersist((prev) => [newSpot, ...prev]);
         setIsCameraModalOpen(false);
 
-        if (exactLoc && coordsToUse.publicLat > 0) {
+        const visualMatches = rankSpotsByVisualSimilarity(
+          {
+            species: newSpot.species,
+            breed: newSpot.breed,
+            coatColor: newSpot.coatColor,
+            primaryColors: [newSpot.coatColor],
+            coatPattern: '',
+            traits: newSpot.traits,
+            suggestedTitle: newSpot.title,
+          },
+          spots,
+          coordsToUse.publicLat > 0
+            ? { lat: coordsToUse.publicLat, lng: coordsToUse.publicLng }
+            : { lat: coords.lat, lng: coords.lng },
+          newSpot.id
+        ).filter((m) => m.matchPercent >= 62);
+
+        if (visualMatches.length > 0) {
+          const alertMatches: SpotMatchResult[] = visualMatches
+            .slice(0, 4)
+            .map((m) => ({
+              matchedSpot: m.spot,
+              distanceMeters: m.distanceMeters || 0,
+              similarityScore: m.matchPercent / 100,
+              commonTraits: m.matchReasons,
+            }));
+          setDoubleMatches(alertMatches);
+          triggerWebPushAlert(
+            'Phát hiện bài viết trùng khớp!',
+            `Có ${alertMatches.length} bài viết có hình ảnh & đặc điểm rất giống bé bạn vừa đăng.`
+          );
+        } else if (exactLoc && coordsToUse.publicLat > 0) {
           const matched = findDoubleMatchesWithin3Km(newSpot, spots);
           if (matched.length > 0) {
             setDoubleMatches(matched);
@@ -689,10 +723,6 @@ export default function DomNhoHomePage() {
   }, [spots, originFilter, regionFilter, userSession]);
 
   const handleTabChange = (nextTab: MainTab) => {
-    if (nextTab === 'stories') {
-      setIsStoryModalOpen(true);
-      return;
-    }
     if (nextTab === 'profile') {
       setIsProfileModalOpen(true);
       return;
@@ -728,6 +758,11 @@ export default function DomNhoHomePage() {
             onOpenCreatePost={() => setIsCameraModalOpen(true)}
             vetStations={vetStations}
           />
+        ) : mainTab === 'stories' ? (
+          <StoryPageView
+            onBackToExplore={() => setMainTab('explore')}
+            onOpenMap={() => setMainTab('map')}
+          />
         ) : (
           <ExploreView
             spots={visibleSpots}
@@ -735,7 +770,7 @@ export default function DomNhoHomePage() {
             locationLabel={coords.label}
             onOpenLocationPicker={() => setIsLocationPickerOpen(true)}
             onOpenFullMap={() => setMainTab('map')}
-            onOpenStory={() => setIsStoryModalOpen(true)}
+            onOpenStory={() => setMainTab('stories')}
             onOpenFilterModal={() => setIsFilterModalOpen(true)}
             onSelectDetail={(spot) => setSelectedSpot(spot)}
             savedSpotIds={savedSpotIds}
@@ -780,11 +815,6 @@ export default function DomNhoHomePage() {
           </motion.div>
         )}
       </AnimatePresence>
-
-      <StoryDetailModal
-        isOpen={isStoryModalOpen}
-        onClose={() => setIsStoryModalOpen(false)}
-      />
 
       <LocationPickerModal
         isOpen={isLocationPickerOpen}
@@ -843,6 +873,11 @@ export default function DomNhoHomePage() {
         isOpen={isCameraModalOpen}
         themeId="morning_sun"
         userCoords={coords}
+        existingSpots={spots}
+        onSelectMatchedSpot={(spot) => {
+          setIsCameraModalOpen(false);
+          setSelectedSpot(spot);
+        }}
         onClose={() => setIsCameraModalOpen(false)}
         onCreateSpot={handleCreateNewSpot}
       />

@@ -1,11 +1,12 @@
 'use client';
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Camera,
   Check,
   CheckCircle2,
+  ExternalLink,
   Heart,
   ImagePlus,
   LifeBuoy,
@@ -13,19 +14,27 @@ import {
   Plus,
   Search,
   Sparkles,
-  Trash2,
   Upload,
-  Wand2,
   X,
 } from 'lucide-react';
-import { SpotType, ThemeId } from '@/lib/types';
+import { DomSpot, SpotType, ThemeId } from '@/lib/types';
 import { compressImageToWebpClient } from '@/lib/image-compressor';
+import {
+  rankSpotsByVisualSimilarity,
+  VisualAnalysisResult,
+  VisualMatchItem,
+} from '@/lib/visual-matcher';
 import LocationMapPickerModal from '@/components/modals/LocationMapPickerModal';
+
+const FALLBACK_PET_IMAGE =
+  'https://images.unsplash.com/photo-1543852786-1cf6624b9987?auto=format&fit=crop&w=400&q=80';
 
 interface CameraQuickModalProps {
   isOpen: boolean;
   themeId: ThemeId;
   userCoords: { lat: number; lng: number; label: string; isRealGps?: boolean };
+  existingSpots?: DomSpot[];
+  onSelectMatchedSpot?: (spot: DomSpot) => void;
   onClose: () => void;
   onCreateSpot: (payload: {
     spotType: SpotType;
@@ -61,6 +70,8 @@ const QUICK_TRAITS = [
 export default function CameraQuickModal({
   isOpen,
   userCoords,
+  existingSpots = [],
+  onSelectMatchedSpot,
   onClose,
   onCreateSpot,
 }: CameraQuickModalProps) {
@@ -83,9 +94,14 @@ export default function CameraQuickModal({
   const [compressedKB, setCompressedKB] = useState<number>(0);
   const [aiAnalyzing, setAiAnalyzing] = useState(false);
   const [aiStatusText, setAiStatusText] = useState<string>('');
+  const [lastAiAnalysis, setLastAiAnalysis] =
+    useState<VisualAnalysisResult | null>(null);
 
   const [customAddress, setCustomAddress] = useState<string>('');
-  const [pinnedCoords, setPinnedCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const [pinnedCoords, setPinnedCoords] = useState<{
+    lat: number;
+    lng: number;
+  } | null>(null);
   const [hasExactLocation, setHasExactLocation] = useState<boolean>(true);
   const [isMapPickerOpen, setIsMapPickerOpen] = useState<boolean>(false);
 
@@ -94,7 +110,10 @@ export default function CameraQuickModal({
     let stream: MediaStream | null = null;
 
     async function startCamera() {
-      if (typeof navigator === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
+      if (
+        typeof navigator === 'undefined' ||
+        !navigator.mediaDevices?.getUserMedia
+      ) {
         return;
       }
       try {
@@ -119,6 +138,44 @@ export default function CameraQuickModal({
       setCameraActive(false);
     };
   }, [isOpen]);
+
+  const suggestedMatches: VisualMatchItem[] = useMemo(() => {
+    if (images.length === 0 || existingSpots.length === 0) return [];
+    const effectiveAnalysis: VisualAnalysisResult = {
+      species: lastAiAnalysis?.species || species,
+      breed: breed || lastAiAnalysis?.breed || '',
+      coatColor: coatColor || lastAiAnalysis?.coatColor || '',
+      primaryColors: lastAiAnalysis?.primaryColors || [coatColor],
+      coatPattern: lastAiAnalysis?.coatPattern || '',
+      traits:
+        selectedTraits.length > 0
+          ? selectedTraits
+          : lastAiAnalysis?.traits || [],
+      suggestedTitle: title || lastAiAnalysis?.suggestedTitle || '',
+      visualMatches: lastAiAnalysis?.visualMatches,
+    };
+    const effectiveCoords = pinnedCoords || {
+      lat: userCoords.lat,
+      lng: userCoords.lng,
+    };
+    return rankSpotsByVisualSimilarity(
+      effectiveAnalysis,
+      existingSpots,
+      effectiveCoords
+    ).slice(0, 4);
+  }, [
+    images.length,
+    existingSpots,
+    lastAiAnalysis,
+    species,
+    breed,
+    coatColor,
+    selectedTraits,
+    title,
+    pinnedCoords,
+    userCoords.lat,
+    userCoords.lng,
+  ]);
 
   if (!isOpen) return null;
 
@@ -171,7 +228,13 @@ export default function CameraQuickModal({
   };
 
   const removeImage = (indexToRemove: number) => {
-    setImages((prev) => prev.filter((_, idx) => idx !== indexToRemove));
+    setImages((prev) => {
+      const next = prev.filter((_, idx) => idx !== indexToRemove);
+      if (next.length === 0) {
+        setLastAiAnalysis(null);
+      }
+      return next;
+    });
   };
 
   const analyzeWithAi = async (dataUrlToAnalyze?: string) => {
@@ -181,16 +244,26 @@ export default function CameraQuickModal({
       return;
     }
     setAiAnalyzing(true);
-    setAiStatusText('Đang nhận diện đặc điểm của bé từ ảnh...');
+    setAiStatusText(
+      'Đang phân tích hình ảnh và kiểm tra các bài viết trùng khớp...'
+    );
     try {
       const res = await fetch('/api/analyze-image', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ imageDataUrl: targetImg }),
+        body: JSON.stringify({
+          imageDataUrl: targetImg,
+          candidateSpots: existingSpots,
+          userCoords: pinnedCoords || {
+            lat: userCoords.lat,
+            lng: userCoords.lng,
+          },
+        }),
       });
       const data = await res.json();
       if (data.ok && data.analysis) {
-        const a = data.analysis;
+        const a: VisualAnalysisResult = data.analysis;
+        setLastAiAnalysis(a);
         if (a.species === 'dog' || a.species === 'cat') setSpecies(a.species);
         if (a.breed) setBreed(a.breed);
         if (a.coatColor) setCoatColor(a.coatColor);
@@ -200,11 +273,18 @@ export default function CameraQuickModal({
         if (a.suggestedTitle && !title) {
           setTitle(a.suggestedTitle);
         }
+        const matchCount = Array.isArray(data.matches)
+          ? data.matches.length
+          : 0;
         setAiStatusText(
-          `✓ Đã nhận diện: ${a.breed || ''} (${a.coatColor || ''})`
+          matchCount > 0
+            ? `✓ Nhận diện: ${a.breed || ''} (${a.coatColor || ''}) — Phát hiện ${matchCount} bài viết có đặc điểm trùng khớp cao.`
+            : `✓ Đã nhận diện: ${a.breed || ''} (${a.coatColor || ''})`
         );
       } else {
-        setAiStatusText('Đã tải ảnh thành công. Bạn có thể chọn đặc điểm bên dưới.');
+        setAiStatusText(
+          'Đã tải ảnh thành công. Bạn có thể chọn đặc điểm bên dưới.'
+        );
       }
     } catch {
       setAiStatusText('Đã lưu ảnh thành công.');
@@ -276,7 +356,7 @@ export default function CameraQuickModal({
                 Đăng tin cần cứu hộ, tìm lạc hoặc nhận nuôi
               </h3>
               <p className="text-xs text-[#52605A] mt-0.5">
-                Chia sẻ hình ảnh và vị trí để cộng đồng chung tay giúp bé
+                Tự động phân tích ảnh và đối chiếu bài viết trùng khớp
               </p>
             </div>
             <button
@@ -360,7 +440,9 @@ export default function CameraQuickModal({
                       className="h-10 px-3.5 rounded-[10px] bg-[#E8EFE6] text-[#0E513B] text-xs font-bold hover:bg-[#DDDCD4] flex items-center gap-1.5 transition-colors disabled:opacity-50"
                     >
                       <Sparkles className="w-3.5 h-3.5" />
-                      <span>{aiAnalyzing ? 'Đang nhận diện...' : 'Nhận diện lại'}</span>
+                      <span>
+                        {aiAnalyzing ? 'Đang đối chiếu...' : 'Quét trùng khớp lại'}
+                      </span>
                     </button>
                   </div>
                 </div>
@@ -394,7 +476,7 @@ export default function CameraQuickModal({
                           Tải lên hoặc chụp nhiều ảnh của bé
                         </p>
                         <p className="text-[11px] text-[#52605A] mt-0.5">
-                          Hỗ trợ định dạng JPG, PNG, WEBP (tự động nén dung lượng nhẹ)
+                          Hệ thống sẽ tự động phân tích ảnh để gợi ý các bài viết có hình ảnh tương đồng
                         </p>
                       </div>
                       <button
@@ -420,9 +502,71 @@ export default function CameraQuickModal({
               />
 
               {aiStatusText && (
-                <p className="text-xs font-medium text-[#0E513B] mt-1.5 flex items-center gap-1.5 bg-[#E8EFE6]/60 p-2 rounded-[8px]">
+                <p className="text-xs font-medium text-[#0E513B] mt-2 flex items-center gap-1.5 bg-[#E8EFE6]/60 p-2.5 rounded-[10px]">
                   <span>{aiStatusText}</span>
                 </p>
+              )}
+
+              {images.length > 0 && suggestedMatches.length > 0 && (
+                <div className="mt-3 p-3.5 rounded-xl bg-[#FAF7F1] border border-[#DDDCD4] space-y-2.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-xs font-bold text-[#142820]">
+                      Đề xuất bài viết có ảnh & đặc điểm trùng khớp ({suggestedMatches.length})
+                    </p>
+                    <span className="text-[11px] text-[#52605A]">
+                      Kiểm tra trước khi đăng
+                    </span>
+                  </div>
+
+                  <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                    {suggestedMatches.map((m) => (
+                      <div
+                        key={m.spot.id}
+                        className="p-2.5 rounded-[10px] bg-white border border-[#DDDCD4] flex items-center gap-3 hover:border-[#0E513B]/50 transition-colors"
+                      >
+                        <img
+                          src={m.spot.images?.[0] || FALLBACK_PET_IMAGE}
+                          alt={m.spot.title}
+                          onError={(e) => {
+                            const target = e.currentTarget;
+                            if (target.src !== FALLBACK_PET_IMAGE) {
+                              target.src = FALLBACK_PET_IMAGE;
+                            }
+                          }}
+                          className="w-14 h-14 rounded-lg object-cover border border-[#DDDCD4] shrink-0 bg-[#F1EFE8]"
+                        />
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-1.5 mb-0.5">
+                            <span className="px-1.5 py-0.5 rounded bg-[#0E513B] text-white text-[10px] font-bold">
+                              Trùng khớp {m.matchPercent}%
+                            </span>
+                            <span className="text-[10px] text-[#52605A] truncate">
+                              {m.spot.areaLabel}
+                            </span>
+                          </div>
+                          <p className="text-xs font-bold text-[#142820] line-clamp-1">
+                            {m.spot.title}
+                          </p>
+                          {m.matchReasons.length > 0 && (
+                            <p className="text-[11px] text-[#0E513B] line-clamp-1 mt-0.5">
+                              {m.matchReasons.join(' • ')}
+                            </p>
+                          )}
+                        </div>
+                        {onSelectMatchedSpot && (
+                          <button
+                            type="button"
+                            onClick={() => onSelectMatchedSpot(m.spot)}
+                            className="h-8 px-2.5 rounded-lg bg-[#E8EFE6] hover:bg-[#0E513B] text-[#0E513B] hover:text-white text-[11px] font-bold shrink-0 inline-flex items-center gap-1 transition-colors"
+                          >
+                            <span>Xem</span>
+                            <ExternalLink className="w-3 h-3" />
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
               )}
             </div>
 
@@ -472,6 +616,64 @@ export default function CameraQuickModal({
               </div>
             </div>
 
+            <div className="grid grid-cols-3 gap-2.5">
+              <div>
+                <span className="text-xs font-bold uppercase tracking-wider text-[#52605A] block mb-1.5">
+                  Loài
+                </span>
+                <div className="grid grid-cols-2 gap-1 bg-[#FAF7F1] p-1 rounded-[10px] border border-[#DDDCD4]">
+                  <button
+                    type="button"
+                    onClick={() => setSpecies('cat')}
+                    className={`h-8 rounded-[7px] text-xs font-bold transition-colors ${
+                      species === 'cat'
+                        ? 'bg-[#0E513B] text-white'
+                        : 'text-[#52605A] hover:text-[#142820]'
+                    }`}
+                  >
+                    Mèo
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSpecies('dog')}
+                    className={`h-8 rounded-[7px] text-xs font-bold transition-colors ${
+                      species === 'dog'
+                        ? 'bg-[#0E513B] text-white'
+                        : 'text-[#52605A] hover:text-[#142820]'
+                    }`}
+                  >
+                    Chó
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <span className="text-xs font-bold uppercase tracking-wider text-[#52605A] block mb-1.5">
+                  Giống
+                </span>
+                <input
+                  type="text"
+                  value={breed}
+                  onChange={(e) => setBreed(e.target.value)}
+                  placeholder="VD: Mèo ta, Poodle..."
+                  className="w-full h-10 px-2.5 rounded-[10px] border border-[#DDDCD4] text-xs font-semibold text-[#142820] focus:outline-none focus:border-[#0E513B]"
+                />
+              </div>
+
+              <div>
+                <span className="text-xs font-bold uppercase tracking-wider text-[#52605A] block mb-1.5">
+                  Màu lông
+                </span>
+                <input
+                  type="text"
+                  value={coatColor}
+                  onChange={(e) => setCoatColor(e.target.value)}
+                  placeholder="VD: Vàng trắng..."
+                  className="w-full h-10 px-2.5 rounded-[10px] border border-[#DDDCD4] text-xs font-semibold text-[#142820] focus:outline-none focus:border-[#0E513B]"
+                />
+              </div>
+            </div>
+
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold uppercase tracking-wider text-[#52605A]">
@@ -509,7 +711,8 @@ export default function CameraQuickModal({
                 <div className="flex items-center gap-1.5 text-[11px] font-medium text-[#0E513B] bg-[#E8EFE6]/70 px-3 py-1.5 rounded-[8px]">
                   <Check className="w-3.5 h-3.5 text-[#0E513B]" />
                   <span>
-                    Đã lưu tọa độ bản đồ: {pinnedCoords.lat.toFixed(5)}, {pinnedCoords.lng.toFixed(5)}
+                    Đã lưu tọa độ bản đồ: {pinnedCoords.lat.toFixed(5)},{' '}
+                    {pinnedCoords.lng.toFixed(5)}
                   </span>
                 </div>
               )}

@@ -25,6 +25,8 @@ const FORBIDDEN_IMAGE_HOSTS = [
   'shutterstock.com',
   'istockphoto.com',
   'gettyimages.com',
+  'thumb_1000.jpg',
+  'videodt3601',
 ];
 
 export function isForbiddenImageUrl(url: string | undefined | null): boolean {
@@ -92,7 +94,8 @@ export function isSpotPinAllowedOnMap(spot: DomSpot): boolean {
 export function getSpotRejectionReason(spot: DomSpot, now = Date.now()): string | null {
   if (!spot || typeof spot !== 'object') return 'invalid';
   if (!Array.isArray(spot.images) || spot.images.length === 0) return 'no-image';
-  if (spot.images.some((img) => isForbiddenImageUrl(img))) return 'forbidden-image';
+  const cleanImages = spot.images.filter((img) => !isForbiddenImageUrl(img));
+  if (cleanImages.length === 0) return 'forbidden-image';
 
   if (spot.sourceType === 'USER_POST') return null;
 
@@ -116,8 +119,10 @@ export function filterTrustedSpots(spots: DomSpot[], now = Date.now()): DomSpot[
     .filter((s) => getSpotRejectionReason(s, now) === null)
     .map((s) => {
       const exact = isSpotPinAllowedOnMap(s);
+      const cleanImages = (s.images || []).filter((img) => !isForbiddenImageUrl(img));
       return {
         ...s,
+        images: cleanImages.length > 0 ? cleanImages : s.images,
         hasExactLocation: exact,
       };
     });

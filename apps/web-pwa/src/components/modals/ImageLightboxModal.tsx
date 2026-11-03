@@ -1,17 +1,18 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { createPortal } from 'react-dom';
 import {
   ChevronLeft,
   ChevronRight,
-  Maximize2,
-  Minimize2,
+  RotateCcw,
   X,
   ZoomIn,
   ZoomOut,
-  RotateCcw,
 } from 'lucide-react';
+
+const FALLBACK_PET_IMAGE =
+  'https://images.unsplash.com/photo-1543852786-1cf6624b9987?auto=format&fit=crop&w=1000&q=80';
 
 interface ImageLightboxModalProps {
   images: string[];
@@ -28,195 +29,247 @@ export default function ImageLightboxModal({
   onClose,
   title,
 }: ImageLightboxModalProps) {
+  const safeImages =
+    Array.isArray(images) && images.length > 0
+      ? images.filter(Boolean)
+      : [FALLBACK_PET_IMAGE];
+
+  const [mounted, setMounted] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
   const [zoomLevel, setZoomLevel] = useState(1);
+  const [failedUrls, setFailedUrls] = useState<Record<number, boolean>>({});
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     if (isOpen) {
-      setCurrentIndex(initialIndex);
+      const validIndex =
+        initialIndex >= 0 && initialIndex < safeImages.length
+          ? initialIndex
+          : 0;
+      setCurrentIndex(validIndex);
       setZoomLevel(1);
     }
-  }, [isOpen, initialIndex]);
+  }, [isOpen, initialIndex, safeImages.length]);
 
   useEffect(() => {
     if (!isOpen) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
+        e.stopPropagation();
         onClose();
       } else if (e.key === 'ArrowLeft') {
-        handlePrev();
+        setZoomLevel(1);
+        setCurrentIndex(
+          (prev) => (prev - 1 + safeImages.length) % safeImages.length
+        );
       } else if (e.key === 'ArrowRight') {
-        handleNext();
+        setZoomLevel(1);
+        setCurrentIndex((prev) => (prev + 1) % safeImages.length);
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, images.length]);
+  }, [isOpen, safeImages.length, onClose]);
 
-  if (!isOpen || images.length === 0) return null;
+  if (!isOpen || !mounted || typeof document === 'undefined') return null;
 
-  const handlePrev = () => {
+  const handlePrev = (e: React.MouseEvent) => {
+    e.stopPropagation();
     setZoomLevel(1);
-    setCurrentIndex((prev) => (prev - 1 + images.length) % images.length);
+    setCurrentIndex(
+      (prev) => (prev - 1 + safeImages.length) % safeImages.length
+    );
   };
 
-  const handleNext = () => {
+  const handleNext = (e: React.MouseEvent) => {
+    e.stopPropagation();
     setZoomLevel(1);
-    setCurrentIndex((prev) => (prev + 1) % images.length);
+    setCurrentIndex((prev) => (prev + 1) % safeImages.length);
   };
 
-  const handleZoomIn = () => {
+  const handleZoomIn = (e: React.MouseEvent) => {
+    e.stopPropagation();
     setZoomLevel((prev) => Math.min(prev + 0.5, 3));
   };
 
-  const handleZoomOut = () => {
+  const handleZoomOut = (e: React.MouseEvent) => {
+    e.stopPropagation();
     setZoomLevel((prev) => Math.max(prev - 0.5, 1));
   };
 
-  const handleResetZoom = () => {
+  const handleResetZoom = (e: React.MouseEvent) => {
+    e.stopPropagation();
     setZoomLevel(1);
   };
 
-  const currentImage = images[currentIndex] || images[0];
+  const rawCurrentUrl = safeImages[currentIndex] || safeImages[0];
+  const currentImage = failedUrls[currentIndex]
+    ? FALLBACK_PET_IMAGE
+    : rawCurrentUrl;
 
-  return (
-    <AnimatePresence>
+  const lightboxNode = (
+    <div
+      onClick={(e) => {
+        e.stopPropagation();
+        onClose();
+      }}
+      className="fixed inset-0 z-[120] bg-black/92 backdrop-blur-sm flex flex-col items-center justify-between p-2.5 sm:p-5 select-none"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Xem ảnh phóng to"
+    >
       <div
-        className="fixed inset-0 z-50 bg-black/92 backdrop-blur-md flex flex-col items-center justify-between p-2 sm:p-4 select-none touch-none"
-        role="dialog"
-        aria-modal="true"
-        aria-label="Xem ảnh phóng to"
+        onClick={(e) => e.stopPropagation()}
+        className="w-full max-w-5xl flex items-center justify-between text-white py-2.5 px-3.5 z-20 bg-white/10 backdrop-blur-md border border-white/15 rounded-2xl"
       >
-        <div className="w-full max-w-5xl flex items-center justify-between text-white py-2 px-3 z-10">
-          <div className="flex items-center gap-3 min-w-0">
-            <span className="text-xs sm:text-sm font-bold px-2.5 py-1 rounded-full bg-white/15 backdrop-blur-md">
-              {currentIndex + 1} / {images.length}
-            </span>
-            {title && (
-              <p className="text-xs sm:text-sm font-medium text-white/80 truncate">
-                {title}
-              </p>
-            )}
-          </div>
-
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={handleZoomOut}
-              disabled={zoomLevel <= 1}
-              className="w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 disabled:opacity-40 flex items-center justify-center text-white transition-colors"
-              title="Thu nhỏ"
-              aria-label="Thu nhỏ"
-            >
-              <ZoomOut className="w-4 h-4" />
-            </button>
-            <button
-              type="button"
-              onClick={handleZoomIn}
-              disabled={zoomLevel >= 3}
-              className="w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 disabled:opacity-40 flex items-center justify-center text-white transition-colors"
-              title="Phóng to"
-              aria-label="Phóng to"
-            >
-              <ZoomIn className="w-4 h-4" />
-            </button>
-            {zoomLevel > 1 && (
-              <button
-                type="button"
-                onClick={handleResetZoom}
-                className="w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition-colors"
-                title="Khôi phục kích thước ban đầu"
-                aria-label="Khôi phục kích thước ban đầu"
-              >
-                <RotateCcw className="w-4 h-4" />
-              </button>
-            )}
-            <button
-              type="button"
-              onClick={onClose}
-              className="w-10 h-10 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center text-white transition-transform active:scale-95 ml-2"
-              title="Đóng (Esc)"
-              aria-label="Đóng"
-            >
-              <X className="w-5 h-5" />
-            </button>
-          </div>
-        </div>
-
-        <div className="relative flex-1 w-full max-w-5xl flex items-center justify-center overflow-hidden my-auto">
-          {images.length > 1 && (
-            <>
-              <button
-                type="button"
-                onClick={handlePrev}
-                className="absolute left-2 sm:left-4 z-20 w-11 h-11 rounded-full bg-black/60 hover:bg-black/80 text-white flex items-center justify-center transition-all shadow-lg backdrop-blur-sm active:scale-90"
-                aria-label="Ảnh trước"
-              >
-                <ChevronLeft className="w-6 h-6" />
-              </button>
-              <button
-                type="button"
-                onClick={handleNext}
-                className="absolute right-2 sm:right-4 z-20 w-11 h-11 rounded-full bg-black/60 hover:bg-black/80 text-white flex items-center justify-center transition-all shadow-lg backdrop-blur-sm active:scale-90"
-                aria-label="Ảnh tiếp theo"
-              >
-                <ChevronRight className="w-6 h-6" />
-              </button>
-            </>
+        <div className="flex items-center gap-3 min-w-0">
+          <span className="text-xs sm:text-sm font-bold px-2.5 py-1 rounded-lg bg-white/15 shrink-0">
+            {currentIndex + 1} / {safeImages.length}
+          </span>
+          {title && (
+            <p className="text-xs sm:text-sm font-medium text-white/95 truncate">
+              {title}
+            </p>
           )}
-
-          <div
-            className="w-full h-full flex items-center justify-center p-2 cursor-grab active:cursor-grabbing"
-            onClick={() => {
-              if (zoomLevel === 1) handleZoomIn();
-              else handleResetZoom();
-            }}
-          >
-            <motion.img
-              key={currentImage}
-              src={currentImage}
-              alt={title || `Ảnh ${currentIndex + 1}`}
-              referrerPolicy="no-referrer"
-              initial={{ opacity: 0, scale: 0.96 }}
-              animate={{ opacity: 1, scale: zoomLevel }}
-              transition={{ duration: 0.2 }}
-              className="max-h-[75vh] max-w-full object-contain rounded-xl shadow-2xl transition-transform"
-            />
-          </div>
         </div>
 
-        {images.length > 1 && (
-          <div className="w-full max-w-xl py-3 px-4 z-10">
-            <div className="flex items-center justify-center gap-2 overflow-x-auto no-scrollbar py-1">
-              {images.map((img, idx) => (
-                <button
-                  key={`${img}-${idx}`}
-                  type="button"
-                  onClick={() => {
-                    setZoomLevel(1);
-                    setCurrentIndex(idx);
-                  }}
-                  className={`relative w-14 h-14 sm:w-16 sm:h-16 rounded-xl overflow-hidden shrink-0 border-2 transition-all ${
-                    idx === currentIndex
-                      ? 'border-[#0E513B] ring-2 ring-white/60 scale-105'
-                      : 'border-transparent opacity-60 hover:opacity-100'
-                  }`}
-                >
-                  <img
-                    src={img}
-                    alt={`Thumbnail ${idx + 1}`}
-                    referrerPolicy="no-referrer"
-                    className="w-full h-full object-cover"
-                  />
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
+        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+          <button
+            type="button"
+            onClick={handleZoomOut}
+            disabled={zoomLevel <= 1}
+            className="w-9 h-9 rounded-xl bg-white/15 hover:bg-white/25 disabled:opacity-40 flex items-center justify-center text-white transition-colors"
+            title="Thu nhỏ"
+            aria-label="Thu nhỏ"
+          >
+            <ZoomOut className="w-4 h-4" />
+          </button>
+          <span className="text-xs font-semibold min-w-[42px] text-center">
+            {Math.round(zoomLevel * 100)}%
+          </span>
+          <button
+            type="button"
+            onClick={handleZoomIn}
+            disabled={zoomLevel >= 3}
+            className="w-9 h-9 rounded-xl bg-white/15 hover:bg-white/25 disabled:opacity-40 flex items-center justify-center text-white transition-colors"
+            title="Phóng to"
+            aria-label="Phóng to"
+          >
+            <ZoomIn className="w-4 h-4" />
+          </button>
+          {zoomLevel > 1 && (
+            <button
+              type="button"
+              onClick={handleResetZoom}
+              className="w-9 h-9 rounded-xl bg-white/15 hover:bg-white/25 flex items-center justify-center text-white transition-colors"
+              title="Mặc định"
+              aria-label="Khôi phục kích thước"
+            >
+              <RotateCcw className="w-4 h-4" />
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onClose();
+            }}
+            className="w-9 h-9 rounded-xl bg-white/20 hover:bg-white/35 flex items-center justify-center text-white transition-colors ml-1"
+            title="Đóng (Esc)"
+            aria-label="Đóng"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
       </div>
-    </AnimatePresence>
-  );
-}
 
+      <div className="relative flex-1 w-full max-w-5xl flex items-center justify-center overflow-auto my-2">
+        {safeImages.length > 1 && (
+          <>
+            <button
+              type="button"
+              onClick={handlePrev}
+              className="fixed left-3 sm:left-6 top-1/2 -translate-y-1/2 z-30 w-11 h-11 rounded-full bg-black/75 hover:bg-black text-white border border-white/25 flex items-center justify-center transition-colors shadow-xl"
+              aria-label="Ảnh trước"
+            >
+              <ChevronLeft className="w-6 h-6" />
+            </button>
+            <button
+              type="button"
+              onClick={handleNext}
+              className="fixed right-3 sm:right-6 top-1/2 -translate-y-1/2 z-30 w-11 h-11 rounded-full bg-black/75 hover:bg-black text-white border border-white/25 flex items-center justify-center transition-colors shadow-xl"
+              aria-label="Ảnh tiếp theo"
+            >
+              <ChevronRight className="w-6 h-6" />
+            </button>
+          </>
+        )}
+
+        <div
+          onClick={(e) => {
+            e.stopPropagation();
+            setZoomLevel((prev) => (prev === 1 ? 1.75 : 1));
+          }}
+          className="flex items-center justify-center p-2 cursor-zoom-in"
+        >
+          <img
+            src={currentImage}
+            alt={title || `Ảnh ${currentIndex + 1}`}
+            referrerPolicy="no-referrer"
+            onError={() =>
+              setFailedUrls((prev) => ({ ...prev, [currentIndex]: true }))
+            }
+            style={{
+              transform: `scale(${zoomLevel})`,
+              transformOrigin: 'center center',
+            }}
+            className="max-h-[74dvh] max-w-[92vw] sm:max-w-[82vw] object-contain rounded-xl shadow-2xl transition-transform duration-200"
+          />
+        </div>
+      </div>
+
+      {safeImages.length > 1 && (
+        <div
+          onClick={(e) => e.stopPropagation()}
+          className="w-full max-w-xl py-2 px-3 z-20 bg-white/10 backdrop-blur-md border border-white/15 rounded-2xl"
+        >
+          <div className="flex items-center justify-center gap-2 overflow-x-auto no-scrollbar py-1">
+            {safeImages.map((img, idx) => (
+              <button
+                key={`${img}-${idx}`}
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setZoomLevel(1);
+                  setCurrentIndex(idx);
+                }}
+                className={`relative w-14 h-14 rounded-xl overflow-hidden shrink-0 border-2 transition-all ${
+                  idx === currentIndex
+                    ? 'border-white scale-105 shadow-md'
+                    : 'border-transparent opacity-55 hover:opacity-90'
+                }`}
+              >
+                <img
+                  src={failedUrls[idx] ? FALLBACK_PET_IMAGE : img}
+                  alt={`Ảnh thu nhỏ ${idx + 1}`}
+                  referrerPolicy="no-referrer"
+                  onError={() =>
+                    setFailedUrls((prev) => ({ ...prev, [idx]: true }))
+                  }
+                  className="w-full h-full object-cover"
+                />
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+
+  return createPortal(lightboxNode, document.body);
+}

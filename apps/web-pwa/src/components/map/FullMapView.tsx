@@ -248,6 +248,11 @@ export default function FullMapView({
                   'https://images.unsplash.com/photo-1543466835-00a7907e9de1?auto=format&fit=crop&w=400&q=80'
                 }
                 alt={selectedSpot.title}
+                referrerPolicy="no-referrer"
+                onError={(e) => {
+                  e.currentTarget.src =
+                    'https://images.unsplash.com/photo-1543466835-00a7907e9de1?auto=format&fit=crop&w=400&q=80';
+                }}
                 className="w-full h-full object-cover"
               />
             </div>

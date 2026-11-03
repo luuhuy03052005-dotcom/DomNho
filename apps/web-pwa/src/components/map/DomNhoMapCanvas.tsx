@@ -522,9 +522,10 @@ export default function DomNhoMapCanvas({
               style="background-color: ${dotHex}; box-shadow: 0 3px 10px ${dotHex}66, 0 0 0 2px #FFFDF9;"
             >
               <img
-                src="${escapeHtml(spot.images[0] || '')}"
+                src="${escapeHtml(spot.images[0] || 'https://images.unsplash.com/photo-1543852786-1cf6624b9987?auto=format&fit=crop&w=400&q=80')}"
                 alt="${escapeHtml(spot.breed)}"
                 referrerpolicy="no-referrer"
+                onerror="this.onerror=null;this.src='https://images.unsplash.com/photo-1543852786-1cf6624b9987?auto=format&fit=crop&w=400&q=80';"
                 class="w-full h-full object-cover rounded-full"
               />
               <span

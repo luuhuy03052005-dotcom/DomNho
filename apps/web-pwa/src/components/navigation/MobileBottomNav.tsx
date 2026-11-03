@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Compass, Feather, Heart, Map as MapIcon, User } from 'lucide-react';
+import { BookOpen, Compass, Heart, Map as MapIcon, User } from 'lucide-react';
 import { MainTab } from '@/lib/types';
 
 interface MobileBottomNavProps {
@@ -28,9 +28,8 @@ export default function MobileBottomNav({
     },
     {
       id: 'stories' as MainTab,
-      label: 'Tâm thư',
-      icon: Feather,
-      highlight: true,
+      label: 'Câu chuyện',
+      icon: BookOpen,
     },
     {
       id: 'saved' as MainTab,
@@ -40,17 +39,17 @@ export default function MobileBottomNav({
     },
     {
       id: 'profile' as MainTab,
-      label: 'Cá nhân',
+      label: 'Tài khoản',
       icon: User,
     },
   ];
 
   return (
     <nav
-      className="md:hidden fixed bottom-0 inset-x-0 z-30 bg-[#FFFDF9]/95 backdrop-blur-md border-t border-[#DDDCD4] pb-[env(safe-area-inset-bottom,0px)] shadow-[0_-4px_16px_rgba(20,40,32,0.06)]"
+      className="md:hidden fixed bottom-0 inset-x-0 z-30 bg-white border-t border-[#DDDCD4] pb-[env(safe-area-inset-bottom,0px)]"
       aria-label="Thanh điều hướng dưới"
     >
-      <div className="grid grid-cols-5 h-14 items-center px-1">
+      <div className="grid grid-cols-5 h-14 items-center">
         {navItems.map((item) => {
           const Icon = item.icon;
           const isActive = activeTab === item.id;
@@ -59,26 +58,21 @@ export default function MobileBottomNav({
               key={item.id}
               type="button"
               onClick={() => onChangeTab(item.id)}
-              className={`flex flex-col items-center justify-center h-full min-h-[48px] transition-colors relative ${
+              className={`flex flex-col items-center justify-center h-full transition-colors relative ${
                 isActive
                   ? 'text-[#0E513B] font-bold'
-                  : item.highlight
-                  ? 'text-[#AF421F] font-semibold'
                   : 'text-[#52605A] hover:text-[#142820]'
               }`}
               aria-current={isActive ? 'page' : undefined}
             >
-              {isActive && (
-                <span className="absolute top-0 w-7 h-0.5 rounded-full bg-[#0E513B]" />
-              )}
               <div className="relative">
                 <Icon
                   className={`w-5 h-5 ${
-                    isActive ? 'stroke-[2.5]' : 'stroke-[1.9]'
+                    isActive ? 'stroke-[2.3]' : 'stroke-[1.8]'
                   }`}
                 />
                 {typeof item.badge === 'number' && item.badge > 0 && (
-                  <span className="absolute -top-1.5 -right-2.5 px-1 rounded-full text-[9px] font-bold bg-[#AF421F] text-white min-w-[15px] text-center shadow-sm">
+                  <span className="absolute -top-1 -right-2 px-1 rounded-full text-[9px] font-bold bg-[#AF421F] text-white min-w-[14px] text-center">
                     {item.badge}
                   </span>
                 )}

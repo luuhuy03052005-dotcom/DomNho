@@ -1,5 +1,5 @@
 {
-  "crawledAt": "2026-10-31T07:37:13.575Z",
+  "crawledAt": "2026-11-03T20:19:15.201Z",
   "modelUsed": "gemini-2.5-flash",
   "verifiedArticlesCount": 9,
   "verifiedVetStationsCount": 6,
@@ -23,7 +23,6 @@
         "chế xe lăn"
       ],
       "images": [
-        "https://s1.vnecdn.net/vnexpress/restruct/i/v9963/default/thumb_1000.jpg",
         "https://i1-vnexpress.vnecdn.net/2020/09/18/119666502158373435180593793329-6017-3248-1600435281.jpg?w=500&h=300&q=100&dpr=1&fit=crop&s=vbijhBN0mqa7grpB7dzQaw",
         "https://i1-giaitri.vnecdn.net/2014/06/24/han-1403574545.jpg?w=500&h=300&q=100&dpr=1&fit=crop&s=cK2Pcd727fJDvDC2X_V-yA"
       ],
@@ -129,7 +128,6 @@
       ],
       "images": [
         "https://cdnphoto.dantri.com.vn/Hg7vAiqb1EFam1zFgj0EWHSuM6I=/zoom/1200_630/2026/10/17/123-cropped-1792226023449.jpg",
-        "https://cdnphoto.dantri.com.vn/bjzubeu5JZdJmWrnDq5R9RGzxho=/2026/08/28/videodt3601-1787928329058.png",
         "https://cdnphoto.dantri.com.vn/Lrg249cEYTe4eQvqeNUo9SSRusE=/thumb_w/1020/2026/10/17/123-1792226011172.jpg"
       ],
       "publicLat": 10.795232,

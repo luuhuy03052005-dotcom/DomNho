@@ -1,10 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
 import https from 'node:https';
+import { INITIAL_DOM_SPOTS } from '@/lib/seed-data';
+import { DomSpot } from '@/lib/types';
+import {
+  VisualAnalysisResult,
+  rankSpotsByVisualSimilarity,
+} from '@/lib/visual-matcher';
 
-const GEMINI_KEY = 'AQ.Ab8RN6Ip0zG0UgwbGaZVQXA6LZ1MWT2It5NzlWHFmLDHFK904w';
+const GEMINI_KEY =
+  process.env.GEMINI_API_KEY ||
+  'AQ.Ab8RN6Ip0zG0UgwbGaZVQXA6LZ1MWT2It5NzlWHFmLDHFK904w';
 const GEMINI_MODEL = 'gemini-2.5-flash';
 
-function postJson(urlStr: string, bodyObj: any): Promise<{ status: number; text: string }> {
+function postJson(
+  urlStr: string,
+  bodyObj: any
+): Promise<{ status: number; text: string }> {
   return new Promise((resolve, reject) => {
     const urlObj = new URL(urlStr);
     const bodyStr = JSON.stringify(bodyObj);
@@ -36,23 +47,58 @@ function postJson(urlStr: string, bodyObj: any): Promise<{ status: number; text:
   });
 }
 
-/**
- * API Endpoint: /api/analyze-image
- * Phân tích ảnh thú cưng thật do người dùng tải lên bằng Gemini 2.5 Flash Multimodal
- */
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { imageDataUrl } = body;
+    const { imageDataUrl, candidateSpots, userCoords } = body;
 
-    const parts: any[] = [
-      {
-        text: 'Hãy phân tích bức ảnh thú cưng này và trả về đúng JSON: {"species": "cat" hoặc "dog", "breed": "tên giống tiếng Việt", "coatColor": "màu lông tiếng Việt", "traits": ["3 đặc điểm nhận dạng thực tế từ ảnh"], "suggestedTitle": "tiêu đề ngắn mô tả bé trong ảnh"}',
-      },
-    ];
+    const pool: DomSpot[] =
+      Array.isArray(candidateSpots) && candidateSpots.length > 0
+        ? candidateSpots
+        : INITIAL_DOM_SPOTS;
+
+    const compactCandidates = pool.slice(0, 30).map((s) => ({
+      id: s.id,
+      species: s.species,
+      title: s.title,
+      breed: s.breed,
+      coatColor: s.coatColor,
+      traits: s.traits,
+      area: s.areaLabel,
+      storyExcerpt: (s.story || '').slice(0, 140),
+    }));
+
+    const promptText = `Bạn là hệ thống nhận diện hình ảnh thú cưng chính xác cao.
+Hãy phân tích bức ảnh đính kèm và đối chiếu với danh sách các bài viết hiện có bên dưới.
+
+Danh sách bài viết ứng viên (JSON):
+${JSON.stringify(compactCandidates)}
+
+Yêu cầu trả về đúng 1 đối tượng JSON theo cấu trúc:
+{
+  "species": "cat" hoặc "dog" hoặc "other",
+  "breed": "tên giống ngắn gọn bằng tiếng Việt (VD: Mèo mướp, Mèo cam, Mèo tam thể, Chó cỏ, Chó Poodle...)",
+  "coatColor": "màu lông chính bằng tiếng Việt (VD: Vàng cam, Vàng trắng, Đen, Trắng, Mướp xám, Tam thể...)",
+  "primaryColors": ["màu 1", "màu 2"],
+  "coatPattern": "kiểu hoa văn lông (VD: mướp vằn, đơn sắc, nhị thể, tam thể, đốm...)",
+  "traits": ["3 đến 4 đặc điểm nhận dạng ngoại hình thực tế nhìn thấy trong ảnh"],
+  "suggestedTitle": "tiêu đề ngắn mô tả đúng con vật trong ảnh",
+  "visualMatches": [
+    {
+      "spotId": "id của bài viết trong danh sách ứng viên có đặc điểm loài/màu lông/ngoại hình trùng khớp cao với ảnh",
+      "confidence": số nguyên từ 60 đến 98 thể hiện độ tương đồng thực tế,
+      "reason": "lý do ngắn gọn vì sao ảnh trùng khớp (VD: Cùng là mèo cam lông ngắn, Cùng là chó bị lạc...)"
+    }
+  ]
+}
+Lưu ý quan trọng: Tuyệt đối KHÔNG ghép nhầm loài (ví dụ ảnh là mèo thì không chọn bài chỉ nói về chó hoặc chim). Chỉ đưa vào visualMatches những bài có độ tương đồng thực sự từ 60 trở lên.`;
+
+    const parts: any[] = [{ text: promptText }];
 
     if (imageDataUrl && imageDataUrl.startsWith('data:image/')) {
-      const match = imageDataUrl.match(/^data:(image\/[a-zA-Z0-9+.-]+);base64,(.+)$/);
+      const match = imageDataUrl.match(
+        /^data:(image\/[a-zA-Z0-9+.-]+);base64,(.+)$/
+      );
       if (match) {
         parts.push({
           inlineData: {
@@ -84,11 +130,21 @@ export async function POST(request: NextRequest) {
           .join('\n') || '{}';
       const firstBracket = outText.indexOf('{');
       const lastBracket = outText.lastIndexOf('}');
-      const data = JSON.parse(outText.slice(firstBracket, lastBracket + 1));
+      const analysis: VisualAnalysisResult = JSON.parse(
+        outText.slice(firstBracket, lastBracket + 1)
+      );
+
+      const matchedItems = rankSpotsByVisualSimilarity(
+        analysis,
+        pool,
+        userCoords
+      );
+
       return NextResponse.json({
         ok: true,
         model: GEMINI_MODEL,
-        analysis: data,
+        analysis,
+        matches: matchedItems,
       });
     }
 
