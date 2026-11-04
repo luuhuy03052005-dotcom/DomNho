@@ -53,7 +53,7 @@ export default function DomNhoHeader({
     <header
       className={`sticky top-0 z-30 w-full bg-[#FAF7F1]/95 backdrop-blur-md border-b border-[#DDDCD4] ${className}`}
     >
-      <div className="max-w-[1320px] mx-auto px-4 sm:px-6 lg:px-8 h-[60px] sm:h-[64px] flex items-center justify-between gap-2 sm:gap-4">
+      <div className="max-w-[1320px] mx-auto px-3.5 sm:px-6 lg:px-8 h-[52px] sm:h-[64px] flex items-center justify-between gap-2 sm:gap-4">
         <div className="flex items-center justify-start shrink-0">
           <DomNhoLogo
             showSlogan={false}
@@ -119,7 +119,7 @@ export default function DomNhoHeader({
           <button
             type="button"
             onClick={() => onChangeTab('stories')}
-            className={`md:hidden min-h-[40px] px-2.5 rounded-[10px] border text-xs font-bold flex items-center gap-1.5 transition-colors ${
+            className={`md:hidden h-9 px-2.5 rounded-[9px] border text-xs font-bold flex items-center gap-1.5 transition-colors ${
               activeTab === 'stories'
                 ? 'bg-[#0E513B] text-white border-[#0E513B]'
                 : 'bg-white text-[#142820] border-[#DDDCD4] hover:bg-[#F1EFE8]'
@@ -148,7 +148,7 @@ export default function DomNhoHeader({
           <button
             type="button"
             onClick={onOpenCreatePost}
-            className="min-h-[40px] px-3.5 rounded-[10px] bg-[#0E513B] hover:bg-[#0A412F] text-white text-xs sm:text-sm font-bold flex items-center gap-1.5 transition-colors shadow-sm whitespace-nowrap"
+            className="h-9 sm:min-h-[40px] px-3 sm:px-3.5 rounded-[9px] sm:rounded-[10px] bg-[#0E513B] hover:bg-[#0A412F] text-white text-xs sm:text-sm font-bold flex items-center gap-1.5 transition-colors shadow-sm whitespace-nowrap"
           >
             <Plus className="w-4 h-4 shrink-0" />
             <span>Đăng tin</span>

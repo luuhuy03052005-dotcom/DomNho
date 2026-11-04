@@ -1,10 +1,19 @@
 'use client';
 
-import React, { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { KeyRound, Phone, ShieldCheck, Sparkles, User, X } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
+import {
+  AlertCircle,
+  KeyRound,
+  LogIn,
+  Phone,
+  ShieldCheck,
+  User,
+  UserPlus,
+  X,
+} from 'lucide-react';
 import { ThemeId, UserSession } from '@/lib/types';
-import { DOM_THEMES } from '@/lib/themes';
+import { maskPhoneNumber } from '@/lib/security';
 import { registerZeroVerificationUser } from '@/lib/supabase';
 
 interface ZeroVerifyAuthModalProps {
@@ -17,166 +26,267 @@ interface ZeroVerifyAuthModalProps {
 
 export default function ZeroVerifyAuthModal({
   isOpen,
-  themeId,
   pendingActionLabel,
   onClose,
   onSuccess,
 }: ZeroVerifyAuthModalProps) {
-  const theme = DOM_THEMES[themeId];
+  const [mounted, setMounted] = useState(false);
+  const [authMode, setAuthMode] = useState<'register' | 'login'>('register');
   const [displayName, setDisplayName] = useState('');
-  const [pinCode, setPinCode] = useState('');
   const [rawPhone, setRawPhone] = useState('');
+  const [pinCode, setPinCode] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  if (!isOpen) return null;
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    setErrorMsg(null);
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
+  if (!isOpen || !mounted || typeof document === 'undefined') return null;
+
+  const liveMaskedPhone =
+    rawPhone.replace(/\D/g, '').length >= 7
+      ? maskPhoneNumber(rawPhone)
+      : 'Số được ẩn tự động';
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setErrorMsg(null);
     setSubmitting(true);
     try {
       const session = await registerZeroVerificationUser({
-        displayName,
+        displayName: authMode === 'register' ? displayName : displayName.trim() || undefined,
         pinCode,
         rawPhone,
+        mode: authMode,
       });
+      setDisplayName('');
+      setRawPhone('');
+      setPinCode('');
       onSuccess(session);
+    } catch (err) {
+      const message =
+        err instanceof Error
+          ? err.message
+          : 'Không thể đăng nhập lúc này. Vui lòng kiểm tra lại thông tin.';
+      setErrorMsg(message);
     } finally {
       setSubmitting(false);
     }
   };
 
-  return (
-    <AnimatePresence>
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        onClick={onClose}
-        className="fixed inset-0 z-[60] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4"
+  return createPortal(
+    <div
+      onClick={onClose}
+      data-testid="quick-auth-backdrop"
+      style={{
+        backdropFilter: 'blur(8px)',
+        WebkitBackdropFilter: 'blur(8px)',
+      }}
+      className="fixed inset-0 z-[130] bg-[#142820]/55 backdrop-blur-md flex items-end sm:items-center justify-center sm:p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Đăng nhập nhanh"
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="w-full max-h-[92dvh] sm:max-w-[460px] rounded-t-2xl sm:rounded-2xl bg-[#FAF7F1] text-[#142820] border border-[#DDDCD4] shadow-2xl flex flex-col overflow-hidden"
       >
-        <motion.div
-          initial={{ scale: 0.9, y: 24, opacity: 0 }}
-          animate={{ scale: 1, y: 0, opacity: 1 }}
-          exit={{ scale: 0.9, y: 24, opacity: 0 }}
-          onClick={(e) => e.stopPropagation()}
-          className="w-full max-w-md rounded-[32px] p-6 shadow-2xl backdrop-blur-2xl"
-          style={{
-            backgroundColor: theme.frostedSheetBg,
-            color: theme.textHex,
-          }}
-        >
-          <div className="flex items-start justify-between gap-2">
-            <div>
-              <span className="px-3 py-1 rounded-full text-[11px] font-bold bg-[#E07A5F]/15 text-[#E07A5F]">
-                Định danh nhanh 3 giây
-              </span>
-              <h3 className="text-lg font-bold mt-2">
-                Nhập Tên Gọi Để Đăng Bài & Kết Nối
-              </h3>
-              <p className="text-xs mt-1" style={{ color: theme.mutedTextHex }}>
-                {pendingActionLabel ||
-                  'Thông tin của bạn được ghi nhớ tự động trên thiết bị để bạn không phải nhập lại ở các lần sau.'}
-              </p>
-            </div>
+        <div className="px-5 pt-4 pb-3.5 border-b border-[#DDDCD4] flex items-start justify-between gap-3 bg-[#FAF7F1]">
+          <div className="space-y-1">
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-[11px] font-bold bg-[#E8EFE6] text-[#0E513B]">
+              <LogIn className="w-3 h-3 shrink-0" />
+              <span>Đăng nhập nhanh</span>
+            </span>
+            <h3 className="text-base sm:text-lg font-extrabold text-[#142820]">
+              {authMode === 'register'
+                ? 'Đăng nhập nhanh & Tạo tài khoản'
+                : 'Đăng nhập tài khoản đã có'}
+            </h3>
+            <p className="text-xs text-[#52605A] leading-relaxed">
+              {pendingActionLabel
+                ? `Cần đăng nhập để tiếp tục: ${pendingActionLabel}`
+                : 'Quản lý bài đăng cứu trợ, tìm thú lạc và lưu Nhật ký kỷ niệm của bạn.'}
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={onClose}
+            className="min-w-[40px] min-h-[40px] -mr-1 rounded-[10px] bg-white border border-[#DDDCD4] hover:border-[#0E513B] text-[#142820] flex items-center justify-center shrink-0 transition-colors"
+            aria-label="Đóng hộp thoại đăng nhập"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        <div className="p-5 overflow-y-auto space-y-4">
+          <div
+            className="grid grid-cols-2 gap-1.5 p-1 rounded-xl bg-[#F2EFE7] border border-[#E4E1D8]"
+            role="tablist"
+            aria-label="Chế độ đăng nhập"
+          >
             <button
               type="button"
-              onClick={onClose}
-              className="w-8 h-8 rounded-full flex items-center justify-center"
-              style={{ backgroundColor: theme.pillBg }}
+              role="tab"
+              aria-selected={authMode === 'register'}
+              onClick={() => {
+                setAuthMode('register');
+                setErrorMsg(null);
+              }}
+              className={`min-h-[38px] px-3 rounded-[9px] text-xs font-bold flex items-center justify-center gap-1.5 transition-colors ${
+                authMode === 'register'
+                  ? 'bg-[#0E513B] text-white shadow-sm'
+                  : 'text-[#52605A] hover:text-[#142820]'
+              }`}
             >
-              <X className="w-4 h-4" />
+              <UserPlus className="w-3.5 h-3.5 shrink-0" />
+              <span>Đăng nhập / Tạo mới</span>
+            </button>
+
+            <button
+              type="button"
+              role="tab"
+              aria-selected={authMode === 'login'}
+              onClick={() => {
+                setAuthMode('login');
+                setErrorMsg(null);
+              }}
+              className={`min-h-[38px] px-3 rounded-[9px] text-xs font-bold flex items-center justify-center gap-1.5 transition-colors ${
+                authMode === 'login'
+                  ? 'bg-[#0E513B] text-white shadow-sm'
+                  : 'text-[#52605A] hover:text-[#142820]'
+              }`}
+            >
+              <LogIn className="w-3.5 h-3.5 shrink-0" />
+              <span>Đã có tài khoản</span>
             </button>
           </div>
 
-          <form onSubmit={handleSubmit} className="mt-4 space-y-3">
-            <div>
-              <label className="block text-xs font-bold mb-1">
-                1. Tên gọi của bạn / Biệt danh
-              </label>
-              <div
-                className="flex items-center gap-2 rounded-2xl px-3.5 py-3"
-                style={{ backgroundColor: theme.frostedCardBg }}
-              >
-                <User className="w-4 h-4 text-[#E07A5F]" />
-                <input
-                  type="text"
-                  required
-                  value={displayName}
-                  onChange={(e) => setDisplayName(e.target.value)}
-                  placeholder="Ví dụ: Huy Khanh, Trạm Mèo Thủ Đức..."
-                  className="w-full bg-transparent text-xs sm:text-sm outline-none"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-5 gap-2.5">
-              <div className="col-span-2">
-                <label className="block text-xs font-bold mb-1">
-                  2. Mã PIN (4–6 số)
+          <form onSubmit={handleSubmit} className="space-y-3.5">
+            {authMode === 'register' && (
+              <div>
+                <label className="block text-xs font-bold text-[#142820] mb-1.5">
+                  Tên gọi của bạn / Biệt danh
                 </label>
-                <div
-                  className="flex items-center gap-2 rounded-2xl px-3.5 py-3"
-                  style={{ backgroundColor: theme.frostedCardBg }}
-                >
-                  <KeyRound className="w-4 h-4 text-[#2A9D8F]" />
+                <div className="flex items-center gap-2.5 h-11 rounded-[10px] px-3.5 bg-white border border-[#DDDCD4] focus-within:border-[#0E513B] transition-colors">
+                  <User className="w-4 h-4 text-[#0E513B] shrink-0" />
                   <input
-                    type="password"
-                    inputMode="numeric"
-                    maxLength={6}
+                    type="text"
                     required
-                    value={pinCode}
-                    onChange={(e) => setPinCode(e.target.value)}
-                    placeholder="1234"
-                    className="w-full bg-transparent text-xs sm:text-sm outline-none"
+                    minLength={2}
+                    maxLength={60}
+                    value={displayName}
+                    onChange={(e) => setDisplayName(e.target.value)}
+                    placeholder="Nhập tên hiển thị của bạn..."
+                    className="w-full bg-transparent text-xs sm:text-sm text-[#142820] placeholder:text-[#8A948E] outline-none"
                   />
                 </div>
               </div>
+            )}
 
-              <div className="col-span-3">
-                <label className="block text-xs font-bold mb-1">
-                  SĐT / Zalo (Mặc định che số)
+            <div className="grid grid-cols-1 sm:grid-cols-5 gap-3">
+              <div className="sm:col-span-3">
+                <label className="block text-xs font-bold text-[#142820] mb-1.5">
+                  Số điện thoại / Zalo
                 </label>
-                <div
-                  className="flex items-center gap-2 rounded-2xl px-3.5 py-3"
-                  style={{ backgroundColor: theme.frostedCardBg }}
-                >
-                  <Phone className="w-4 h-4 text-[#2A9D8F]" />
+                <div className="flex items-center gap-2.5 h-11 rounded-[10px] px-3.5 bg-white border border-[#DDDCD4] focus-within:border-[#0E513B] transition-colors">
+                  <Phone className="w-4 h-4 text-[#0E513B] shrink-0" />
                   <input
                     type="tel"
+                    inputMode="tel"
                     required
                     value={rawPhone}
                     onChange={(e) => setRawPhone(e.target.value)}
-                    placeholder="0908 123 456"
-                    className="w-full bg-transparent text-xs sm:text-sm outline-none"
+                    placeholder="Nhập số điện thoại..."
+                    className="w-full bg-transparent text-xs sm:text-sm text-[#142820] placeholder:text-[#8A948E] outline-none"
+                  />
+                </div>
+              </div>
+
+              <div className="sm:col-span-2">
+                <label className="block text-xs font-bold text-[#142820] mb-1.5">
+                  Mã PIN (4–6 số)
+                </label>
+                <div className="flex items-center gap-2 h-11 rounded-[10px] px-3.5 bg-white border border-[#DDDCD4] focus-within:border-[#0E513B] transition-colors">
+                  <KeyRound className="w-4 h-4 text-[#AF421F] shrink-0" />
+                  <input
+                    type="password"
+                    inputMode="numeric"
+                    pattern="\d{4,6}"
+                    minLength={4}
+                    maxLength={6}
+                    required
+                    value={pinCode}
+                    onChange={(e) =>
+                      setPinCode(e.target.value.replace(/\D/g, '').slice(0, 6))
+                    }
+                    placeholder="4–6 chữ số"
+                    className="w-full bg-transparent text-xs sm:text-sm text-[#142820] placeholder:text-[#8A948E] outline-none"
                   />
                 </div>
               </div>
             </div>
 
-            <div
-              className="p-3 rounded-2xl flex items-center gap-2.5 text-[11px]"
-              style={{ backgroundColor: 'rgba(42, 157, 143, 0.12)' }}
-            >
-              <ShieldCheck className="w-4 h-4 text-[#2A9D8F] shrink-0" />
-              <span>
-                Số điện thoại của bạn được che thành <strong>090***456</strong> và chỉ mở khóa khi bạn đồng ý kết nối.
+            {errorMsg && (
+              <div
+                role="alert"
+                className="p-3 rounded-[10px] bg-[#FFF0E5] border border-[#AF421F]/40 text-[#AF421F] text-xs font-semibold flex items-start gap-2"
+              >
+                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                <span className="leading-relaxed">{errorMsg}</span>
+              </div>
+            )}
+
+            <div className="p-3 rounded-[10px] bg-[#E8EFE6]/70 border border-[#D4E2D1] flex items-start gap-2.5 text-[11px] text-[#142820]">
+              <ShieldCheck className="w-4 h-4 text-[#0E513B] shrink-0 mt-0.5" />
+              <span className="leading-relaxed">
+                Số điện thoại của bạn được bảo mật hiển thị dưới dạng{' '}
+                <strong>{liveMaskedPhone}</strong> và chỉ mở khóa khi bạn đồng ý
+                kết nối.
               </span>
             </div>
 
-            <button
-              type="submit"
-              disabled={submitting}
-              className="w-full py-3.5 rounded-full text-sm font-bold text-white shadow-xl flex items-center justify-center gap-2 transition-transform active:scale-95"
-              style={{
-                background: 'linear-gradient(135deg, #2A9D8F 0%, #E07A5F 100%)',
-              }}
-            >
-              <Sparkles className="w-4 h-4" />
-              {submitting ? 'Đang khởi tạo...' : 'Hoàn tất ngay'}
-            </button>
+            <div className="pt-1 flex items-center gap-2.5">
+              <button
+                type="button"
+                onClick={onClose}
+                className="min-h-[44px] px-4 rounded-[10px] bg-white border border-[#DDDCD4] hover:bg-[#F2EFE7] text-xs sm:text-sm font-bold text-[#142820] transition-colors"
+              >
+                Để sau
+              </button>
+
+              <button
+                type="submit"
+                disabled={submitting}
+                className="flex-1 min-h-[44px] px-5 rounded-[10px] bg-[#0E513B] hover:bg-[#0A412F] disabled:opacity-60 text-white text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition-colors shadow-sm"
+              >
+                <LogIn className="w-4 h-4 shrink-0" />
+                <span>
+                  {submitting
+                    ? 'Đang xử lý...'
+                    : authMode === 'login'
+                    ? 'Đăng nhập ngay'
+                    : 'Đăng nhập nhanh'}
+                </span>
+              </button>
+            </div>
           </form>
-        </motion.div>
-      </motion.div>
-    </AnimatePresence>
+        </div>
+      </div>
+    </div>,
+    document.body
   );
 }

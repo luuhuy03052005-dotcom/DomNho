@@ -150,132 +150,126 @@ export default function FullMapView({
 
   return (
     <div className="fixed inset-x-0 top-0 bottom-[calc(56px+env(safe-area-inset-bottom,0px))] z-20 md:static md:z-auto w-full md:h-[calc(100dvh-65px)] bg-[#FAF7F1] text-[#142820] flex flex-col md:flex-row overflow-hidden">
-      <div className="md:hidden shrink-0 bg-[#FAF7F1] border-b border-[#DDDCD4] px-3 pt-[max(8px,env(safe-area-inset-top,0px))] pb-2 space-y-1.5 z-20">
-        <div className="flex items-center justify-between gap-2">
+      <div className="md:hidden shrink-0 bg-[#FAF7F1]/95 backdrop-blur-md border-b border-[#DDDCD4] px-2.5 pt-[max(6px,env(safe-area-inset-top,0px))] pb-1.5 space-y-1.5 z-20">
+        <div className="flex items-center gap-1.5">
           <button
             type="button"
             onClick={onBackToExplore}
-            className="min-w-[44px] min-h-[44px] -ml-1 px-2 rounded-[10px] text-[#142820] hover:bg-[#F1EFE8] flex items-center justify-center transition-colors"
+            className="w-9 h-9 rounded-[9px] bg-white border border-[#DDDCD4] text-[#142820] hover:bg-[#F1EFE8] flex items-center justify-center shrink-0 transition-colors"
             aria-label="Quay lại"
           >
-            <ArrowLeft className="w-5 h-5" />
+            <ArrowLeft className="w-4 h-4" />
           </button>
 
-          <h1 className="text-base font-extrabold text-[#142820] truncate">
-            Bản đồ
-          </h1>
-
-          <button
-            type="button"
-            onClick={onOpenCreatePost}
-            className="min-h-[40px] px-3.5 rounded-[10px] bg-[#0E513B] hover:bg-[#0A412F] text-white text-xs font-bold flex items-center gap-1 shadow-sm transition-colors shrink-0"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Đăng tin</span>
-          </button>
-        </div>
-
-        <div className="flex items-center gap-2">
           <button
             type="button"
             onClick={onOpenLocationPicker}
-            className="flex-1 min-h-[42px] px-3 rounded-[10px] bg-white border border-[#DDDCD4] text-xs font-semibold text-[#142820] flex items-center justify-between gap-2"
+            className="flex-1 min-w-0 h-9 px-2.5 rounded-[9px] bg-white border border-[#DDDCD4] text-xs font-semibold text-[#142820] flex items-center justify-between gap-1.5"
           >
-            <span className="flex items-center gap-1.5 truncate">
+            <span className="flex items-center gap-1 min-w-0">
               <MapPin className="w-3.5 h-3.5 text-[#0E513B] shrink-0" />
               <span className="truncate">
                 {userCoords.label || 'Thủ Đức, TP.HCM'}
               </span>
             </span>
-            <ChevronDown className="w-4 h-4 text-[#52605A] shrink-0" />
+            <ChevronDown className="w-3.5 h-3.5 text-[#52605A] shrink-0" />
           </button>
 
           <button
             type="button"
             onClick={handleLocateMe}
-            className="min-w-[44px] min-h-[42px] rounded-[10px] bg-white border border-[#DDDCD4] text-[#142820] hover:border-[#0E513B] flex items-center justify-center shrink-0"
+            className="w-9 h-9 rounded-[9px] bg-white border border-[#DDDCD4] text-[#142820] hover:border-[#0E513B] flex items-center justify-center shrink-0"
             title="Vị trí của tôi"
             aria-label="Vị trí của tôi"
           >
             <Crosshair className="w-4 h-4 text-[#0E513B]" />
           </button>
+
+          <button
+            type="button"
+            onClick={onOpenCreatePost}
+            className="h-9 px-2.5 rounded-[9px] bg-[#0E513B] hover:bg-[#0A412F] text-white text-xs font-bold flex items-center gap-1 shadow-sm transition-colors shrink-0"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            <span>Đăng tin</span>
+          </button>
         </div>
 
-        <div className="grid grid-cols-2 gap-1.5">
+        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
           <button
             type="button"
             onClick={() => setCategory('ALL')}
             aria-pressed={category === 'ALL'}
-            className={`min-h-[38px] px-2.5 rounded-[10px] text-xs font-bold border flex items-center justify-center gap-1.5 transition-colors ${
+            className={`h-8 px-2.5 rounded-full text-[11px] font-bold border flex items-center gap-1 whitespace-nowrap shrink-0 transition-colors ${
               category === 'ALL'
-                ? 'bg-[#D7E5D9] text-[#0E513B] border-[#0E513B]/40'
+                ? 'bg-[#0E513B] text-white border-[#0E513B]'
                 : 'bg-white text-[#142820] border-[#DDDCD4]'
             }`}
           >
-            <LayoutGrid className="w-3.5 h-3.5 text-[#0E513B] shrink-0" />
-            <span className="truncate">Tất cả</span>
+            <LayoutGrid className="w-3 h-3 shrink-0" />
+            <span>Tất cả</span>
           </button>
 
           <button
             type="button"
             onClick={() => setCategory('RESCUE')}
             aria-pressed={category === 'RESCUE'}
-            className={`min-h-[38px] px-2.5 rounded-[10px] text-xs font-bold border flex items-center justify-center gap-1.5 transition-colors ${
+            className={`h-8 px-2.5 rounded-full text-[11px] font-bold border flex items-center gap-1 whitespace-nowrap shrink-0 transition-colors ${
               category === 'RESCUE'
                 ? 'bg-[#FFF0E5] text-[#AF421F] border-[#AF421F]'
                 : 'bg-white text-[#142820] border-[#DDDCD4]'
             }`}
           >
-            <LifeBuoy className="w-3.5 h-3.5 text-[#C84B24] shrink-0" />
-            <span className="truncate">Cứu trợ</span>
+            <LifeBuoy className="w-3 h-3 text-[#C84B24] shrink-0" />
+            <span>Cứu trợ</span>
           </button>
 
           <button
             type="button"
             onClick={() => setCategory('LOST')}
             aria-pressed={category === 'LOST'}
-            className={`min-h-[38px] px-2.5 rounded-[10px] text-xs font-bold border flex items-center justify-center gap-1.5 transition-colors ${
+            className={`h-8 px-2.5 rounded-full text-[11px] font-bold border flex items-center gap-1 whitespace-nowrap shrink-0 transition-colors ${
               category === 'LOST'
                 ? 'bg-[#FFF3D8] text-[#80570D] border-[#80570D]'
                 : 'bg-white text-[#142820] border-[#DDDCD4]'
             }`}
           >
-            <PawFilterIcon className="w-3.5 h-3.5 text-[#D4942A] shrink-0" />
-            <span className="truncate">Thú lạc</span>
+            <PawFilterIcon className="w-3 h-3 text-[#D4942A] shrink-0" />
+            <span>Thú lạc</span>
           </button>
 
           <button
             type="button"
             onClick={() => setCategory('ADOPT')}
             aria-pressed={category === 'ADOPT'}
-            className={`min-h-[38px] px-2.5 rounded-[10px] text-xs font-bold border flex items-center justify-center gap-1.5 transition-colors ${
+            className={`h-8 px-2.5 rounded-full text-[11px] font-bold border flex items-center gap-1 whitespace-nowrap shrink-0 transition-colors ${
               category === 'ADOPT'
                 ? 'bg-[#E8EFE6] text-[#0E513B] border-[#0E513B]'
                 : 'bg-white text-[#142820] border-[#DDDCD4]'
             }`}
           >
-            <Home className="w-3.5 h-3.5 text-[#0E513B] shrink-0" />
-            <span className="truncate">Trạm &amp; Nhận nuôi</span>
+            <Home className="w-3 h-3 text-[#0E513B] shrink-0" />
+            <span>Nhận nuôi</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setShowVets((v) => !v)}
+            aria-pressed={showVets}
+            className={`h-8 px-2.5 rounded-full text-[11px] font-bold border flex items-center gap-1 whitespace-nowrap shrink-0 transition-colors ${
+              showVets
+                ? 'bg-[#0E513B] text-white border-[#0E513B]'
+                : 'bg-white text-[#142820] border-[#DDDCD4]'
+            }`}
+          >
+            <Stethoscope
+              className={`w-3 h-3 shrink-0 ${
+                showVets ? 'text-white' : 'text-[#0E513B]'
+              }`}
+            />
+            <span>Thú y 24/7</span>
           </button>
         </div>
-
-        <button
-          type="button"
-          onClick={() => setShowVets((v) => !v)}
-          aria-pressed={showVets}
-          className={`w-full min-h-[38px] px-3 rounded-[10px] text-xs font-bold border flex items-center justify-center gap-1.5 transition-colors ${
-            showVets
-              ? 'bg-[#0E513B] text-white border-[#0E513B]'
-              : 'bg-white text-[#142820] border-[#DDDCD4]'
-          }`}
-        >
-          <Stethoscope
-            className={`w-3.5 h-3.5 shrink-0 ${
-              showVets ? 'text-white' : 'text-[#0E513B]'
-            }`}
-          />
-          <span>Thú y 24/7</span>
-        </button>
       </div>
 
       <aside className="hidden md:flex w-[360px] lg:w-[390px] shrink-0 h-full bg-[#FAF7F1] border-r border-[#DDDCD4] flex-col overflow-y-auto">

@@ -49,6 +49,7 @@ import {
   fuzzCoordinates,
 } from '@/lib/security';
 import {
+  clearPermanentSession,
   loadPermanentSession,
   persistPermanentSession,
 } from '@/lib/supabase';
@@ -763,7 +764,7 @@ export default function DomNhoHomePage() {
   const handleLinkPartnerName = useCallback(
     (partnerName: string) => {
       ensureAuthenticated(
-        'Tạo biệt danh của bạn trước khi ghép đôi Bản đồ Kỷ niệm:',
+        'Đăng nhập nhanh để ghép đôi Không gian Đi dạo',
         (session) => {
           const updated: UserSession = {
             ...session,
@@ -1035,10 +1036,19 @@ export default function DomNhoHomePage() {
         onClose={() => setIsProfileModalOpen(false)}
         onRequireAuth={() => {
           setPendingAuthAction({
-            label: 'Đăng nhập tài khoản',
+            label: 'Đăng nhập nhanh tài khoản',
             callback: () => setIsProfileModalOpen(true),
           });
           setIsAuthModalOpen(true);
+        }}
+        onLogout={() => {
+          clearPermanentSession();
+          setUserSession(null);
+          showToast(
+            'Đã đăng xuất',
+            'Bạn đã đăng xuất khỏi tài khoản trên thiết bị này.',
+            'info'
+          );
         }}
         onResolveSpotToPeace={handleResolveSpotToPeace}
         onAddWeeklyMemorySnap={handleAddWeeklyMemorySnap}
