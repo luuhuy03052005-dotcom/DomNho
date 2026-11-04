@@ -36,7 +36,7 @@ export default function FilterModal({
     <AnimatePresence>
       <div
         onClick={onClose}
-        className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4"
+        className="fixed inset-0 z-[80] bg-black/50 flex items-end sm:items-center justify-center p-0 sm:p-4"
       >
         <motion.div
           initial={{ y: '100%', opacity: 0.5 }}
@@ -56,7 +56,7 @@ export default function FilterModal({
             <button
               type="button"
               onClick={onClose}
-              className="w-8 h-8 rounded-full bg-[#F1EFE8] flex items-center justify-center text-[#142820] hover:bg-[#DDDCD4]"
+              className="min-w-[44px] min-h-[44px] rounded-[10px] bg-[#F1EFE8] flex items-center justify-center text-[#142820] hover:bg-[#DDDCD4]"
               aria-label="Đóng bộ lọc"
             >
               <X className="w-4 h-4" />

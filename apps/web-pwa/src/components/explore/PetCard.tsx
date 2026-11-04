@@ -13,6 +13,7 @@ import ImageLightboxModal from '@/components/modals/ImageLightboxModal';
 import {
   DomSpot,
   getFriendlySourceName,
+  getSpotBadgeMeta,
   isUserWebPost,
 } from '@/lib/types';
 import { calculateDistanceMeters, formatDistanceVi } from '@/lib/security';
@@ -56,26 +57,7 @@ export default function PetCard({
       )
     : null;
 
-  const isRescueCenter = spot.entityCategory === 'RESCUE_CENTER';
-  const isRescue = spot.spotType === 'RED_SOS';
-  const isLost = spot.spotType === 'ORANGE_SIGHT';
-
-  let badgeLabel = 'Cần cứu trợ';
-  let badgeClass = 'bg-[#FFF0E5] text-[#AF421F]';
-
-  if (isRescueCenter) {
-    badgeLabel = 'Trạm cứu hộ';
-    badgeClass = 'bg-[#E8EFE6] text-[#0E513B]';
-  } else if (isRescue) {
-    badgeLabel = 'Cần cứu trợ';
-    badgeClass = 'bg-[#FFF0E5] text-[#AF421F]';
-  } else if (isLost) {
-    badgeLabel = 'Tìm thú lạc';
-    badgeClass = 'bg-[#FFF3D8] text-[#80570D]';
-  } else {
-    badgeLabel = 'Chờ nhận nuôi';
-    badgeClass = 'bg-[#E8EFE6] text-[#0E513B]';
-  }
+  const badgeMeta = getSpotBadgeMeta(spot);
 
   const sourceName = isUserPost
     ? 'Tự đăng trên web'
@@ -93,7 +75,7 @@ export default function PetCard({
     : null;
 
   const locationDisplay =
-    spot.formattedAddress || spot.areaLabel || 'Chưa rõ khu vực';
+    spot.areaLabel || spot.formattedAddress || 'Chưa rõ khu vực';
 
   const imageUrl =
     !imgError && spot.images && spot.images[0]
@@ -105,7 +87,7 @@ export default function PetCard({
   return (
     <>
       <article
-        className={`bg-white rounded-xl border overflow-hidden flex flex-col justify-between transition-colors ${
+        className={`shrink-0 h-auto min-w-0 bg-white rounded-[12px] border flex flex-col justify-between transition-colors shadow-[0_3px_14px_rgba(20,40,32,0.05)] ${
           matchInfo
             ? 'border-[#0E513B] ring-1 ring-[#0E513B]/20'
             : 'border-[#DDDCD4] hover:border-[#0E513B]/50'
@@ -113,12 +95,14 @@ export default function PetCard({
       >
         <div
           onClick={() => setIsLightboxOpen(true)}
-          className="relative w-full aspect-[16/10] bg-[#F1EFE8] overflow-hidden cursor-zoom-in group"
+          className="relative w-full aspect-[16/9] min-h-[190px] shrink-0 bg-[#F1EFE8] rounded-t-[11px] overflow-hidden cursor-zoom-in group"
           title="Bấm vào ảnh để phóng to xem rõ hơn"
         >
           <img
             src={imageUrl}
             alt={spot.title}
+            loading="lazy"
+            decoding="async"
             onError={() => setImgError(true)}
             referrerPolicy="no-referrer"
             className="w-full h-full object-cover"
@@ -126,26 +110,10 @@ export default function PetCard({
 
           {matchInfo && (
             <div className="absolute top-2.5 left-2.5 px-2.5 py-1 rounded-md bg-[#0E513B] text-white text-xs font-bold flex items-center gap-1 shadow-sm">
-              <CheckCircle2 className="w-3.5 h-3.5" />
+              <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
               <span>Trùng khớp {matchInfo.matchPercent}%</span>
             </div>
           )}
-
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              onToggleSave(spot);
-            }}
-            className={`absolute top-2.5 right-2.5 w-8 h-8 rounded-full flex items-center justify-center transition-colors shadow-sm ${
-              isSaved
-                ? 'bg-[#FFF0E5] text-[#AF421F] border border-[#AF421F]/30'
-                : 'bg-white/90 text-[#142820] hover:bg-white'
-            }`}
-            aria-label={isSaved ? 'Bỏ lưu' : 'Lưu bài viết'}
-          >
-            <Heart className={`w-4 h-4 ${isSaved ? 'fill-[#AF421F]' : ''}`} />
-          </button>
 
           <button
             type="button"
@@ -157,47 +125,58 @@ export default function PetCard({
           >
             {photoCount > 1 ? (
               <>
-                <Camera className="w-3.5 h-3.5" />
+                <Camera className="w-3.5 h-3.5 shrink-0" />
                 <span>Xem {photoCount} ảnh</span>
               </>
             ) : (
               <>
-                <ZoomIn className="w-3.5 h-3.5" />
+                <ZoomIn className="w-3.5 h-3.5 shrink-0" />
                 <span>Xem ảnh rõ</span>
               </>
             )}
           </button>
         </div>
 
-        <div className="p-4 flex-1 flex flex-col justify-between gap-3">
-          <div className="space-y-2">
+        <div className="p-3.5 sm:p-4 flex-1 min-w-0 flex flex-col justify-between gap-3">
+          <div className="space-y-2 min-w-0">
             {matchInfo && matchInfo.matchReasons.length > 0 && (
               <div className="px-2.5 py-1.5 rounded-lg bg-[#E8EFE6]/70 border border-[#0E513B]/20 text-[11px] font-semibold text-[#0E513B]">
                 Điểm giống: {matchInfo.matchReasons.join(' · ')}
               </div>
             )}
 
-            <div className="flex items-center justify-between gap-2 text-xs">
+            <div className="flex flex-wrap items-center justify-between gap-1.5 text-xs">
               <span
-                className={`px-2 py-0.5 rounded font-bold text-[11px] ${badgeClass}`}
+                className="px-2 py-0.5 rounded font-extrabold text-[11px] uppercase tracking-wider shrink-0"
+                style={{
+                  backgroundColor: badgeMeta.bgHex,
+                  color: badgeMeta.textHex,
+                }}
               >
-                {badgeLabel}
+                {badgeMeta.uppercaseLabel}
               </span>
 
-              <div className="flex items-center gap-2 text-[#52605A] font-medium">
-                {distMeters !== null && (
-                  <span className="text-[#142820] font-semibold flex items-center gap-0.5">
-                    <MapPin className="w-3 h-3 text-[#0E513B]" />
-                    {formatDistanceVi(distMeters)}
+              <div className="flex items-center gap-1.5 text-[#52605A] font-medium min-w-0">
+                {distMeters !== null ? (
+                  <span className="text-[#142820] font-semibold inline-flex items-center gap-0.5 truncate">
+                    <MapPin className="w-3 h-3 text-[#0E513B] shrink-0" />
+                    <span className="truncate">{formatDistanceVi(distMeters)}</span>
+                  </span>
+                ) : (
+                  <span className="text-[#52605A] inline-flex items-center gap-0.5 truncate">
+                    <MapPin className="w-3 h-3 text-[#0E513B] shrink-0" />
+                    <span className="truncate">{locationDisplay}</span>
                   </span>
                 )}
-                {publishedLabel && <span>• {publishedLabel}</span>}
+                {publishedLabel && (
+                  <span className="shrink-0">• {publishedLabel}</span>
+                )}
               </div>
             </div>
 
             <h3
               onClick={() => onSelectDetail(spot)}
-              className="text-base font-bold text-[#142820] hover:text-[#0E513B] cursor-pointer leading-snug line-clamp-2"
+              className="text-base sm:text-[17px] font-extrabold text-[#142820] hover:text-[#0E513B] cursor-pointer leading-snug line-clamp-2 min-h-[2.75rem] break-words"
             >
               {spot.title}
             </h3>
@@ -206,16 +185,16 @@ export default function PetCard({
               {locationDisplay} · Nguồn: {sourceName}
             </p>
 
-            <p className="text-xs text-[#52605A] leading-relaxed line-clamp-2">
+            <p className="text-xs sm:text-[13px] text-[#52605A] leading-relaxed line-clamp-2 min-h-[2.5rem] break-words">
               {spot.story}
             </p>
           </div>
 
-          <div className="flex items-center gap-2 pt-2 border-t border-[#F1EFE8]">
+          <div className="mt-auto flex flex-wrap items-center gap-2 pt-2.5 border-t border-[#F1EFE8]">
             <button
               type="button"
               onClick={() => onSelectDetail(spot)}
-              className="flex-1 h-10 px-3 rounded-lg bg-[#0E513B] hover:bg-[#0A412F] text-white text-xs sm:text-sm font-semibold flex items-center justify-center transition-colors"
+              className="flex-1 min-w-[110px] min-h-[44px] px-3 rounded-[10px] bg-[#0E513B] hover:bg-[#0A412F] text-white text-xs sm:text-sm font-bold flex items-center justify-center transition-colors"
             >
               Xem chi tiết
             </button>
@@ -226,13 +205,37 @@ export default function PetCard({
                 target="_blank"
                 rel="noopener noreferrer"
                 onClick={(e) => e.stopPropagation()}
-                className="h-10 px-3 rounded-lg border border-[#DDDCD4] bg-[#FAF7F1] hover:bg-[#F1EFE8] text-[#142820] text-xs font-semibold flex items-center gap-1 transition-colors shrink-0"
+                className="min-h-[44px] px-3 rounded-[10px] border border-[#DDDCD4] bg-[#FAF7F1] hover:bg-[#F1EFE8] text-[#142820] text-xs font-bold flex items-center justify-center gap-1 transition-colors shrink-0"
                 title={`Mở bài gốc tại ${sourceName}`}
               >
                 <span>Nguồn</span>
-                <ExternalLink className="w-3.5 h-3.5" />
+                <ExternalLink className="w-3.5 h-3.5 shrink-0" />
               </a>
             )}
+
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onToggleSave(spot);
+              }}
+              aria-pressed={isSaved}
+              aria-label={
+                isSaved
+                  ? `Bỏ lưu bài viết ${spot.title}`
+                  : `Lưu bài viết ${spot.title}`
+              }
+              title={isSaved ? 'Bỏ lưu bài viết' : 'Lưu bài viết'}
+              className={`min-w-[44px] min-h-[44px] rounded-[10px] border flex items-center justify-center transition-colors shrink-0 ${
+                isSaved
+                  ? 'bg-[#FFF0E5] text-[#AF421F] border-[#AF421F]'
+                  : 'bg-white text-[#142820] border-[#DDDCD4] hover:border-[#0E513B]'
+              }`}
+            >
+              <Heart
+                className={`w-4 h-4 ${isSaved ? 'fill-[#AF421F]' : ''}`}
+              />
+            </button>
           </div>
         </div>
       </article>

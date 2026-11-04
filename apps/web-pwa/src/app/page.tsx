@@ -1,9 +1,10 @@
 'use client';
 
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { BellRing } from 'lucide-react';
+import { AlertCircle, BellRing, CheckCircle2 } from 'lucide-react';
 import DomNhoHeader from '@/components/navigation/DomNhoHeader';
+import DomNhoFooter from '@/components/navigation/DomNhoFooter';
 import MobileBottomNav from '@/components/navigation/MobileBottomNav';
 import ExploreView from '@/components/explore/ExploreView';
 import FullMapView from '@/components/map/FullMapView';
@@ -59,9 +60,9 @@ import {
 } from '@/lib/spot-validation';
 import { rankSpotsByVisualSimilarity } from '@/lib/visual-matcher';
 
-const REAL_SPOTS_STORAGE_KEY = 'dom_nho_real_verified_spots_v9';
-const SAVED_GMAPS_STORAGE_KEY = 'dom_nho_saved_gmaps_places_v9';
-const MEMORY_STORAGE_KEY = 'dom_nho_real_memories_v9';
+const REAL_SPOTS_STORAGE_KEY = 'dom_nho_real_verified_spots_v10';
+const SAVED_GMAPS_STORAGE_KEY = 'dom_nho_saved_gmaps_places_v10';
+const MEMORY_STORAGE_KEY = 'dom_nho_real_memories_v10';
 const SAVED_SPOT_IDS_KEY = 'dom_nho_saved_spot_ids_v1';
 
 const LEGACY_STORAGE_KEYS = [
@@ -85,6 +86,9 @@ const LEGACY_STORAGE_KEYS = [
   'dom_nho_real_verified_spots_v8',
   'dom_nho_saved_gmaps_places_v8',
   'dom_nho_real_memories_v8',
+  'dom_nho_real_verified_spots_v9',
+  'dom_nho_saved_gmaps_places_v9',
+  'dom_nho_real_memories_v9',
 ];
 
 export default function DomNhoHomePage() {
@@ -107,6 +111,7 @@ export default function DomNhoHomePage() {
   const [userSession, setUserSession] = useState<UserSession | null>(null);
   const [patrolModeActive, setPatrolModeActive] = useState<boolean>(true);
   const [selectedSpot, setSelectedSpot] = useState<DomSpot | null>(null);
+  const [detailSpot, setDetailSpot] = useState<DomSpot | null>(null);
 
   const [isLocationPickerOpen, setIsLocationPickerOpen] = useState<boolean>(false);
   const [isFilterModalOpen, setIsFilterModalOpen] = useState<boolean>(false);
@@ -124,7 +129,10 @@ export default function DomNhoHomePage() {
   const [toastBanner, setToastBanner] = useState<{
     title: string;
     subtitle: string;
+    tone?: 'success' | 'info' | 'error';
   } | null>(null);
+
+  const exploreScrollYRef = useRef<number>(0);
 
   const {
     coords,
@@ -135,15 +143,38 @@ export default function DomNhoHomePage() {
   } = useGeolocation(patrolModeActive);
   const { triggerWebPushAlert, requestPushPermission } = usePushNotification();
 
-  const showToast = useCallback((title: string, subtitle: string) => {
-    setToastBanner({ title, subtitle });
-    window.setTimeout(() => {
-      setToastBanner((curr) => (curr?.title === title ? null : curr));
-    }, 4500);
-  }, []);
+  const showToast = useCallback(
+    (
+      title: string,
+      subtitle: string,
+      tone: 'success' | 'info' | 'error' = 'info'
+    ) => {
+      setToastBanner({ title, subtitle, tone });
+      window.setTimeout(() => {
+        setToastBanner((curr) => (curr?.title === title ? null : curr));
+      }, 4500);
+    },
+    []
+  );
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
+
+    const params = new URLSearchParams(window.location.search);
+    const tabParam = params.get('tab');
+    if (
+      tabParam === 'map' ||
+      tabParam === 'stories' ||
+      tabParam === 'saved' ||
+      tabParam === 'explore'
+    ) {
+      setMainTab(tabParam);
+    } else if (tabParam === 'profile') {
+      setIsProfileModalOpen(true);
+    }
+    if (params.get('create') === '1') {
+      setIsCameraModalOpen(true);
+    }
 
     LEGACY_STORAGE_KEYS.forEach((k) => window.localStorage.removeItem(k));
 
@@ -258,20 +289,40 @@ export default function DomNhoHomePage() {
       if (!isAuto) {
         showToast(
           'Đang cập nhật tin mới...',
-          'Hệ thống đang kết nối dữ liệu từ cộng đồng và các kênh cứu hộ.'
+          'Hệ thống đang kết nối dữ liệu từ cộng đồng và các kênh cứu hộ.',
+          'info'
         );
       }
       try {
+        const simulateMode =
+          typeof window !== 'undefined'
+            ? (window as any).__domNhoSimulateCrawlMode || 'NONE'
+            : 'NONE';
+
         const res = await fetch('/api/crawl-live', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ targetPlatform }),
+          body: JSON.stringify({ targetPlatform, simulateMode }),
         });
-        const data = await res.json();
+        const data = await res.json().catch(() => null);
+
+        if (!res.ok || !data?.ok) {
+          if (!isAuto) {
+            showToast(
+              'Cập nhật chưa thành công',
+              'Không thể tải tin mới lúc này. Đang giữ nguyên danh sách hiện có.',
+              'error'
+            );
+          }
+          return;
+        }
+
         const trusted = Array.isArray(data.spots)
           ? filterTrustedSpots(data.spots)
           : [];
-        if (data.ok && trusted.length > 0) {
+        const newlyAddedCount = Number(data.newlyAddedCount || 0);
+
+        if (trusted.length > 0) {
           updateSpotsAndPersist((prev) => {
             const userPosts = prev.filter((s) => s.sourceType === 'USER_POST');
             return [...userPosts, ...trusted];
@@ -281,7 +332,8 @@ export default function DomNhoHomePage() {
             data.savedGoogleMapsPlaces.length > 0
           ) {
             setSavedPlaces((prev) => {
-              const incoming = data.savedGoogleMapsPlaces as SavedGoogleMapPlace[];
+              const incoming =
+                data.savedGoogleMapsPlaces as SavedGoogleMapPlace[];
               const existingIds = new Set(incoming.map((p) => p.id));
               const merged = [
                 ...incoming,
@@ -299,21 +351,29 @@ export default function DomNhoHomePage() {
           if (Array.isArray(data.vetStations) && data.vetStations.length > 0) {
             setVetStations(data.vetStations);
           }
-          showToast(
-            `Đã cập nhật ${trusted.length} bài viết mới`,
-            'Dữ liệu đã được kiểm duyệt và sẵn sàng hỗ trợ.'
-          );
-        } else if (!isAuto) {
-          showToast(
-            'Đã đồng bộ đầy đủ',
-            data?.error || 'Các trạm cứu trợ hiện đều đã được cập nhật đầy đủ.'
-          );
+        }
+
+        if (!isAuto) {
+          if (newlyAddedCount > 0) {
+            showToast(
+              `Đã cập nhật ${newlyAddedCount} tin mới`,
+              'Các bài viết mới đã được bổ sung vào danh sách quanh bạn.',
+              'success'
+            );
+          } else {
+            showToast(
+              'Chưa có thêm tin mới',
+              'Danh sách hiện tại đã có đầy đủ các bài viết mới nhất.',
+              'info'
+            );
+          }
         }
       } catch {
         if (!isAuto) {
           showToast(
-            'Không thể kết nối mạng',
-            'Vui lòng kiểm tra lại đường truyền internet của bạn.'
+            'Cập nhật chưa thành công',
+            'Không thể kết nối máy chủ cập nhật lúc này. Đang giữ nguyên danh sách hiện có.',
+            'error'
           );
         }
       } finally {
@@ -325,14 +385,26 @@ export default function DomNhoHomePage() {
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    const AUTO_UPDATE_INTERVAL_MS = 10 * 60 * 1000;
-    const lastAutoUpdate = window.sessionStorage.getItem('dom_nho_last_auto_update');
-    const now = Date.now();
-    if (!lastAutoUpdate || now - Number(lastAutoUpdate) > AUTO_UPDATE_INTERVAL_MS) {
-      window.sessionStorage.setItem('dom_nho_last_auto_update', String(now));
-      handleTriggerLiveCrawl('ALL', true);
-    }
-  }, [handleTriggerLiveCrawl]);
+    let cancelled = false;
+    fetch('/api/crawl-live', { method: 'GET' })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (cancelled || !data?.ok || !Array.isArray(data.spots)) return;
+        const trusted = filterTrustedSpots(data.spots);
+        if (trusted.length > 0) {
+          updateSpotsAndPersist((prev) => {
+            const userPosts = prev.filter((s) => s.sourceType === 'USER_POST');
+            return [...userPosts, ...trusted];
+          });
+        }
+      })
+      .catch(() => {
+        // Keep local seed data if offline
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [updateSpotsAndPersist]);
 
   const ensureAuthenticated = useCallback(
     (actionLabel: string, callback: (session: UserSession) => void) => {
@@ -380,7 +452,7 @@ export default function DomNhoHomePage() {
       spotType: SpotType;
       title: string;
       story: string;
-      species: 'cat' | 'dog';
+      species: 'cat' | 'dog' | 'other';
       breed: string;
       coatColor: string;
       traits: string[];
@@ -542,6 +614,11 @@ export default function DomNhoHomePage() {
             ? { ...curr, isContactUnlockedForViewer: true }
             : curr
         );
+        setDetailSpot((curr) =>
+          curr && curr.id === spot.id
+            ? { ...curr, isContactUnlockedForViewer: true }
+            : curr
+        );
         showToast(
           'Đã kết nối thành công',
           'Bạn đã có thể liên hệ trực tiếp với người chăm sóc bé.'
@@ -566,6 +643,16 @@ export default function DomNhoHomePage() {
         )
       );
       setSelectedSpot((curr) =>
+        curr && curr.id === spotId
+          ? {
+                ...curr,
+                spotType: 'GREEN_PEACE',
+                status: 'RESOLVED',
+                lightPower: 200,
+              }
+          : curr
+      );
+      setDetailSpot((curr) =>
         curr && curr.id === spotId
           ? {
                 ...curr,
@@ -722,28 +809,43 @@ export default function DomNhoHomePage() {
     });
   }, [spots, originFilter, regionFilter, userSession]);
 
-  const handleTabChange = (nextTab: MainTab) => {
-    if (nextTab === 'profile') {
-      setIsProfileModalOpen(true);
-      return;
-    }
-    setMainTab(nextTab);
-  };
+  const handleTabChange = useCallback(
+    (nextTab: MainTab) => {
+      if (nextTab === 'profile') {
+        setIsProfileModalOpen(true);
+        return;
+      }
+      if (typeof window !== 'undefined' && mainTab === 'explore') {
+        exploreScrollYRef.current = window.scrollY;
+      }
+      setMainTab(nextTab);
+      if (typeof window !== 'undefined') {
+        if (nextTab === 'explore') {
+          const savedY = exploreScrollYRef.current;
+          window.requestAnimationFrame(() => {
+            window.scrollTo({ top: savedY, behavior: 'instant' as ScrollBehavior });
+          });
+        } else {
+          window.scrollTo({ top: 0, behavior: 'instant' as ScrollBehavior });
+        }
+      }
+    },
+    [mainTab]
+  );
 
   return (
     <div className="min-h-screen bg-[#FAF7F1] text-[#142820] flex flex-col font-sans selection:bg-[#E8EFE6] selection:text-[#0E513B]">
-      {mainTab !== 'map' && (
-        <DomNhoHeader
-          activeTab={mainTab}
-          onChangeTab={handleTabChange}
-          locationLabel={coords.label}
-          onOpenLocationPicker={() => setIsLocationPickerOpen(true)}
-          onOpenCreatePost={() => setIsCameraModalOpen(true)}
-          onOpenProfile={() => setIsProfileModalOpen(true)}
-          userSession={userSession}
-          savedCount={savedSpotIds.size}
-        />
-      )}
+      <DomNhoHeader
+        activeTab={mainTab}
+        onChangeTab={handleTabChange}
+        locationLabel={coords.label}
+        onOpenLocationPicker={() => setIsLocationPickerOpen(true)}
+        onOpenCreatePost={() => setIsCameraModalOpen(true)}
+        onOpenProfile={() => setIsProfileModalOpen(true)}
+        userSession={userSession}
+        savedCount={savedSpotIds.size}
+        className={mainTab === 'map' ? 'hidden md:block' : ''}
+      />
 
       <main className="flex-1 w-full">
         {mainTab === 'map' ? (
@@ -751,17 +853,21 @@ export default function DomNhoHomePage() {
             spots={spots}
             selectedSpot={selectedSpot}
             onSelectSpot={setSelectedSpot}
-            onOpenSpotDetail={(spot) => setSelectedSpot(spot)}
+            onOpenSpotDetail={(spot) => {
+              setSelectedSpot(spot);
+              setDetailSpot(spot);
+            }}
             userCoords={coords}
+            onOpenLocationPicker={() => setIsLocationPickerOpen(true)}
             onRequestRealGps={handleRequestUserGpsWithToast}
-            onBackToExplore={() => setMainTab('explore')}
+            onBackToExplore={() => handleTabChange('explore')}
             onOpenCreatePost={() => setIsCameraModalOpen(true)}
             vetStations={vetStations}
           />
         ) : mainTab === 'stories' ? (
           <StoryPageView
-            onBackToExplore={() => setMainTab('explore')}
-            onOpenMap={() => setMainTab('map')}
+            onBackToExplore={() => handleTabChange('explore')}
+            onOpenMap={() => handleTabChange('map')}
           />
         ) : (
           <ExploreView
@@ -769,10 +875,12 @@ export default function DomNhoHomePage() {
             userCoords={coords}
             locationLabel={coords.label}
             onOpenLocationPicker={() => setIsLocationPickerOpen(true)}
-            onOpenFullMap={() => setMainTab('map')}
-            onOpenStory={() => setMainTab('stories')}
+            onOpenFullMap={() => handleTabChange('map')}
+            onOpenStory={() => handleTabChange('stories')}
             onOpenFilterModal={() => setIsFilterModalOpen(true)}
-            onSelectDetail={(spot) => setSelectedSpot(spot)}
+            onSelectDetail={(spot) => {
+              setDetailSpot(spot);
+            }}
             savedSpotIds={savedSpotIds}
             onToggleSaveSpot={handleToggleSaveSpot}
             regionFilter={regionFilter}
@@ -780,12 +888,22 @@ export default function DomNhoHomePage() {
             originFilter={originFilter}
             onChangeOriginFilter={setOriginFilter}
             isSavedView={mainTab === 'saved'}
-            onBackToExplore={() => setMainTab('explore')}
+            onBackToExplore={() => handleTabChange('explore')}
             onTriggerUpdate={() => handleTriggerLiveCrawl('ALL')}
             isUpdating={isUpdatingFeed}
           />
         )}
       </main>
+
+      <DomNhoFooter
+        activeTab={mainTab}
+        onChangeTab={handleTabChange}
+        onOpenCreatePost={() => setIsCameraModalOpen(true)}
+        onOpenLocationPicker={() => setIsLocationPickerOpen(true)}
+        onOpenProfile={() => setIsProfileModalOpen(true)}
+        savedCount={savedSpotIds.size}
+        totalSpotsCount={visibleSpots.length}
+      />
 
       <MobileBottomNav
         activeTab={mainTab}
@@ -796,19 +914,37 @@ export default function DomNhoHomePage() {
       <AnimatePresence>
         {toastBanner && (
           <motion.div
-            initial={{ opacity: 0, y: -20, scale: 0.95 }}
+            initial={{ opacity: 0, y: -16, scale: 0.96 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -20, scale: 0.95 }}
-            className="fixed top-20 sm:top-24 left-1/2 -translate-x-1/2 z-[90] w-[92vw] max-w-md rounded-2xl px-4 py-3 bg-white border border-[#DDDCD4] shadow-xl flex items-start gap-3 pointer-events-none"
+            exit={{ opacity: 0, y: -16, scale: 0.96 }}
+            role="status"
+            aria-live="polite"
+            className={`fixed top-16 sm:top-20 inset-x-3 sm:inset-x-auto sm:left-1/2 sm:-translate-x-1/2 z-[130] max-w-md mx-auto rounded-xl px-3.5 py-3 bg-white border shadow-lg flex items-start gap-3 pointer-events-none overflow-hidden ${
+              toastBanner.tone === 'error'
+                ? 'border-[#AF421F]'
+                : 'border-[#DDDCD4]'
+            }`}
           >
-            <div className="w-8 h-8 rounded-full bg-[#E8EFE6] text-[#0E513B] flex items-center justify-center shrink-0 mt-0.5">
-              <BellRing className="w-4 h-4" />
+            <div
+              className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 mt-0.5 ${
+                toastBanner.tone === 'error'
+                  ? 'bg-[#FFF0E5] text-[#AF421F]'
+                  : 'bg-[#E8EFE6] text-[#0E513B]'
+              }`}
+            >
+              {toastBanner.tone === 'error' ? (
+                <AlertCircle className="w-4 h-4" />
+              ) : toastBanner.tone === 'success' ? (
+                <CheckCircle2 className="w-4 h-4" />
+              ) : (
+                <BellRing className="w-4 h-4" />
+              )}
             </div>
-            <div>
-              <p className="text-xs font-bold text-[#142820]">
+            <div className="min-w-0 flex-1 break-words">
+              <p className="text-xs font-extrabold text-[#142820] leading-snug break-words">
                 {toastBanner.title}
               </p>
-              <p className="text-[11px] mt-0.5 leading-snug text-[#52605A]">
+              <p className="text-[11px] mt-0.5 leading-snug text-[#52605A] break-words">
                 {toastBanner.subtitle}
               </p>
             </div>
@@ -820,6 +956,8 @@ export default function DomNhoHomePage() {
         isOpen={isLocationPickerOpen}
         onClose={() => setIsLocationPickerOpen(false)}
         currentLabel={coords.label}
+        currentLat={coords.lat}
+        currentLng={coords.lng}
         onSelectLocation={handleSelectPresetLocation}
         onRequestGps={handleRequestUserGpsWithToast}
         isLocatingGps={isLocating}
@@ -844,11 +982,11 @@ export default function DomNhoHomePage() {
       />
 
       <SpotDetailModal
-        spot={selectedSpot}
+        spot={detailSpot}
         themeId="morning_sun"
         userCoords={coords}
         userSession={userSession}
-        onClose={() => setSelectedSpot(null)}
+        onClose={() => setDetailSpot(null)}
         onBoostLight={handleBoostLight}
         onAddSighting={(spotId, sighting) => {
           updateSpotsAndPersist((prev) =>
@@ -858,15 +996,18 @@ export default function DomNhoHomePage() {
                 : s
             )
           );
-          showToast('Đã gửi thông tin nhìn thấy', 'Cảm ơn bạn đã hỗ trợ tìm kiếm bé!');
+          showToast('Đã gửi thông tin nhìn thấy', 'Cảm ơn bạn đã hỗ trợ tìm kiếm bé!', 'success');
         }}
         onUnlockContactRequest={handleUnlockContactOrAdopt}
         onResolveSpotToPeace={handleResolveSpotToPeace}
         onSaveSpotToGoogleMapsVault={handleSaveSpotToGoogleMapsVault}
         onFocusSpotOnMap={(spot) => {
           setSelectedSpot(spot);
-          setMainTab('map');
+          setDetailSpot(null);
+          handleTabChange('map');
         }}
+        isSaved={detailSpot ? savedSpotIds.has(detailSpot.id) : false}
+        onToggleSave={handleToggleSaveSpot}
       />
 
       <CameraQuickModal
@@ -877,6 +1018,7 @@ export default function DomNhoHomePage() {
         onSelectMatchedSpot={(spot) => {
           setIsCameraModalOpen(false);
           setSelectedSpot(spot);
+          setDetailSpot(spot);
         }}
         onClose={() => setIsCameraModalOpen(false)}
         onCreateSpot={handleCreateNewSpot}
@@ -944,6 +1086,7 @@ export default function DomNhoHomePage() {
         onClose={() => setDoubleMatches([])}
         onOpenMatchedSpot={(spot) => {
           setSelectedSpot(spot);
+          setDetailSpot(spot);
           setDoubleMatches([]);
         }}
       />

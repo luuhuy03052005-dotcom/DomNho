@@ -1,51 +1,71 @@
 'use client';
 
-import React from 'react';
-import { MapPin } from 'lucide-react';
-import { DomSpot } from '@/lib/types';
+import React, { useMemo } from 'react';
+import { MapPin, Navigation } from 'lucide-react';
+import { DomSpot, getSpotBadgeMeta } from '@/lib/types';
 import { isSpotPinAllowedOnMap } from '@/lib/spot-validation';
 
 interface ContextMapCardProps {
   spots: DomSpot[];
   onOpenFullMap: () => void;
+  onOpenLocationPicker?: () => void;
   userCoords: { lat: number; lng: number; label: string };
 }
 
 export default function ContextMapCard({
   spots,
   onOpenFullMap,
+  onOpenLocationPicker,
   userCoords,
 }: ContextMapCardProps) {
-  const totalPins = spots.filter((s) => isSpotPinAllowedOnMap(s)).length;
+  const pinnableSpots = useMemo(
+    () => spots.filter((s) => isSpotPinAllowedOnMap(s)),
+    [spots]
+  );
+
+  const categoryCounts = useMemo(() => {
+    let rescue = 0;
+    let lost = 0;
+    let adopt = 0;
+    for (const s of spots) {
+      const kind = getSpotBadgeMeta(s).categoryKind;
+      if (kind === 'RESCUE') rescue += 1;
+      else if (kind === 'LOST') lost += 1;
+      else adopt += 1;
+    }
+    return { rescue, lost, adopt };
+  }, [spots]);
 
   return (
-    <div className="bg-white rounded-xl border border-[#DDDCD4] p-4 sm:p-5 space-y-3">
-      <div className="flex items-center justify-between gap-2">
-        <div>
-          <h3 className="text-sm font-bold text-[#142820]">
+    <div className="bg-white rounded-[12px] border border-[#DDDCD4] p-4 sm:p-5 space-y-3.5 shadow-[0_3px_14px_rgba(20,40,32,0.04)]">
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <h3 className="text-sm sm:text-base font-extrabold text-[#142820]">
             Bản đồ quanh bạn
           </h3>
-          <p className="text-xs text-[#52605A] flex items-center gap-1 mt-0.5">
-            <MapPin className="w-3 h-3 text-[#0E513B] shrink-0" />
-            <span className="truncate">{userCoords.label || 'Thủ Đức, TP.HCM'}</span>
+          <p className="text-xs text-[#52605A] flex items-center gap-1 mt-0.5 truncate">
+            <MapPin className="w-3.5 h-3.5 text-[#0E513B] shrink-0" />
+            <span className="truncate">
+              {userCoords.label || 'Thủ Đức, TP.HCM'}
+            </span>
           </p>
         </div>
 
-        <span className="text-xs font-semibold text-[#0E513B] bg-[#E8EFE6] px-2.5 py-1 rounded-md shrink-0">
-          {totalPins} vị trí
+        <span className="text-xs font-bold text-[#0E513B] bg-[#E8EFE6] px-2.5 py-1 rounded-md shrink-0">
+          {pinnableSpots.length} vị trí
         </span>
       </div>
 
       <div
         onClick={onOpenFullMap}
-        className="relative w-full aspect-[16/10] rounded-lg overflow-hidden border border-[#DDDCD4] bg-[#F4F0E6] cursor-pointer"
-        title="Bấm để mở bản đồ"
+        className="relative w-full aspect-[16/10] rounded-[10px] overflow-hidden border border-[#DDDCD4] bg-[#F4F0E6] cursor-pointer group"
+        title="Bấm để mở bản đồ tương tác"
       >
         <svg
           viewBox="0 0 360 225"
           fill="none"
           xmlns="http://www.w3.org/2000/svg"
-          className="w-full h-full object-cover"
+          className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
           aria-hidden="true"
         >
           <rect width="360" height="225" fill="#F6F2E9" />
@@ -71,20 +91,91 @@ export default function ContextMapCard({
             strokeWidth="22"
             strokeLinecap="round"
           />
-          <circle cx="175" cy="112" r="7" fill="#0E513B" />
-          <circle cx="220" cy="68" r="9" fill="#AF421F" />
-          <circle cx="128" cy="72" r="9" fill="#0E513B" />
-          <circle cx="142" cy="152" r="8" fill="#80570D" />
+          <circle
+            cx="175"
+            cy="112"
+            r="8"
+            fill="#2563EB"
+            stroke="#FFFFFF"
+            strokeWidth="2.5"
+          />
+          <circle
+            cx="220"
+            cy="68"
+            r="9.5"
+            fill="#AF421F"
+            stroke="#FFFFFF"
+            strokeWidth="2"
+          />
+          <circle
+            cx="128"
+            cy="72"
+            r="9.5"
+            fill="#0E513B"
+            stroke="#FFFFFF"
+            strokeWidth="2"
+          />
+          <circle
+            cx="142"
+            cy="152"
+            r="8.5"
+            fill="#D4942A"
+            stroke="#FFFFFF"
+            strokeWidth="2"
+          />
         </svg>
       </div>
 
-      <button
-        type="button"
-        onClick={onOpenFullMap}
-        className="w-full h-10 px-4 rounded-lg bg-[#0E513B] hover:bg-[#0A412F] text-white text-xs sm:text-sm font-semibold flex items-center justify-center transition-colors"
-      >
-        Mở bản đồ tương tác →
-      </button>
+      <div className="grid grid-cols-3 gap-2 pt-0.5">
+        <div className="rounded-[9px] bg-[#FFF0E5]/70 border border-[#AF421F]/20 px-2.5 py-2 text-center">
+          <p className="text-sm font-extrabold text-[#AF421F] leading-none">
+            {categoryCounts.rescue}
+          </p>
+          <p className="text-[11px] font-semibold text-[#52605A] mt-1">
+            Cứu trợ
+          </p>
+        </div>
+
+        <div className="rounded-[9px] bg-[#FFF3D8]/80 border border-[#80570D]/20 px-2.5 py-2 text-center">
+          <p className="text-sm font-extrabold text-[#80570D] leading-none">
+            {categoryCounts.lost}
+          </p>
+          <p className="text-[11px] font-semibold text-[#52605A] mt-1">
+            Thú lạc
+          </p>
+        </div>
+
+        <div className="rounded-[9px] bg-[#E8EFE6]/85 border border-[#0E513B]/20 px-2.5 py-2 text-center">
+          <p className="text-sm font-extrabold text-[#0E513B] leading-none">
+            {categoryCounts.adopt}
+          </p>
+          <p className="text-[11px] font-semibold text-[#52605A] mt-1">
+            Nhận nuôi
+          </p>
+        </div>
+      </div>
+
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={onOpenFullMap}
+          className="flex-1 min-h-[42px] px-4 rounded-[10px] bg-[#0E513B] hover:bg-[#0A412F] text-white text-xs sm:text-sm font-bold flex items-center justify-center transition-colors"
+        >
+          Mở bản đồ tương tác →
+        </button>
+
+        {onOpenLocationPicker && (
+          <button
+            type="button"
+            onClick={onOpenLocationPicker}
+            className="min-h-[42px] px-3 rounded-[10px] bg-[#FAF7F1] hover:bg-[#F1EFE8] border border-[#DDDCD4] text-xs font-bold text-[#142820] flex items-center justify-center gap-1.5 shrink-0 transition-colors"
+            title="Đổi vị trí hoặc ghim trên bản đồ"
+          >
+            <Navigation className="w-3.5 h-3.5 text-[#AF421F]" />
+            <span>Ghim vị trí</span>
+          </button>
+        )}
+      </div>
     </div>
   );
 }

@@ -18,7 +18,7 @@ export default function SuccessStoryCard({ onOpenStory }: SuccessStoryCardProps)
           onOpenStory();
         }
       }}
-      className="bg-white rounded-xl border border-[#DDDCD4] p-4 sm:p-5 hover:border-[#0E513B] transition-colors cursor-pointer space-y-2.5"
+      className="bg-white rounded-[12px] border border-[#DDDCD4] p-4 sm:p-5 hover:border-[#0E513B] transition-colors cursor-pointer space-y-2.5 shadow-[0_3px_14px_rgba(20,40,32,0.04)]"
     >
       <p className="text-xs font-bold uppercase tracking-wider text-[#0E513B]">
         Ý nghĩa dự án

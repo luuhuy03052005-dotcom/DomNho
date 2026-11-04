@@ -506,7 +506,7 @@ export default function NearbySearchModal({
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-[#2A9D8F] text-white flex items-center gap-1">
                             <Stethoscope className="w-3 h-3" />
-                            Cách bạn {formatDistanceVi(distanceMeters)}
+                            {formatDistanceVi(distanceMeters)}
                           </span>
                           {vet.hotline && (
                             <span className="text-[11px] font-bold text-[#2A9D8F]">
@@ -561,7 +561,7 @@ export default function NearbySearchModal({
                   >
                     <p className="text-sm font-bold">
                       Chưa có đốm sáng nào có tọa độ trong bán kính{' '}
-                      {formatDistanceVi(searchRadiusMeters)} quanh vị trí này.
+                      {Math.round(searchRadiusMeters / 1000)} km quanh vị trí này.
                     </p>
                     <p
                       className="text-xs"
@@ -603,7 +603,7 @@ export default function NearbySearchModal({
                           />
                           {hasPin && distanceMeters !== null ? (
                             <span className="absolute bottom-1.5 left-1.5 px-2.5 py-1 rounded-full text-xs font-black bg-[#D2673B] text-white shadow-md ring-1 ring-white/30">
-                              Cách bạn {formatDistanceVi(distanceMeters)}
+                              {formatDistanceVi(distanceMeters)}
                             </span>
                           ) : (
                             <span className="absolute bottom-1.5 left-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#133E35] text-white backdrop-blur-md">

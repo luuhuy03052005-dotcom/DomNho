@@ -1,16 +1,13 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
+import { Layers, LocateFixed, Minus, Plus } from 'lucide-react';
 import {
-  Footprints,
-  Layers,
-  LocateFixed,
-  Minus,
-  Plus,
-  Radar,
-} from 'lucide-react';
-import { DomSpot, ThemeId, VetStation, isUserWebPost } from '@/lib/types';
-import { DOM_THEMES } from '@/lib/themes';
+  DomSpot,
+  ThemeId,
+  VetStation,
+  getSpotBadgeMeta,
+} from '@/lib/types';
 import { calculateDistanceMeters } from '@/lib/security';
 import { isSpotPinAllowedOnMap } from '@/lib/spot-validation';
 
@@ -31,7 +28,13 @@ interface DomNhoMapCanvasProps {
   newlyDroppedSpotId: string | null;
 }
 
-/** Escape chuỗi trước khi chèn vào HTML của marker (chống lỗi hiển thị / XSS từ dữ liệu bài viết) */
+interface StoredSpotMarker {
+  marker: any;
+  wrapper: HTMLDivElement;
+  circleEl: HTMLDivElement;
+  pinColor: string;
+}
+
 function escapeHtml(value: string): string {
   return String(value ?? '')
     .replace(/&/g, '&amp;')
@@ -41,30 +44,11 @@ function escapeHtml(value: string): string {
     .replace(/'/g, '&#39;');
 }
 
-/** Rút gọn tên hiển thị trên nhãn ghim bản đồ để không bị dài và đè lên nhau */
-function getCompactSpotLabel(spot: DomSpot): string {
-  const raw =
-    spot.entityCategory === 'RESCUE_CENTER'
-      ? spot.authorName || spot.title
-      : spot.breed || spot.title;
-  return raw
-    .replace(/^Cộng đồng\s+/i, '')
-    .replace(/^Trạm cứu hộ\s+/i, 'Trạm ')
-    .replace(/^Mái ấm Cứu trợ\s+/i, 'Mái ấm ')
-    .replace(/^Mái ấm\s+Mèo\s+cứu\s+hộ\s+/i, 'Mái ấm ')
-    .replace(/^Trung tâm Cứu trợ\s+/i, '')
-    .trim();
-}
-
-/**
- * Tính toán độ lệch pixel (offset [dx, dy]) cho các ghim ở gần nhau
- * để các icon không bao giờ nằm chồng khít lên nhau ở mức zoom thành phố.
- */
 function computeAntiOverlapOffsets(
   coordsList: { lat: number; lng: number }[]
 ): [number, number][] {
   const offsets: [number, number][] = coordsList.map(() => [0, 0]);
-  const PROXIMITY_DEG = 0.022; // ~2.2km
+  const PROXIMITY_DEG = 0.018;
   const RING_RADIUS_PX = 24;
 
   for (let i = 0; i < coordsList.length; i++) {
@@ -89,71 +73,75 @@ function computeAntiOverlapOffsets(
   return offsets;
 }
 
-/**
- * Tạo đa giác hình tròn địa lý thực tế (GeoJSON Polygon) theo bán kính mét trên bề mặt Trái Đất
- */
-function createGeoCirclePolygon(
-  centerLng: number,
-  centerLat: number,
-  radiusMeters: number,
-  points = 64
-) {
-  const coords: [number, number][] = [];
-  const distanceX =
-    radiusMeters / (111320 * Math.cos((centerLat * Math.PI) / 180));
-  const distanceY = radiusMeters / 110574;
-
-  for (let i = 0; i <= points; i++) {
-    const theta = (i / points) * (2 * Math.PI);
-    const x = distanceX * Math.cos(theta);
-    const y = distanceY * Math.sin(theta);
-    coords.push([centerLng + x, centerLat + y]);
+function getPinIconSvg(kind: 'RESCUE' | 'LOST' | 'ADOPT' | 'VET'): string {
+  if (kind === 'ADOPT') {
+    return `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M3 10.5L12 3L21 10.5V20C21 20.55 20.55 21 20 21H15V14H9V21H4C3.45 21 3 20.55 3 20V10.5Z" fill="#FFFFFF"/>
+    </svg>`;
   }
+  if (kind === 'LOST') {
+    return `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="7" cy="7.5" r="2.2" fill="#FFFFFF"/>
+      <circle cx="12" cy="5.5" r="2.2" fill="#FFFFFF"/>
+      <circle cx="17" cy="7.5" r="2.2" fill="#FFFFFF"/>
+      <path d="M7.2 16C6.4 12.8 9 10.8 12 10.8C15 10.8 17.6 12.8 16.8 16C16.2 18.2 14.3 19.6 12 19.6C9.7 19.6 7.8 18.2 7.2 16Z" fill="#FFFFFF"/>
+    </svg>`;
+  }
+  if (kind === 'VET') {
+    return `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M10 4H14V10H20V14H14V20H10V14H4V10H10V4Z" fill="#FFFFFF"/>
+    </svg>`;
+  }
+  return `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <circle cx="12" cy="12" r="8.5" stroke="#FFFFFF" stroke-width="2.2"/>
+    <circle cx="12" cy="12" r="3.5" stroke="#FFFFFF" stroke-width="2"/>
+    <path d="M6 6L9.5 9.5M18 6L14.5 9.5M6 18L9.5 14.5M18 18L14.5 14.5" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round"/>
+  </svg>`;
+}
 
-  return {
-    type: 'FeatureCollection' as const,
-    features: [
-      {
-        type: 'Feature' as const,
-        geometry: {
-          type: 'Polygon' as const,
-          coordinates: [coords],
-        },
-        properties: {},
-      },
-    ],
-  };
+function applySpotMarkerSelectionStyle(
+  entry: StoredSpotMarker,
+  isSelected: boolean
+) {
+  const sizePx = isSelected ? 44 : 36;
+  const borderRing = isSelected
+    ? `0 0 0 3.5px #FFFFFF, 0 0 0 6px ${entry.pinColor}55, 0 8px 20px rgba(20,40,32,0.38)`
+    : '0 0 0 2.5px #FFFFFF, 0 3px 10px rgba(20,40,32,0.25)';
+
+  entry.wrapper.style.zIndex = isSelected ? '65' : '30';
+  entry.circleEl.style.width = `${sizePx}px`;
+  entry.circleEl.style.height = `${sizePx}px`;
+  entry.circleEl.style.boxShadow = borderRing;
 }
 
 export default function DomNhoMapCanvas({
-  themeId,
   spots,
   selectedSpot,
   onSelectSpot,
   userCoords,
-  patrolModeActive,
-  searchRadiusMeters = 5000,
   focusCoordsTrigger,
-  onStepPatrolWalk,
   onRequestRealGps,
-  onOpenNearbySearch,
   showVetStations,
   vetStations,
 }: DomNhoMapCanvasProps) {
-  const theme = DOM_THEMES[themeId];
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapInstanceRef = useRef<any>(null);
   const maplibreglRef = useRef<any>(null);
-  const spotMarkersRef = useRef<any[]>([]);
+  const spotMarkersMapRef = useRef<Map<string, StoredSpotMarker>>(new Map());
   const vetMarkersRef = useRef<any[]>([]);
   const userMarkerRef = useRef<any>(null);
+  const selectedSpotRef = useRef<DomSpot | null>(selectedSpot);
+  selectedSpotRef.current = selectedSpot;
+  const onSelectSpotRef = useRef(onSelectSpot);
+  onSelectSpotRef.current = onSelectSpot;
+
   const [mapReady, setMapReady] = useState(false);
-  const [currentZoom, setCurrentZoom] = useState<number>(13.2);
-  const [mapLayerMode, setMapLayerMode] = useState<'roadmap' | 'hybrid'>('roadmap');
+  const [mapLayerMode, setMapLayerMode] = useState<'roadmap' | 'hybrid'>(
+    'roadmap'
+  );
 
   const googleMapsApiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '';
 
-  // 1. Khởi tạo Bản đồ Google Maps Thực Tế 100% (Tile Server chính thức của Google Maps)
   useEffect(() => {
     let cancelled = false;
 
@@ -164,7 +152,9 @@ export default function DomNhoMapCanvas({
 
       maplibreglRef.current = maplibregl;
 
-      const keyParam = googleMapsApiKey ? `&key=${encodeURIComponent(googleMapsApiKey)}` : '';
+      const keyParam = googleMapsApiKey
+        ? `&key=${encodeURIComponent(googleMapsApiKey)}`
+        : '';
 
       const googleMapStyle: any = {
         version: 8,
@@ -178,7 +168,7 @@ export default function DomNhoMapCanvas({
               `https://mt3.google.com/vt/lyrs=m&hl=vi&gl=VN&x={x}&y={y}&z={z}${keyParam}`,
             ],
             tileSize: 256,
-            attribution: 'Dữ liệu bản đồ ©2026 Google Maps Việt Nam',
+            attribution: 'Dữ liệu bản đồ © Google Maps',
           },
           'google-hybrid-tiles': {
             type: 'raster',
@@ -189,7 +179,7 @@ export default function DomNhoMapCanvas({
               `https://mt3.google.com/vt/lyrs=y&hl=vi&gl=VN&x={x}&y={y}&z={z}${keyParam}`,
             ],
             tileSize: 256,
-            attribution: 'Ảnh vệ tinh ©2026 Google Maps',
+            attribution: 'Ảnh vệ tinh © Google Maps',
           },
         },
         layers: [
@@ -217,78 +207,17 @@ export default function DomNhoMapCanvas({
         container: mapContainerRef.current,
         style: googleMapStyle,
         center: [userCoords.lng, userCoords.lat],
-        zoom: 12.8,
+        zoom: 11.6,
         minZoom: 4,
         maxZoom: 20,
-        attributionControl: true,
+        attributionControl: false,
       });
 
       mapInstanceRef.current = map;
 
-      map.on('zoomend', () => {
-        if (!cancelled) {
-          setCurrentZoom(map.getZoom());
-        }
-      });
-
       map.on('load', () => {
         if (cancelled) return;
-
-        // Thêm nguồn GeoJSON cho Vòng Radar Đi Dạo 500m
-        map.addSource('patrol-500m-source', {
-          type: 'geojson',
-          data: createGeoCirclePolygon(userCoords.lng, userCoords.lat, 500),
-        });
-
-        map.addLayer({
-          id: 'patrol-500m-fill',
-          type: 'fill',
-          source: 'patrol-500m-source',
-          paint: {
-            'fill-color': '#2A9D8F',
-            'fill-opacity': 0.11,
-          },
-        });
-
-        map.addLayer({
-          id: 'patrol-500m-outline',
-          type: 'line',
-          source: 'patrol-500m-source',
-          paint: {
-            'line-color': '#2A9D8F',
-            'line-width': 2,
-            'line-dasharray': [3, 2],
-            'line-opacity': 0.65,
-          },
-        });
-
-        // Thêm nguồn GeoJSON cho Vòng Làm Mờ Tọa Độ ±200m của Đốm đang chọn
-        map.addSource('spot-fuzz-200m-source', {
-          type: 'geojson',
-          data: createGeoCirclePolygon(userCoords.lng, userCoords.lat, 0),
-        });
-
-        map.addLayer({
-          id: 'spot-fuzz-200m-fill',
-          type: 'fill',
-          source: 'spot-fuzz-200m-source',
-          paint: {
-            'fill-color': '#E63946',
-            'fill-opacity': 0.14,
-          },
-        });
-
-        map.addLayer({
-          id: 'spot-fuzz-200m-outline',
-          type: 'line',
-          source: 'spot-fuzz-200m-source',
-          paint: {
-            'line-color': '#E63946',
-            'line-width': 1.8,
-            'line-opacity': 0.6,
-          },
-        });
-
+        map.resize();
         setMapReady(true);
       });
     }
@@ -297,6 +226,8 @@ export default function DomNhoMapCanvas({
 
     return () => {
       cancelled = true;
+      spotMarkersMapRef.current.forEach((entry) => entry.marker.remove());
+      spotMarkersMapRef.current.clear();
       if (mapInstanceRef.current) {
         mapInstanceRef.current.remove();
         mapInstanceRef.current = null;
@@ -304,7 +235,42 @@ export default function DomNhoMapCanvas({
     };
   }, []);
 
-  // 2. Chuyển đổi chế độ Bản đồ Đường phố / Vệ tinh Google Maps
+  useEffect(() => {
+    const container = mapContainerRef.current;
+    if (!container) return;
+
+    const syncMapSizeAndCamera = () => {
+      const map = mapInstanceRef.current;
+      if (!map) return;
+      map.resize();
+      const activeSpot = selectedSpotRef.current;
+      if (activeSpot && isSpotPinAllowedOnMap(activeSpot)) {
+        map.easeTo({
+          center: [activeSpot.publicLng, activeSpot.publicLat],
+          duration: 240,
+        });
+      }
+    };
+
+    let observer: ResizeObserver | null = null;
+    if (typeof ResizeObserver !== 'undefined') {
+      observer = new ResizeObserver(syncMapSizeAndCamera);
+      observer.observe(container);
+    }
+
+    window.addEventListener('orientationchange', syncMapSizeAndCamera);
+    window.visualViewport?.addEventListener('resize', syncMapSizeAndCamera);
+
+    return () => {
+      observer?.disconnect();
+      window.removeEventListener('orientationchange', syncMapSizeAndCamera);
+      window.visualViewport?.removeEventListener(
+        'resize',
+        syncMapSizeAndCamera
+      );
+    };
+  }, [mapReady]);
+
   useEffect(() => {
     const map = mapInstanceRef.current;
     if (!map || !mapReady) return;
@@ -320,44 +286,27 @@ export default function DomNhoMapCanvas({
         mapLayerMode === 'hybrid' ? 'visible' : 'none'
       );
     } catch {
-      // ignore if style not ready
+      // ignore if style is still loading
     }
   }, [mapLayerMode, mapReady]);
 
-  // 3. Cập nhật vị trí GPS của Người dùng & Vòng Radar Tìm kiếm Gần bạn trên Google Maps
   useEffect(() => {
     const map = mapInstanceRef.current;
     const maplibregl = maplibreglRef.current;
     if (!map || !maplibregl || !mapReady) return;
 
-    const visualRadius = patrolModeActive
-      ? Math.min(searchRadiusMeters || 500, 10000)
-      : 0;
-
-    const patrolSource = map.getSource('patrol-500m-source');
-    if (patrolSource) {
-      patrolSource.setData(
-        createGeoCirclePolygon(
-          userCoords.lng,
-          userCoords.lat,
-          visualRadius
-        )
-      );
-    }
-
     if (!userMarkerRef.current) {
       const el = document.createElement('div');
-      el.className = 'relative flex flex-col items-center pointer-events-none';
+      el.className =
+        'relative flex items-center justify-center pointer-events-none';
       el.innerHTML = `
-        <div class="relative flex items-center justify-center">
-          <span class="absolute w-9 h-9 rounded-full bg-[#2A9D8F]/35 animate-ping"></span>
-          <div class="w-5 h-5 rounded-full bg-[#2A9D8F] flex items-center justify-center shadow-lg" style="box-shadow: 0 0 0 3px #FFFDF9;">
-            <div class="w-2 h-2 rounded-full bg-white"></div>
-          </div>
+        <div class="relative flex items-center justify-center" title="Vị trí của bạn">
+          <span class="w-9 h-9 rounded-full" style="background-color: rgba(37, 99, 235, 0.22);"></span>
+          <div
+            class="absolute w-4 h-4 rounded-full"
+            style="background-color: #2563EB; box-shadow: 0 0 0 3px #FFFFFF, 0 2px 6px rgba(37,99,235,0.45);"
+          ></div>
         </div>
-        <span class="mt-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#2C2623]/90 text-[#FFFDF9] shadow whitespace-nowrap">
-          Vị trí của bạn
-        </span>
       `;
       userMarkerRef.current = new maplibregl.Marker({
         element: el,
@@ -368,67 +317,39 @@ export default function DomNhoMapCanvas({
     } else {
       userMarkerRef.current.setLngLat([userCoords.lng, userCoords.lat]);
     }
-  }, [userCoords.lat, userCoords.lng, patrolModeActive, searchRadiusMeters, mapReady]);
+  }, [userCoords.lat, userCoords.lng, mapReady]);
 
-  // Bay mượt tới tọa độ khi người dùng bấm Định vị GPS hoặc Chọn vị trí tìm kiếm gần bạn
   useEffect(() => {
     const map = mapInstanceRef.current;
     if (!map || !mapReady || !focusCoordsTrigger) return;
     map.flyTo({
       center: [focusCoordsTrigger.lng, focusCoordsTrigger.lat],
-      zoom: 14.2,
-      duration: 850,
+      zoom: 13.8,
+      duration: 650,
     });
   }, [focusCoordsTrigger, mapReady]);
-
-  useEffect(() => {
-    const map = mapInstanceRef.current;
-    if (!map || !mapReady) return;
-
-    const fuzzSource = map.getSource('spot-fuzz-200m-source');
-    if (selectedSpot && isSpotPinAllowedOnMap(selectedSpot)) {
-      if (fuzzSource) {
-        fuzzSource.setData(
-          createGeoCirclePolygon(
-            selectedSpot.publicLng,
-            selectedSpot.publicLat,
-            selectedSpot.fuzzRadiusMeters || 200
-          )
-        );
-      }
-      map.flyTo({
-        center: [selectedSpot.publicLng, selectedSpot.publicLat],
-        zoom: Math.max(map.getZoom(), 14.6),
-        duration: 850,
-      });
-    } else if (fuzzSource) {
-      fuzzSource.setData(createGeoCirclePolygon(userCoords.lng, userCoords.lat, 0));
-    }
-  }, [selectedSpot, mapReady, userCoords.lat, userCoords.lng]);
 
   useEffect(() => {
     const map = mapInstanceRef.current;
     const maplibregl = maplibreglRef.current;
     if (!map || !maplibregl || !mapReady) return;
 
-    spotMarkersRef.current.forEach((m) => m.remove());
-    spotMarkersRef.current = [];
+    spotMarkersMapRef.current.forEach((entry) => entry.marker.remove());
+    spotMarkersMapRef.current.clear();
 
     const pinnableSpots = spots.filter((s) => isSpotPinAllowedOnMap(s));
     const antiOverlapOffsets = computeAntiOverlapOffsets(
       pinnableSpots.map((s) => ({ lat: s.publicLat, lng: s.publicLng }))
     );
-    const showCompactLabels = currentZoom >= 11.4;
 
     pinnableSpots.forEach((spot, idx) => {
-      const dotHex =
-        spot.spotType === 'RED_SOS'
-          ? '#E63946'
-          : spot.spotType === 'ORANGE_SIGHT'
-          ? '#E07A5F'
-          : spot.spotType === 'YELLOW_ADOPT'
-          ? '#F4A261'
-          : '#2A9D8F';
+      const meta = getSpotBadgeMeta(spot);
+      const pinColor =
+        meta.categoryKind === 'RESCUE'
+          ? '#C84B24'
+          : meta.categoryKind === 'LOST'
+          ? '#D4942A'
+          : '#0E513B';
 
       const distMeters = calculateDistanceMeters(
         userCoords.lat,
@@ -441,157 +362,80 @@ export default function DomNhoMapCanvas({
           ? `${distMeters}m`
           : `${(distMeters / 1000).toFixed(1)}km`;
 
-      const isSelected = selectedSpot?.id === spot.id;
-      const isUserPost = isUserWebPost(spot);
-      const shortLabel = escapeHtml(getCompactSpotLabel(spot));
       const offsetPair = antiOverlapOffsets[idx] || [0, 0];
+      const iconSvg = getPinIconSvg(meta.categoryKind);
 
       const wrapper = document.createElement('div');
       wrapper.style.cursor = 'pointer';
-
-      if (spot.entityCategory === 'RESCUE_CENTER') {
-        wrapper.style.zIndex = isSelected ? '60' : '30';
-        const labelVisibilityClass =
-          showCompactLabels || isSelected
-            ? 'flex'
-            : 'hidden group-hover:flex';
-
-        wrapper.innerHTML = `
-          <div class="relative flex flex-col items-center group" title="${escapeHtml(spot.title)} (${distText})">
-            <div
-              class="relative w-[34px] h-[34px] rounded-[11px] flex items-center justify-center shadow-md transition-transform duration-150 group-hover:scale-110"
-              style="background: linear-gradient(145deg, #2A9D8F 0%, #1B7268 100%); box-shadow: 0 3px 10px rgba(42,157,143,0.45), 0 0 0 2px #FFFDF9;"
-            >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M3 10.5L12 3l9 7.5V20a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-9.5z" fill="#FFFDF9"/>
-                <path d="M12 18.2s-3.6-2.2-3.6-4.6c0-1.2.9-2.1 2-2.1.7 0 1.3.4 1.6.9.3-.5.9-.9 1.6-.9 1.1 0 2 .9 2 2.1 0 2.4-3.6 4.6-3.6 4.6z" fill="#E63946"/>
-              </svg>
-            </div>
-            <div
-              class="${labelVisibilityClass} mt-0.5 px-1.5 py-0.5 rounded-md shadow-sm items-center gap-1 whitespace-nowrap"
-              style="background-color: #2A9D8F; color: #FFFFFF;"
-            >
-              <span class="text-[10px] font-bold max-w-[120px] truncate">${shortLabel} • ${distText}</span>
-            </div>
-          </div>
-        `;
-
-        wrapper.addEventListener('mouseenter', () => {
-          wrapper.style.zIndex = '65';
-        });
-        wrapper.addEventListener('mouseleave', () => {
-          wrapper.style.zIndex = isSelected ? '60' : '30';
-        });
-        wrapper.addEventListener('click', (e) => {
-          e.stopPropagation();
-          onSelectSpot(spot);
-        });
-
-        const centerMarker = new maplibregl.Marker({
-          element: wrapper,
-          anchor: 'center',
-          offset: offsetPair,
-        })
-          .setLngLat([spot.publicLng, spot.publicLat])
-          .addTo(map);
-        spotMarkersRef.current.push(centerMarker);
-        return;
-      }
-
-      wrapper.style.zIndex = isSelected
-        ? '60'
-        : spot.spotType === 'RED_SOS'
-        ? '35'
-        : '25';
-      const labelVisibilityClass =
-        showCompactLabels || isSelected
-          ? 'flex'
-          : 'hidden group-hover:flex';
+      wrapper.setAttribute('data-spot-pin-id', spot.id);
 
       wrapper.innerHTML = `
-        <div class="relative flex flex-col items-center group" title="${escapeHtml(spot.title)} (${distText})">
-          <div class="relative flex items-center justify-center" style="width: 38px; height: 38px;">
-            <span
-              class="dom-marker-ring"
-              style="width: 42px; height: 42px; background-color: ${dotHex};"
-            ></span>
-            <div
-              class="relative w-9 h-9 rounded-full p-0.5 shadow-md transition-transform duration-150 group-hover:scale-110 ${
-                spot.spotType === 'RED_SOS' ? 'dom-marker-core-sos' : ''
-              }"
-              style="background-color: ${dotHex}; box-shadow: 0 3px 10px ${dotHex}66, 0 0 0 2px #FFFDF9;"
-            >
-              <img
-                src="${escapeHtml(spot.images[0] || 'https://images.unsplash.com/photo-1543852786-1cf6624b9987?auto=format&fit=crop&w=400&q=80')}"
-                alt="${escapeHtml(spot.breed)}"
-                referrerpolicy="no-referrer"
-                onerror="this.onerror=null;this.src='https://images.unsplash.com/photo-1543852786-1cf6624b9987?auto=format&fit=crop&w=400&q=80';"
-                class="w-full h-full object-cover rounded-full"
-              />
-              <span
-                class="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full flex items-center justify-center text-[8px] font-bold text-white shadow"
-                style="background-color: ${isUserPost ? '#2A9D8F' : dotHex};"
-              >
-                ${
-                  isUserPost
-                    ? 'W'
-                    : spot.spotType === 'RED_SOS'
-                    ? '!'
-                    : spot.spotType === 'GREEN_PEACE'
-                    ? '✓'
-                    : '✦'
-                }
-              </span>
-            </div>
+        <div
+          class="relative flex flex-col items-center group transition-transform duration-150 hover:scale-110"
+          style="display: flex; flex-direction: column; align-items: center;"
+          title="${escapeHtml(spot.title)} (${distText})"
+        >
+          <div
+            data-pin-circle="1"
+            class="relative flex items-center justify-center rounded-full transition-all duration-150"
+            style="width: 36px; height: 36px; border-radius: 9999px; display: flex; align-items: center; justify-content: center; background-color: ${pinColor}; box-shadow: 0 0 0 2.5px #FFFFFF, 0 3px 10px rgba(20,40,32,0.25);"
+          >
+            ${iconSvg}
           </div>
           <div
-            class="${labelVisibilityClass} mt-0.5 px-1.5 py-0.5 rounded-full shadow-sm backdrop-blur-md items-center gap-1 whitespace-nowrap"
-            style="background-color: ${theme.frostedBg}; color: ${theme.textHex};"
-          >
-            <span class="w-1.5 h-1.5 rounded-full shrink-0" style="background-color: ${dotHex};"></span>
-            <span class="text-[10px] font-bold max-w-[110px] truncate">${shortLabel} • ${distText}</span>
-          </div>
+            style="width: 0; height: 0; border-left: 6px solid transparent; border-right: 6px solid transparent; border-top: 8px solid ${pinColor}; margin-top: -1px;"
+          ></div>
         </div>
       `;
 
-      wrapper.addEventListener('mouseenter', () => {
-        wrapper.style.zIndex = '65';
-      });
-      wrapper.addEventListener('mouseleave', () => {
-        wrapper.style.zIndex = isSelected
-          ? '60'
-          : spot.spotType === 'RED_SOS'
-          ? '35'
-          : '25';
-      });
+      const circleEl = wrapper.querySelector(
+        '[data-pin-circle="1"]'
+      ) as HTMLDivElement;
+
       wrapper.addEventListener('click', (e) => {
         e.stopPropagation();
-        onSelectSpot(spot);
+        onSelectSpotRef.current(spot);
       });
 
       const marker = new maplibregl.Marker({
         element: wrapper,
-        anchor: 'center',
+        anchor: 'bottom',
         offset: offsetPair,
       })
         .setLngLat([spot.publicLng, spot.publicLat])
         .addTo(map);
 
-      spotMarkersRef.current.push(marker);
+      const entry: StoredSpotMarker = {
+        marker,
+        wrapper,
+        circleEl,
+        pinColor,
+      };
+      applySpotMarkerSelectionStyle(
+        entry,
+        selectedSpotRef.current?.id === spot.id
+      );
+      spotMarkersMapRef.current.set(spot.id, entry);
     });
-  }, [
-    spots,
-    selectedSpot?.id,
-    currentZoom,
-    userCoords.lat,
-    userCoords.lng,
-    theme.frostedBg,
-    theme.textHex,
-    mapReady,
-    onSelectSpot,
-  ]);
+  }, [spots, userCoords.lat, userCoords.lng, mapReady]);
 
-  // 6. Render các Bệnh viện / Phòng khám Thú Y Cấp Cứu 24/7 dạng ghim nhỏ gọn (không tràn chữ)
+  useEffect(() => {
+    const map = mapInstanceRef.current;
+    if (!map || !mapReady) return;
+
+    spotMarkersMapRef.current.forEach((entry, spotId) => {
+      applySpotMarkerSelectionStyle(entry, selectedSpot?.id === spotId);
+    });
+
+    if (selectedSpot && isSpotPinAllowedOnMap(selectedSpot)) {
+      map.flyTo({
+        center: [selectedSpot.publicLng, selectedSpot.publicLat],
+        zoom: Math.max(map.getZoom(), 13.8),
+        duration: 500,
+      });
+    }
+  }, [selectedSpot, mapReady]);
+
   useEffect(() => {
     const map = mapInstanceRef.current;
     const maplibregl = maplibreglRef.current;
@@ -603,31 +447,23 @@ export default function DomNhoMapCanvas({
     if (!showVetStations) return;
 
     vetStations.forEach((vet) => {
-      const shortVetName = vet.name
-        .replace(/^Bệnh viện Thú y\s+/i, 'BV ')
-        .replace(/^Phòng khám Thú y\s+/i, 'PK ')
-        .replace(/^Trung tâm Thú y\s+/i, 'TT ');
-
       const el = document.createElement('div');
       el.style.cursor = 'pointer';
-      el.style.zIndex = '18';
+      el.style.zIndex = '22';
       el.innerHTML = `
         <div
-          class="relative flex flex-col items-center group"
+          class="relative flex flex-col items-center group transition-transform duration-150 hover:scale-110"
           title="${escapeHtml(`${vet.name} • ${vet.address}${vet.hotline ? ` • Hotline: ${vet.hotline}` : ''}`)}"
         >
           <div
-            class="w-7 h-7 rounded-full flex items-center justify-center shadow-md transition-transform group-hover:scale-110"
-            style="background-color: #0F766E; color: #FFFFFF; box-shadow: 0 2px 8px rgba(15,118,110,0.45), 0 0 0 2px #FFFDF9;"
+            class="w-8 h-8 rounded-full flex items-center justify-center"
+            style="background-color: #8E44AD; box-shadow: 0 0 0 2.5px #FFFFFF, 0 3px 10px rgba(142,68,173,0.35);"
           >
-            <span class="text-xs leading-none">🏥</span>
+            ${getPinIconSvg('VET')}
           </div>
-          <span
-            class="mt-0.5 px-1.5 py-0.5 rounded-md text-[9px] font-bold shadow-sm max-w-[86px] truncate whitespace-nowrap"
-            style="background-color: #0F766E; color: #FFFFFF;"
-          >
-            ${escapeHtml(shortVetName)}
-          </span>
+          <div
+            style="width: 0; height: 0; border-left: 5px solid transparent; border-right: 5px solid transparent; border-top: 7px solid #8E44AD; margin-top: -1px;"
+          ></div>
         </div>
       `;
 
@@ -641,7 +477,7 @@ export default function DomNhoMapCanvas({
 
       const marker = new maplibregl.Marker({
         element: el,
-        anchor: 'center',
+        anchor: 'bottom',
       })
         .setLngLat([vet.lng, vet.lat])
         .addTo(map);
@@ -651,38 +487,95 @@ export default function DomNhoMapCanvas({
   }, [showVetStations, vetStations, mapReady]);
 
   const handleZoomIn = () => {
-    mapInstanceRef.current?.zoomIn({ duration: 300 });
+    mapInstanceRef.current?.zoomIn({ duration: 220 });
   };
 
   const handleZoomOut = () => {
-    mapInstanceRef.current?.zoomOut({ duration: 300 });
+    mapInstanceRef.current?.zoomOut({ duration: 220 });
   };
 
   const handleCenterOnUser = () => {
     onRequestRealGps();
     mapInstanceRef.current?.flyTo({
       center: [userCoords.lng, userCoords.lat],
-      zoom: 14.5,
-      duration: 800,
+      zoom: 14,
+      duration: 600,
     });
   };
 
   return (
-    <div className="relative w-full h-full overflow-hidden">
-      <div
-        ref={mapContainerRef}
-        className="absolute inset-0 w-full h-full transition-all duration-500"
-        style={{
-          filter: mapLayerMode === 'roadmap' ? theme.mapTileFilter : 'none',
-        }}
-      />
+    <div className="relative w-full h-full overflow-hidden bg-[#EFECE4]">
+      <div ref={mapContainerRef} className="absolute inset-0 w-full h-full" />
 
-      <div className="absolute right-3 sm:right-4 bottom-28 sm:bottom-8 z-20 flex flex-col gap-2">
+      <div className="hidden md:block absolute left-4 bottom-4 z-20 bg-white/95 border border-[#DDDCD4] rounded-[12px] p-3 shadow-sm space-y-2 pointer-events-none select-none">
+        <div className="flex items-center gap-2.5 text-xs font-semibold text-[#142820]">
+          <span className="w-5 h-5 rounded-full bg-[#0E513B] flex items-center justify-center shrink-0">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none">
+              <path
+                d="M3 10.5L12 3L21 10.5V20H15V14H9V20H3V10.5Z"
+                fill="#FFFFFF"
+              />
+            </svg>
+          </span>
+          <span>Trạm &amp; Nhận nuôi</span>
+        </div>
+
+        <div className="flex items-center gap-2.5 text-xs font-semibold text-[#142820]">
+          <span className="w-5 h-5 rounded-full bg-[#C84B24] flex items-center justify-center shrink-0">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none">
+              <circle
+                cx="12"
+                cy="12"
+                r="8"
+                stroke="#FFFFFF"
+                strokeWidth="2.4"
+              />
+              <path
+                d="M12 8V16M8 12H16"
+                stroke="#FFFFFF"
+                strokeWidth="2.4"
+                strokeLinecap="round"
+              />
+            </svg>
+          </span>
+          <span>Cứu trợ</span>
+        </div>
+
+        <div className="flex items-center gap-2.5 text-xs font-semibold text-[#142820]">
+          <span className="w-5 h-5 rounded-full bg-[#D4942A] flex items-center justify-center shrink-0">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none">
+              <circle cx="7" cy="8" r="2.2" fill="#FFFFFF" />
+              <circle cx="12" cy="6" r="2.2" fill="#FFFFFF" />
+              <circle cx="17" cy="8" r="2.2" fill="#FFFFFF" />
+              <path
+                d="M7.5 16C7 13 9 11 12 11C15 11 17 13 16.5 16C16 18 14 19.5 12 19.5C10 19.5 8 18 7.5 16Z"
+                fill="#FFFFFF"
+              />
+            </svg>
+          </span>
+          <span>Thú lạc</span>
+        </div>
+
+        <div className="flex items-center gap-2.5 text-xs font-semibold text-[#142820]">
+          <span className="w-5 h-5 rounded-full bg-[#8E44AD] flex items-center justify-center shrink-0">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none">
+              <path
+                d="M10 4H14V10H20V14H14V20H10V14H4V10H10V4Z"
+                fill="#FFFFFF"
+              />
+            </svg>
+          </span>
+          <span>Thú y</span>
+        </div>
+      </div>
+
+      <div className="absolute right-3 sm:right-4 bottom-9 sm:bottom-10 z-20 flex flex-col gap-1.5">
         <button
           type="button"
           onClick={handleZoomIn}
-          className="w-10 h-10 rounded-full flex items-center justify-center shadow-lg border border-[#DDDCD4] bg-white/95 text-[#142820] hover:border-[#0E513B] transition-transform active:scale-90"
+          className="min-w-[44px] min-h-[44px] rounded-[10px] flex items-center justify-center shadow-sm border border-[#DDDCD4] bg-white/95 text-[#142820] hover:border-[#0E513B] transition-colors"
           title="Phóng to bản đồ"
+          aria-label="Phóng to bản đồ"
         >
           <Plus className="w-4 h-4" />
         </button>
@@ -690,8 +583,9 @@ export default function DomNhoMapCanvas({
         <button
           type="button"
           onClick={handleZoomOut}
-          className="w-10 h-10 rounded-full flex items-center justify-center shadow-lg border border-[#DDDCD4] bg-white/95 text-[#142820] hover:border-[#0E513B] transition-transform active:scale-90"
+          className="min-w-[44px] min-h-[44px] rounded-[10px] flex items-center justify-center shadow-sm border border-[#DDDCD4] bg-white/95 text-[#142820] hover:border-[#0E513B] transition-colors"
           title="Thu nhỏ bản đồ"
+          aria-label="Thu nhỏ bản đồ"
         >
           <Minus className="w-4 h-4" />
         </button>
@@ -701,12 +595,13 @@ export default function DomNhoMapCanvas({
           onClick={() =>
             setMapLayerMode((m) => (m === 'roadmap' ? 'hybrid' : 'roadmap'))
           }
-          className={`w-10 h-10 rounded-full flex items-center justify-center shadow-lg border transition-transform active:scale-90 ${
+          className={`min-w-[44px] min-h-[44px] rounded-[10px] flex items-center justify-center shadow-sm border transition-colors ${
             mapLayerMode === 'hybrid'
               ? 'bg-[#0E513B] text-white border-[#0E513B]'
-              : 'bg-white/95 text-[#142820] border-[#DDDCD4]'
+              : 'bg-white/95 text-[#142820] border-[#DDDCD4] hover:border-[#0E513B]'
           }`}
-          title="Chuyển đổi Bản đồ Đường phố / Vệ tinh"
+          title="Đổi lớp bản đồ Đường phố / Vệ tinh"
+          aria-label="Đổi lớp bản đồ"
         >
           <Layers className="w-4 h-4" />
         </button>
@@ -714,11 +609,16 @@ export default function DomNhoMapCanvas({
         <button
           type="button"
           onClick={handleCenterOnUser}
-          className="w-10 h-10 rounded-full flex items-center justify-center shadow-lg border border-[#DDDCD4] bg-white/95 text-[#0E513B] hover:border-[#0E513B] transition-transform active:scale-90"
-          title="Định vị GPS của bạn"
+          className="min-w-[44px] min-h-[44px] rounded-[10px] flex items-center justify-center shadow-sm border border-[#DDDCD4] bg-white/95 text-[#142820] hover:border-[#0E513B] transition-colors"
+          title="Vị trí của tôi"
+          aria-label="Vị trí của tôi"
         >
           <LocateFixed className="w-4 h-4" />
         </button>
+      </div>
+
+      <div className="absolute right-2.5 bottom-2 z-10 px-2.5 py-0.5 rounded-full bg-white/90 border border-[#DDDCD4] text-[10px] font-medium text-[#52605A] pointer-events-none select-none">
+        Dữ liệu bản đồ © Google Maps
       </div>
     </div>
   );

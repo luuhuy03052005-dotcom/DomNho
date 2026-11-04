@@ -1,27 +1,27 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import React, { useEffect, useRef, useState } from 'react';
 import {
-  BookmarkPlus,
+  ArrowLeft,
+  ArrowRight,
+  Bookmark,
   Camera,
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
+  Clock,
+  Compass,
   Download,
   ExternalLink,
   Flame,
-  Globe,
-  Lock,
-  Map,
+  Heart,
   MapPin,
   MessageCircle,
   Navigation,
+  Phone,
   QrCode,
-  Send,
-  Unlock,
+  ShieldCheck,
   X,
-  Maximize2,
   ZoomIn,
 } from 'lucide-react';
 import ImageLightboxModal from '@/components/modals/ImageLightboxModal';
@@ -32,20 +32,23 @@ import {
   UserSession,
   getFriendlySourceName,
   getPlatformBadgeMeta,
+  getSpotBadgeMeta,
   isUserWebPost,
 } from '@/lib/types';
-import { DOM_THEMES, SPOT_LEXICON } from '@/lib/themes';
 import { calculateDistanceMeters, formatDistanceVi } from '@/lib/security';
-import { isSpotPinAllowedOnMap } from '@/lib/spot-validation';
 import {
   compressImageToWebpClient,
   generateRescuePosterDataUrl,
 } from '@/lib/image-compressor';
+import { isSpotPinAllowedOnMap } from '@/lib/spot-validation';
+
+const FALLBACK_PET_IMAGE =
+  'https://images.unsplash.com/photo-1543852786-1cf6624b9987?auto=format&fit=crop&w=900&q=80';
 
 interface SpotDetailModalProps {
   spot: DomSpot | null;
   themeId: ThemeId;
-  userCoords: { lat: number; lng: number };
+  userCoords: { lat: number; lng: number; label: string };
   userSession: UserSession | null;
   onClose: () => void;
   onBoostLight: (spotId: string) => void;
@@ -57,12 +60,13 @@ interface SpotDetailModalProps {
   ) => void;
   onResolveSpotToPeace: (spotId: string) => void;
   onSaveSpotToGoogleMapsVault: (spot: DomSpot) => void;
-  onFocusSpotOnMap?: (spot: DomSpot) => void;
+  onFocusSpotOnMap: (spot: DomSpot) => void;
+  isSaved?: boolean;
+  onToggleSave?: (spot: DomSpot) => void;
 }
 
 export default function SpotDetailModal({
   spot,
-  themeId,
   userCoords,
   userSession,
   onClose,
@@ -72,374 +76,416 @@ export default function SpotDetailModal({
   onResolveSpotToPeace,
   onSaveSpotToGoogleMapsVault,
   onFocusSpotOnMap,
+  isSaved = false,
+  onToggleSave,
 }: SpotDetailModalProps) {
-  const theme = DOM_THEMES[themeId];
   const [imageIndex, setImageIndex] = useState(0);
-  const [isLightboxOpen, setIsLightboxOpen] = useState(false);
   const [failedImages, setFailedImages] = useState<Record<number, boolean>>({});
+  const [isLightboxOpen, setIsLightboxOpen] = useState(false);
   const [activeSubPanel, setActiveSubPanel] = useState<
-    | 'NONE'
-    | 'REPORT_SIGHTING'
-    | 'UNLOCK_CONTACT'
-    | 'QR_POSTER'
-    | 'GOOGLE_MAP_EMBED'
+    'NONE' | 'REPORT_SIGHTING' | 'UNLOCK_CONTACT' | 'QR_POSTER'
   >('NONE');
 
-  useEffect(() => {
-    setImageIndex(0);
-    setIsLightboxOpen(false);
-    setFailedImages({});
-    setActiveSubPanel('NONE');
-  }, [spot?.id]);
-
   const [sightingNote, setSightingNote] = useState('');
-  const [sightingEmotion] = useState('Vừa bắt gặp • Khỏe mạnh');
-  const [sightingPhotoUrl, setSightingPhotoUrl] = useState('');
+  const [sightingArea, setSightingArea] = useState('');
+  const [sightingImage, setSightingImage] = useState<string>('');
+  const [uploadingSighting, setUploadingSighting] = useState(false);
 
-  const [unlockMessage, setUnlockMessage] = useState('');
-  const [unlockType] = useState<
+  const [contactMessage, setContactMessage] = useState('');
+  const [contactRequestType, setContactRequestType] = useState<
     'SIGHTING_REPORT' | 'ADOPT_REQUEST' | 'FOSTER_OFFER'
-  >('SIGHTING_REPORT');
-  const [contactUnlockedLocal, setContactUnlockedLocal] = useState(false);
+  >('ADOPT_REQUEST');
 
-  const [posterDataUrl, setPosterDataUrl] = useState<string>('');
+  const [posterDataUrl, setPosterDataUrl] = useState<string | null>(null);
   const [generatingPoster, setGeneratingPoster] = useState(false);
+
+  const sightingFileRef = useRef<HTMLInputElement | null>(null);
+  const bodyScrollRef = useRef<HTMLDivElement | null>(null);
+  const subPanelAnchorRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (spot) {
+      setImageIndex(0);
+      setFailedImages({});
+      setIsLightboxOpen(false);
+      setActiveSubPanel('NONE');
+      setPosterDataUrl(null);
+      setSightingArea(userCoords.label);
+      if (bodyScrollRef.current) {
+        bodyScrollRef.current.scrollTop = 0;
+      }
+    }
+  }, [spot?.id, userCoords.label]);
+
+  useEffect(() => {
+    if (!spot || typeof document === 'undefined') return;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [spot]);
+
+  useEffect(() => {
+    if (!spot || isLightboxOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [spot, isLightboxOpen, onClose]);
 
   if (!spot) return null;
 
+  const safeImages =
+    Array.isArray(spot.images) && spot.images.length > 0
+      ? spot.images.filter(Boolean)
+      : [FALLBACK_PET_IMAGE];
+
+  const hasExactCoords = isSpotPinAllowedOnMap(spot);
   const isUserPost = isUserWebPost(spot);
-  const hasMapPin = isSpotPinAllowedOnMap(spot);
-  const meta = SPOT_LEXICON[spot.spotType];
-  const distanceMeters = hasMapPin
+  const badgeMeta = getSpotBadgeMeta(spot);
+
+  const distanceMeters = hasExactCoords
     ? calculateDistanceMeters(
         userCoords.lat,
         userCoords.lng,
         spot.publicLat,
         spot.publicLng
       )
-    : null;
+    : 0;
 
-  const googleMapsUrl = hasMapPin
-    ? spot.googleMapsUrl ||
-      `https://www.google.com/maps/search/?api=1&query=${spot.publicLat},${spot.publicLng}`
-    : '';
-  const googleMapsDirectionsUrl = hasMapPin
-    ? spot.googleMapsDirectionsUrl ||
-      `https://www.google.com/maps/dir/?api=1&origin=${userCoords.lat},${userCoords.lng}&destination=${spot.publicLat},${spot.publicLng}&travelmode=two-wheeler`
-    : '';
-  const googleMapsEmbedUrl = hasMapPin
-    ? spot.googleMapsEmbedUrl ||
-      `https://maps.google.com/maps?q=${spot.publicLat},${spot.publicLng}&hl=vi&z=16&output=embed`
-    : '';
-
-  const isAuthor =
-    isUserPost &&
-    userSession &&
-    (spot.authorId === userSession.id ||
-      spot.authorName.toLowerCase() === userSession.displayName.toLowerCase());
-
-  const handleSightingFileChange = async (
-    e: React.ChangeEvent<HTMLInputElement>
-  ) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    try {
-      const compressed = await compressImageToWebpClient(file, 960, 0.78);
-      setSightingPhotoUrl(compressed.dataUrl);
-    } catch {
-      // ignore
-    }
-  };
-
-  const submitSighting = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!sightingNote.trim()) return;
-    const newSighting: SightingItem = {
-      id: `sight-${Date.now()}`,
-      reporterName: userSession?.displayName || 'Người Đi Đường Ấm Áp',
-      imageUrl: sightingPhotoUrl || spot.images[0],
-      note: sightingNote.trim(),
-      emotionTag: sightingEmotion,
-      createdAt: 'Vừa xong',
-      distanceFromOriginMeters:
-        distanceMeters !== null ? Math.max(40, Math.min(450, distanceMeters)) : 100,
-      lat: userCoords.lat,
-      lng: userCoords.lng,
-      googleMapsUrl: `https://www.google.com/maps/search/?api=1&query=${userCoords.lat},${userCoords.lng}`,
-    };
-    onAddSighting(spot.id, newSighting);
-    setSightingNote('');
-    setSightingPhotoUrl('');
-    setActiveSubPanel('NONE');
-  };
-
-  const submitUnlockContact = (e: React.FormEvent) => {
-    e.preventDefault();
-    onUnlockContactRequest(
-      spot,
-      unlockMessage.trim() ||
-        'Mình đang ở gần khu vực này, mong kết nối với bạn ngay!',
-      unlockType
-    );
-    setContactUnlockedLocal(true);
-    setActiveSubPanel('NONE');
-  };
-
-  const handleCreatePoster = async () => {
-    setGeneratingPoster(true);
-    setActiveSubPanel('QR_POSTER');
-    try {
-      const url = await generateRescuePosterDataUrl(spot);
-      setPosterDataUrl(url);
-    } finally {
-      setGeneratingPoster(false);
-    }
-  };
-
-  const dotHex =
-    spot.spotType === 'RED_SOS'
-      ? '#E63946'
-      : spot.spotType === 'ORANGE_SIGHT'
-      ? '#E07A5F'
-      : spot.spotType === 'YELLOW_ADOPT'
-      ? '#F4A261'
-      : '#2A9D8F';
-
-  const isRescueCenter = spot.entityCategory === 'RESCUE_CENTER';
-  const categoryLabel = isRescueCenter
-    ? 'Trung tâm cứu trợ & Nhận nuôi'
-    : 'Cá thể thú cưng';
-  const sourceName = getFriendlySourceName(
-    spot.verificationInfo?.sourceDomain,
-    spot.authorName,
-    spot.sourceUrl
+  const isAuthor = Boolean(userSession && spot.authorId === userSession.id);
+  const isContactUnlocked = Boolean(
+    isAuthor || spot.isContactUnlockedForViewer
   );
+
+  const googleMapsDirectionFromUserUrl = hasExactCoords
+    ? `https://www.google.com/maps/dir/?api=1&origin=${userCoords.lat},${userCoords.lng}&destination=${spot.publicLat},${spot.publicLng}&travelmode=two-wheeler`
+    : spot.googleMapsUrl || '';
+
+  const friendlySource = isUserPost
+    ? spot.authorName || 'Cộng đồng Đốm Nhỏ'
+    : getFriendlySourceName(
+        spot.verificationInfo?.sourceDomain,
+        spot.authorName,
+        spot.sourceUrl
+      );
+
   const platformBadge = getPlatformBadgeMeta(
     spot.sourcePlatform,
     spot.sourceUrl
   );
-  const publishedLabel = spot.publishedDate
+
+  const publishedDateFormatted = spot.publishedDate
     ? new Date(spot.publishedDate).toLocaleDateString('vi-VN', {
         day: '2-digit',
         month: '2-digit',
         year: 'numeric',
       })
     : null;
-  const realPhone = spot.rawPhoneSecret?.trim() || '';
+
+  const handleSightingFileChange = async (
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingSighting(true);
+    try {
+      const compressed = await compressImageToWebpClient(file, 960, 0.8);
+      setSightingImage(compressed.dataUrl);
+    } finally {
+      setUploadingSighting(false);
+    }
+  };
+
+  const handleSubmitSighting = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!sightingNote.trim()) return;
+
+    const newSighting: SightingItem = {
+      id: `sight-${Date.now()}`,
+      reporterName: userSession?.displayName || 'Người Đi Đường Tốt Bụng',
+      createdAt: 'Vừa xong',
+      note: sightingArea
+        ? `[${sightingArea}] ${sightingNote.trim()}`
+        : sightingNote.trim(),
+      imageUrl: sightingImage || safeImages[0],
+      emotionTag: 'Vừa bắt gặp',
+      distanceFromOriginMeters: distanceMeters,
+      lat: userCoords.lat,
+      lng: userCoords.lng,
+    };
+
+    onAddSighting(spot.id, newSighting);
+    setSightingNote('');
+    setSightingImage('');
+    setActiveSubPanel('NONE');
+  };
+
+  const handleSubmitUnlockContact = (e: React.FormEvent) => {
+    e.preventDefault();
+    onUnlockContactRequest(
+      spot,
+      contactMessage.trim() ||
+        'Chào bạn, mình muốn hỗ trợ thông tin / nhận nuôi bé!',
+      contactRequestType
+    );
+    setContactMessage('');
+    setActiveSubPanel('NONE');
+  };
+
+  const handleGeneratePoster = async () => {
+    setActiveSubPanel('QR_POSTER');
+    if (posterDataUrl) return;
+    setGeneratingPoster(true);
+    try {
+      const dataUrl = await generateRescuePosterDataUrl(spot);
+      setPosterDataUrl(dataUrl);
+    } finally {
+      setGeneratingPoster(false);
+    }
+  };
+
+  const openSubPanelAndScroll = (
+    panel: 'REPORT_SIGHTING' | 'UNLOCK_CONTACT' | 'QR_POSTER'
+  ) => {
+    setActiveSubPanel((curr) => (curr === panel ? 'NONE' : panel));
+    window.setTimeout(() => {
+      subPanelAnchorRef.current?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'nearest',
+      });
+    }, 80);
+  };
+
+  const currentHeroSrc = failedImages[imageIndex]
+    ? FALLBACK_PET_IMAGE
+    : safeImages[imageIndex] || FALLBACK_PET_IMAGE;
 
   return (
-    <AnimatePresence>
-      <motion.div
-        key="spot-detail-backdrop"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
+    <>
+      <div
         onClick={onClose}
-        className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-2.5 sm:p-4"
+        className="fixed inset-0 z-[80] bg-black/55 flex items-end sm:items-center justify-center sm:p-4"
+        role="dialog"
+        aria-modal="true"
+        aria-label={`Chi tiết tin: ${spot.title}`}
       >
-        <motion.div
-          initial={{ scale: 0.94, y: 20, opacity: 0 }}
-          animate={{ scale: 1, y: 0, opacity: 1 }}
-          exit={{ scale: 0.94, y: 20, opacity: 0 }}
-          transition={{ type: 'spring', stiffness: 280, damping: 26 }}
+        <div
           onClick={(e) => e.stopPropagation()}
-          className="relative w-full max-w-lg max-h-[90dvh] rounded-[24px] sm:rounded-[28px] shadow-2xl border border-[#DDDCD4] overflow-hidden flex flex-col"
-          style={{
-            backgroundColor: theme.frostedSheetBg,
-            color: theme.textHex,
-          }}
+          className="w-full h-[100dvh] sm:h-auto sm:max-h-[90dvh] sm:max-w-2xl bg-[#FAF7F1] text-[#142820] sm:rounded-2xl sm:border sm:border-[#DDDCD4] shadow-2xl flex flex-col overflow-hidden"
         >
+          <header className="shrink-0 bg-[#FAF7F1] border-b border-[#DDDCD4] px-3 sm:px-5 py-2.5 pt-[max(10px,env(safe-area-inset-top,0px))] flex items-center justify-between gap-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="min-w-[44px] min-h-[44px] -ml-1 px-2.5 rounded-[10px] text-[#142820] hover:bg-[#F1EFE8] flex items-center gap-1.5 text-xs sm:text-sm font-bold transition-colors"
+              aria-label="Quay lại"
+            >
+              <ArrowLeft className="w-5 h-5 shrink-0" />
+              <span className="hidden sm:inline">Quay lại</span>
+            </button>
+
+            <h2 className="text-base sm:text-lg font-extrabold text-[#142820] truncate">
+              Chi tiết tin
+            </h2>
+
+            <button
+              type="button"
+              onClick={onClose}
+              className="min-w-[44px] min-h-[44px] -mr-1 rounded-[10px] text-[#52605A] hover:text-[#142820] hover:bg-[#F1EFE8] flex items-center justify-center transition-colors"
+              aria-label="Đóng chi tiết tin"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </header>
+
           <div
-            onClick={() => setIsLightboxOpen(true)}
-            className="relative w-full h-56 sm:h-64 bg-[#F1EFE8] shrink-0 overflow-hidden cursor-zoom-in group"
+            ref={bodyScrollRef}
+            className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-4 sm:px-6 py-4 space-y-4"
           >
-            <img
-              src={
-                failedImages[imageIndex]
-                  ? 'https://images.unsplash.com/photo-1543852786-1cf6624b9987?auto=format&fit=crop&w=800&q=80'
-                  : spot.images[imageIndex] || spot.images[0]
-              }
-              alt={spot.title}
-              referrerPolicy="no-referrer"
-              onError={() =>
-                setFailedImages((prev) => ({ ...prev, [imageIndex]: true }))
-              }
-              className="w-full h-full object-cover"
-            />
-            <div
-              className="absolute inset-0 pointer-events-none"
-              style={{
-                background:
-                  'linear-gradient(180deg, rgba(0,0,0,0.4) 0%, transparent 40%, rgba(0,0,0,0.7) 100%)',
-              }}
-            />
+            <div className="space-y-2.5">
+              <div
+                onClick={() => setIsLightboxOpen(true)}
+                className="relative w-full aspect-[16/9] min-h-[190px] rounded-2xl overflow-hidden bg-[#F1EFE8] border border-[#DDDCD4] cursor-zoom-in"
+                title="Bấm vào ảnh để mở trình xem ảnh rõ"
+              >
+                <img
+                  src={currentHeroSrc}
+                  alt={spot.title}
+                  referrerPolicy="no-referrer"
+                  onError={() =>
+                    setFailedImages((prev) => ({ ...prev, [imageIndex]: true }))
+                  }
+                  className="w-full h-full object-cover"
+                />
+              </div>
 
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                onClose();
-              }}
-              className="absolute top-3.5 right-3.5 w-9 h-9 rounded-full bg-black/60 text-white flex items-center justify-center hover:bg-black/80 transition-colors"
-              aria-label="Đóng"
-            >
-              <X className="w-4 h-4" />
-            </button>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                {safeImages.length > 1 ? (
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setImageIndex(
+                          (i) => (i - 1 + safeImages.length) % safeImages.length
+                        )
+                      }
+                      className="min-w-[40px] min-h-[40px] rounded-[10px] bg-white border border-[#DDDCD4] hover:border-[#0E513B] text-[#142820] flex items-center justify-center transition-colors"
+                      aria-label="Ảnh trước"
+                    >
+                      <ChevronLeft className="w-4 h-4" />
+                    </button>
 
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                setIsLightboxOpen(true);
-              }}
-              className="absolute top-3.5 right-14 h-9 px-3 rounded-full bg-black/60 text-white flex items-center gap-1.5 text-xs font-semibold hover:bg-black/80 transition-colors"
-              title="Phóng to ảnh để xem rõ hơn"
-            >
-              <ZoomIn className="w-3.5 h-3.5" />
-              <span>Xem ảnh rõ</span>
-            </button>
+                    <span className="px-3 py-1.5 rounded-[10px] bg-white border border-[#DDDCD4] text-xs font-bold text-[#142820]">
+                      {imageIndex + 1} / {safeImages.length}
+                    </span>
 
-            <div className="absolute top-3.5 left-3.5 flex items-center gap-1.5 flex-wrap pr-28 pointer-events-none">
-              {isUserPost ? (
-                <span className="px-2.5 py-1 rounded-md text-[11px] font-bold bg-[#0E513B] text-white">
-                  Tự đăng trên Web
-                </span>
-              ) : (
-                <span className="px-2.5 py-1 rounded-md text-[11px] font-bold bg-black/70 text-white flex items-center gap-1">
-                  <span>{platformBadge.shortLabel}</span>
-                  <span>•</span>
-                  <span>{sourceName}</span>
-                </span>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setImageIndex((i) => (i + 1) % safeImages.length)
+                      }
+                      className="min-w-[40px] min-h-[40px] rounded-[10px] bg-white border border-[#DDDCD4] hover:border-[#0E513B] text-[#142820] flex items-center justify-center transition-colors"
+                      aria-label="Ảnh tiếp theo"
+                    >
+                      <ChevronRight className="w-4 h-4" />
+                    </button>
+                  </div>
+                ) : (
+                  <span className="text-xs font-medium text-[#52605A]">
+                    1 / 1 ảnh đính kèm
+                  </span>
+                )}
+
+                <button
+                  type="button"
+                  onClick={() => setIsLightboxOpen(true)}
+                  className="min-h-[40px] px-3.5 rounded-[10px] bg-white border border-[#DDDCD4] hover:border-[#0E513B] text-xs font-bold text-[#142820] inline-flex items-center gap-1.5 transition-colors"
+                >
+                  <ZoomIn className="w-4 h-4 text-[#0E513B]" />
+                  <span>Xem ảnh rõ</span>
+                </button>
+              </div>
+
+              {safeImages.length > 1 && (
+                <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pt-0.5">
+                  {safeImages.map((imgUrl, idx) => (
+                    <button
+                      key={`${imgUrl}-${idx}`}
+                      type="button"
+                      onClick={() => setImageIndex(idx)}
+                      className={`relative w-14 h-14 rounded-[10px] overflow-hidden shrink-0 border-2 transition-all ${
+                        idx === imageIndex
+                          ? 'border-[#0E513B] shadow-sm'
+                          : 'border-[#DDDCD4] opacity-70 hover:opacity-100'
+                      }`}
+                      aria-label={`Xem ảnh ${idx + 1}`}
+                      aria-pressed={idx === imageIndex}
+                    >
+                      <img
+                        src={
+                          failedImages[idx] ? FALLBACK_PET_IMAGE : imgUrl
+                        }
+                        alt={`${spot.title} - ảnh ${idx + 1}`}
+                        referrerPolicy="no-referrer"
+                        onError={() =>
+                          setFailedImages((prev) => ({
+                            ...prev,
+                            [idx]: true,
+                          }))
+                        }
+                        className="w-full h-full object-cover"
+                      />
+                    </button>
+                  ))}
+                </div>
               )}
             </div>
 
-            {spot.images.length > 1 && (
-              <>
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setImageIndex(
-                      (i) => (i - 1 + spot.images.length) % spot.images.length
-                    );
+            <div className="space-y-2.5">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span
+                  className="inline-block px-2.5 py-1 rounded-md text-xs font-extrabold uppercase tracking-wider"
+                  style={{
+                    backgroundColor: badgeMeta.bgHex,
+                    color: badgeMeta.textHex,
                   }}
-                  className="absolute left-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-black/60 hover:bg-black/80 text-white flex items-center justify-center"
-                  aria-label="Ảnh trước"
                 >
-                  <ChevronLeft className="w-4 h-4" />
-                </button>
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setImageIndex((i) => (i + 1) % spot.images.length);
-                  }}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-black/60 hover:bg-black/80 text-white flex items-center justify-center"
-                  aria-label="Ảnh tiếp theo"
-                >
-                  <ChevronRight className="w-4 h-4" />
-                </button>
-              </>
-            )}
+                  {badgeMeta.uppercaseLabel}
+                </span>
 
-            <div className="absolute bottom-3 inset-x-4 flex items-center justify-between gap-2 text-white">
-              <div className="flex items-center gap-2 truncate pointer-events-none">
-                {distanceMeters !== null ? (
-                  <span className="px-2.5 py-1 rounded-md text-xs font-bold bg-black/70 text-white flex items-center gap-1">
-                    <MapPin className="w-3.5 h-3.5" />
-                    <span>Cách bạn {formatDistanceVi(distanceMeters)}</span>
-                  </span>
-                ) : (
-                  <span className="px-2.5 py-1 rounded-md text-[11px] font-bold bg-black/70 text-white flex items-center gap-1">
-                    <MapPin className="w-3 h-3" />
-                    <span>{spot.areaLabel}</span>
-                  </span>
-                )}
-                {publishedLabel && (
-                  <span className="text-xs font-medium opacity-90 truncate hidden sm:inline">
-                    {publishedLabel}
-                  </span>
-                )}
+                <div className="flex items-center gap-2 flex-wrap">
+                  {hasExactCoords && (
+                    <span className="px-2.5 py-1 rounded-md bg-white border border-[#DDDCD4] text-xs font-bold text-[#142820] inline-flex items-center gap-1">
+                      <MapPin className="w-3.5 h-3.5 text-[#0E513B] shrink-0" />
+                      <span>{formatDistanceVi(distanceMeters)}</span>
+                    </span>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={() => onBoostLight(spot.id)}
+                    className="px-2.5 py-1 rounded-md bg-[#FFF0E5] border border-[#AF421F]/25 text-xs font-bold text-[#AF421F] inline-flex items-center gap-1 transition-colors hover:bg-[#FFE4D1]"
+                    title="Thắp thêm sự quan tâm cho bài viết"
+                  >
+                    <Flame className="w-3.5 h-3.5 fill-current" />
+                    <span>Quan tâm ({spot.boostCount})</span>
+                  </button>
+                </div>
               </div>
 
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onBoostLight(spot.id);
-                }}
-                className="px-3 py-1 rounded-md text-xs font-bold bg-[#AF421F] text-white flex items-center gap-1 active:scale-95 transition-transform shrink-0"
-              >
-                <Flame className="w-3.5 h-3.5 fill-current" />
-                <span>Quan tâm ({spot.boostCount || 1})</span>
-              </button>
-            </div>
-          </div>
-
-          {spot.images.length > 1 && (
-            <div className="flex items-center gap-2 px-4 py-2.5 bg-[#FAF7F1] border-b border-[#DDDCD4] overflow-x-auto no-scrollbar shrink-0">
-              {spot.images.map((img, idx) => (
-                <button
-                  key={`${img}-${idx}`}
-                  type="button"
-                  onClick={() => setImageIndex(idx)}
-                  className={`relative w-14 h-14 rounded-lg overflow-hidden shrink-0 border-2 transition-all ${
-                    idx === imageIndex
-                      ? 'border-[#0E513B]'
-                      : 'border-[#DDDCD4] opacity-70 hover:opacity-100'
-                  }`}
-                >
-                  <img
-                    src={
-                      failedImages[idx]
-                        ? 'https://images.unsplash.com/photo-1543852786-1cf6624b9987?auto=format&fit=crop&w=800&q=80'
-                        : img
-                    }
-                    alt={`Ảnh ${idx + 1}`}
-                    onError={() =>
-                      setFailedImages((prev) => ({ ...prev, [idx]: true }))
-                    }
-                    className="w-full h-full object-cover"
-                  />
-                </button>
-              ))}
-              <button
-                type="button"
-                onClick={() => setIsLightboxOpen(true)}
-                className="h-14 px-3 rounded-lg border border-[#DDDCD4] hover:border-[#0E513B] text-[#142820] flex flex-col items-center justify-center text-[10px] font-bold shrink-0 transition-colors bg-white"
-              >
-                <Maximize2 className="w-3.5 h-3.5 mb-0.5" />
-                <span>Phóng to</span>
-              </button>
-            </div>
-          )}
-
-          <div className="p-5 overflow-y-auto no-scrollbar space-y-4">
-            <div>
-              <p className="text-xs font-bold" style={{ color: dotHex }}>
-                {isRescueCenter ? categoryLabel : meta.label} •{' '}
-                {isUserPost ? `Người đăng: ${spot.authorName}` : `Nguồn: ${sourceName}`}
-              </p>
-              <h3 className="text-base sm:text-lg font-bold mt-0.5 leading-snug">
+              <h1 className="text-xl sm:text-2xl font-extrabold text-[#142820] leading-snug">
                 {spot.title}
-              </h3>
-              <p
-                className="text-xs sm:text-sm mt-1.5 leading-relaxed"
-                style={{ color: theme.mutedTextHex }}
-              >
+              </h1>
+
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs sm:text-sm text-[#52605A]">
+                <span className="inline-flex items-center gap-1 font-medium text-[#142820]">
+                  <MapPin className="w-4 h-4 text-[#0E513B] shrink-0" />
+                  <span>{spot.formattedAddress || spot.areaLabel}</span>
+                </span>
+                <span className="text-[#DDDCD4]">|</span>
+                <span>
+                  Nguồn:{' '}
+                  <strong className="font-semibold text-[#142820]">
+                    {friendlySource}
+                  </strong>
+                </span>
+                {publishedDateFormatted && (
+                  <>
+                    <span className="text-[#DDDCD4]">|</span>
+                    <span>Ngày đăng: {publishedDateFormatted}</span>
+                  </>
+                )}
+              </div>
+            </div>
+
+            <div className="p-4 rounded-xl bg-white border border-[#DDDCD4] space-y-3">
+              <p className="text-sm sm:text-base text-[#142820] leading-relaxed whitespace-pre-line">
                 {spot.story}
               </p>
 
-              {spot.traits.length > 0 && (
-                <div className="flex flex-wrap gap-1.5 mt-3">
-                  {spot.traits.map((trait) => (
+              {(spot.breed ||
+                spot.coatColor ||
+                (Array.isArray(spot.traits) && spot.traits.length > 0)) && (
+                <div className="flex flex-wrap gap-1.5 pt-1 border-t border-[#F1EFE8]">
+                  {spot.breed && spot.breed !== 'Chưa rõ giống' && (
+                    <span className="px-2.5 py-1 rounded-md bg-[#F1EFE8] text-xs font-semibold text-[#142820]">
+                      Giống: {spot.breed}
+                    </span>
+                  )}
+                  {spot.coatColor && spot.coatColor !== 'Chưa rõ màu lông' && (
+                    <span className="px-2.5 py-1 rounded-md bg-[#F1EFE8] text-xs font-semibold text-[#142820]">
+                      Màu lông: {spot.coatColor}
+                    </span>
+                  )}
+                  {spot.traits?.map((trait) => (
                     <span
                       key={trait}
-                      className="px-3 py-1 rounded-full text-xs font-semibold"
-                      style={{
-                        backgroundColor: theme.pillBg,
-                        color: theme.textHex,
-                      }}
+                      className="px-2.5 py-1 rounded-md bg-[#E8EFE6] text-xs font-semibold text-[#0E513B]"
                     >
                       {trait}
                     </span>
@@ -448,464 +494,384 @@ export default function SpotDetailModal({
               )}
             </div>
 
-            {hasMapPin ? (
-              <div
-                className="p-3.5 rounded-3xl space-y-2.5"
-                style={{ backgroundColor: theme.frostedCardBg }}
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex items-start gap-2">
-                    <MapPin className="w-4 h-4 text-[#E63946] shrink-0 mt-0.5" />
-                    <div>
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        {distanceMeters !== null && (
-                          <span className="px-2 py-0.5 rounded-full text-xs font-black bg-[#D2673B]/15 text-[#D2673B]">
-                            Cách bạn {formatDistanceVi(distanceMeters)}
-                          </span>
-                        )}
-                        <span className="text-xs font-bold text-[#133E35]">
-                          {spot.formattedAddress || spot.areaLabel}
-                        </span>
-                      </div>
-                      <p
-                        className="text-[11px] font-mono opacity-75 mt-0.5"
-                        style={{ color: theme.mutedTextHex }}
-                      >
-                        Tọa độ GPS: {spot.publicLat.toFixed(5)}, {spot.publicLng.toFixed(5)}
-                      </p>
-                    </div>
-                  </div>
-                </div>
+            {hasExactCoords ? (
+              <div className="space-y-2">
+                <button
+                  type="button"
+                  onClick={() => onFocusSpotOnMap(spot)}
+                  className="w-full min-h-[48px] px-4 rounded-[10px] bg-white border border-[#DDDCD4] hover:border-[#0E513B] text-sm font-bold text-[#142820] flex items-center justify-between gap-2 transition-colors"
+                >
+                  <span className="inline-flex items-center gap-2">
+                    <Compass className="w-4 h-4 text-[#0E513B] shrink-0" />
+                    <span>Xem trên bản đồ</span>
+                  </span>
+                  <ArrowRight className="w-4 h-4 text-[#0E513B] shrink-0" />
+                </button>
 
-                <div className="flex flex-wrap items-center gap-2 pt-1">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      onSaveSpotToGoogleMapsVault(spot);
-                      window.open(googleMapsUrl, '_blank', 'noopener,noreferrer');
-                    }}
-                    className="px-3 py-1.5 rounded-full text-xs font-bold bg-[#2A9D8F] text-white flex items-center gap-1.5 shadow-sm active:scale-95 transition-transform"
-                  >
-                    <BookmarkPlus className="w-3.5 h-3.5" />
-                    Lưu trên Google Maps
-                  </button>
-
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   <a
-                    href={googleMapsDirectionsUrl}
+                    href={googleMapsDirectionFromUserUrl}
                     target="_blank"
-                    rel="noreferrer"
-                    className="px-3 py-1.5 rounded-full text-xs font-bold bg-[#E07A5F]/15 text-[#E07A5F] flex items-center gap-1.5"
+                    rel="noopener noreferrer"
+                    className="min-h-[44px] px-3.5 rounded-[10px] bg-white border border-[#DDDCD4] hover:border-[#0E513B] text-xs font-bold text-[#142820] flex items-center justify-center gap-1.5 transition-colors"
                   >
-                    <Navigation className="w-3.5 h-3.5" />
-                    Chỉ đường Google Maps
+                    <Navigation className="w-3.5 h-3.5 text-[#0E513B]" />
+                    <span>Chỉ đường Google Maps</span>
                   </a>
 
-                  {onFocusSpotOnMap && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        onFocusSpotOnMap(spot);
-                        onClose();
-                      }}
-                      className="px-3 py-1.5 rounded-full text-xs font-semibold flex items-center gap-1"
-                      style={{
-                        backgroundColor: theme.pillBg,
-                        color: theme.textHex,
-                      }}
-                    >
-                      <MapPin className="w-3.5 h-3.5 text-[#E63946]" />
-                      Xem ghim trên Bản đồ
-                    </button>
-                  )}
-
                   <button
                     type="button"
-                    onClick={() =>
-                      setActiveSubPanel((curr) =>
-                        curr === 'GOOGLE_MAP_EMBED' ? 'NONE' : 'GOOGLE_MAP_EMBED'
-                      )
-                    }
-                    className="px-3 py-1.5 rounded-full text-xs font-semibold flex items-center gap-1"
-                    style={{
-                      backgroundColor: theme.pillBg,
-                      color: theme.textHex,
-                    }}
+                    onClick={() => onSaveSpotToGoogleMapsVault(spot)}
+                    className="min-h-[44px] px-3.5 rounded-[10px] bg-white border border-[#DDDCD4] hover:border-[#0E513B] text-xs font-bold text-[#142820] flex items-center justify-center gap-1.5 transition-colors"
                   >
-                    <Map className="w-3.5 h-3.5 text-[#2A9D8F]" />
-                    {activeSubPanel === 'GOOGLE_MAP_EMBED'
-                      ? 'Ẩn bản đồ nhúng'
-                      : 'Xem bản đồ nhúng'}
+                    <Bookmark className="w-3.5 h-3.5 text-[#0E513B]" />
+                    <span>Lưu vào Sổ tay vị trí</span>
                   </button>
                 </div>
-
-                {activeSubPanel === 'GOOGLE_MAP_EMBED' && (
-                  <div className="pt-2">
-                    <div className="w-full h-48 rounded-2xl overflow-hidden shadow-inner">
-                      <iframe
-                        title={`Google Maps - ${spot.title}`}
-                        src={googleMapsEmbedUrl}
-                        className="w-full h-full border-0"
-                        loading="lazy"
-                        referrerPolicy="no-referrer-when-downgrade"
-                      />
-                    </div>
-                  </div>
-                )}
               </div>
             ) : (
-              <div
-                className="p-3.5 rounded-3xl flex items-start gap-2.5"
-                style={{ backgroundColor: theme.frostedCardBg }}
-              >
-                <MapPin className="w-4 h-4 text-[#E07A5F] shrink-0 mt-0.5" />
+              <div className="p-3.5 rounded-xl bg-white border border-[#DDDCD4] flex items-start gap-2.5 text-xs text-[#52605A]">
+                <MapPin className="w-4 h-4 text-[#AF421F] shrink-0 mt-0.5" />
                 <div>
-                  <p className="text-xs font-bold">
-                    Khu vực: {spot.areaLabel || 'Chưa rõ địa chỉ cụ thể'}
+                  <p className="font-bold text-[#142820]">
+                    Khu vực ghi nhận: {spot.formattedAddress || spot.areaLabel}
                   </p>
-                  <p
-                    className="text-[11px] mt-0.5 leading-relaxed"
-                    style={{ color: theme.mutedTextHex }}
-                  >
-                    Bài viết gốc không công khai số nhà/đường cụ thể nên không gắn ghim lên bản đồ. Bạn vui lòng liên hệ trực tiếp tại trang gốc bên dưới để nhận thông tin chi tiết.
+                  <p className="mt-0.5">
+                    Bài viết chưa có tọa độ số nhà cụ thể nên chỉ hiển thị trong danh sách tin khu vực để tránh ghim sai vị trí.
                   </p>
                 </div>
               </div>
             )}
 
-            {!isUserPost ? (
-              <div
-                className="p-4 rounded-3xl space-y-3"
-                style={{ backgroundColor: 'rgba(42, 157, 143, 0.14)' }}
-              >
-                <div className="space-y-1">
-                  <p className="text-xs font-bold text-[#2A9D8F]">
-                    🌐 Thông tin được tổng hợp từ {sourceName}
-                  </p>
-                  <p className="text-xs font-semibold">
-                    Đơn vị / Đầu mối: {spot.authorName}
-                  </p>
-                  {realPhone && (
-                    <p
-                      className="text-xs"
-                      style={{ color: theme.mutedTextHex }}
-                    >
-                      Nơi tiếp nhận / Liên hệ: {realPhone}
+            {isUserPost && (
+              <div className="p-3.5 rounded-xl bg-white border border-[#DDDCD4] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-full bg-[#E8EFE6] text-[#0E513B] flex items-center justify-center shrink-0">
+                    <ShieldCheck className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold text-[#142820]">
+                      Đăng bởi: {spot.authorName}
                     </p>
-                  )}
-                  <p
-                    className="text-[11px] leading-relaxed"
-                    style={{ color: theme.mutedTextHex }}
-                  >
-                    Vì đây là bài viết được tổng hợp từ nguồn bên ngoài, để nhận nuôi, hỗ trợ hoặc báo tin tìm thấy, bạn vui lòng truy cập trực tiếp nơi đăng gốc.
-                  </p>
+                    <p className="text-xs text-[#52605A] flex items-center gap-1 mt-0.5">
+                      <Phone className="w-3 h-3" />
+                      {isContactUnlocked ? (
+                        <a
+                          href={`tel:${spot.rawPhoneSecret || '0908123456'}`}
+                          className="font-bold text-[#0E513B] underline"
+                        >
+                          {spot.rawPhoneSecret || '0908123456'} (Bấm để gọi)
+                        </a>
+                      ) : (
+                        <span>
+                          SĐT bảo mật: <strong>{spot.maskedPhone}</strong>
+                        </span>
+                      )}
+                    </p>
+                  </div>
                 </div>
 
-                {spot.sourceUrl && (
-                  <a
-                    href={spot.sourceUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="w-full py-3.5 px-5 rounded-full text-xs sm:text-sm font-bold text-white bg-[#2A9D8F] shadow-lg flex items-center justify-center gap-2 active:scale-95 transition-transform"
+                {spot.spotType === 'RED_SOS' && (
+                  <button
+                    type="button"
+                    onClick={handleGeneratePoster}
+                    className="min-h-[40px] px-3 rounded-[10px] bg-[#FFF0E5] text-[#AF421F] text-xs font-bold inline-flex items-center justify-center gap-1.5 shrink-0"
                   >
-                    <span>Đi tới nơi liên hệ tại {sourceName}</span>
-                    <ExternalLink className="w-4 h-4 shrink-0" />
-                  </a>
+                    <QrCode className="w-3.5 h-3.5" />
+                    <span>Tạo Poster QR</span>
+                  </button>
                 )}
               </div>
-            ) : (
-              <>
-                <div
-                  className="p-3.5 rounded-2xl flex items-center justify-between gap-2"
-                  style={{ backgroundColor: theme.frostedCardBg }}
-                >
-                  <div className="flex items-center gap-2.5">
-                    {contactUnlockedLocal || spot.isContactUnlockedForViewer ? (
-                      <Unlock className="w-4 h-4 text-[#2A9D8F]" />
-                    ) : (
-                      <Lock className="w-4 h-4 text-[#E07A5F]" />
-                    )}
-                    <div>
-                      <p className="text-xs font-bold">
-                        Liên hệ người đăng:{' '}
-                        {contactUnlockedLocal || spot.isContactUnlockedForViewer
-                          ? realPhone || spot.maskedPhone
-                          : spot.maskedPhone}
-                      </p>
-                      <p
-                        className="text-[11px]"
-                        style={{ color: theme.mutedTextHex }}
-                      >
-                        {contactUnlockedLocal || spot.isContactUnlockedForViewer
-                          ? 'Đã mở khóa số điện thoại người đăng trên Web'
-                          : 'Bấm “Liên hệ người đăng” bên dưới để gửi lời nhắn & mở khóa SĐT'}
-                      </p>
+            )}
+
+            {spot.sightings && spot.sightings.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-xs font-bold uppercase tracking-wider text-[#0E513B]">
+                  Manh mối cộng đồng báo về ({spot.sightings.length})
+                </p>
+                <div className="space-y-2">
+                  {spot.sightings.map((st) => (
+                    <div
+                      key={st.id}
+                      className="p-3 rounded-xl bg-white border border-[#DDDCD4] flex items-start gap-3"
+                    >
+                      {st.imageUrl && (
+                        <img
+                          src={st.imageUrl}
+                          alt={st.note}
+                          className="w-12 h-12 rounded-lg object-cover shrink-0 bg-[#F1EFE8]"
+                        />
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between text-[11px]">
+                          <span className="font-bold text-[#0E513B]">
+                            {st.reporterName}
+                          </span>
+                          <span className="text-[#52605A] flex items-center gap-1">
+                            <Clock className="w-3 h-3" />
+                            {st.createdAt}
+                          </span>
+                        </div>
+                        <p className="text-xs text-[#142820] mt-1">{st.note}</p>
+                        {st.emotionTag && (
+                          <p className="text-[11px] text-[#52605A] mt-0.5">
+                            Trạng thái: {st.emotionTag}
+                          </p>
+                        )}
+                      </div>
                     </div>
-                  </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {isUserPost && (
+              <div ref={subPanelAnchorRef} className="space-y-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  <button
+                    type="button"
+                    onClick={() => openSubPanelAndScroll('REPORT_SIGHTING')}
+                    className="min-h-[44px] px-4 rounded-[10px] bg-white border border-[#DDDCD4] hover:border-[#AF421F] text-xs font-bold text-[#AF421F] flex items-center justify-center gap-2 transition-colors"
+                  >
+                    <Camera className="w-4 h-4" />
+                    <span>Báo phát hiện mới</span>
+                  </button>
 
                   <button
                     type="button"
-                    onClick={handleCreatePoster}
-                    className="px-3 py-1.5 rounded-full text-xs font-bold flex items-center gap-1.5 transition-transform active:scale-95"
-                    style={{
-                      backgroundColor: 'rgba(230, 57, 70, 0.12)',
-                      color: '#E63946',
-                    }}
+                    onClick={() => openSubPanelAndScroll('UNLOCK_CONTACT')}
+                    className="min-h-[44px] px-4 rounded-[10px] bg-white border border-[#DDDCD4] hover:border-[#0E513B] text-xs font-bold text-[#0E513B] flex items-center justify-center gap-2 transition-colors"
                   >
-                    <QrCode className="w-3.5 h-3.5" />
-                    Poster QR
+                    <MessageCircle className="w-4 h-4" />
+                    <span>Gửi lời nhắn &amp; Mở SĐT</span>
                   </button>
                 </div>
 
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <h4 className="text-xs font-bold uppercase tracking-wider opacity-75">
-                      Dấu vết cộng đồng báo trên Web ({spot.sightings.length})
-                    </h4>
-                  </div>
-
-                  {spot.sightings.length > 0 ? (
-                    <div className="space-y-2">
-                      {spot.sightings.map((s) => (
-                        <div
-                          key={s.id}
-                          className="p-3 rounded-2xl flex items-center gap-3"
-                          style={{ backgroundColor: theme.frostedCardBg }}
-                        >
-                          <img
-                            src={s.imageUrl}
-                            alt={s.reporterName}
-                            className="w-12 h-12 rounded-xl object-cover shrink-0"
-                          />
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center justify-between gap-1">
-                              <p className="text-xs font-bold truncate">
-                                {s.reporterName}
-                              </p>
-                              <span className="text-[10px] opacity-70 shrink-0">
-                                {s.createdAt} • {s.distanceFromOriginMeters}m
-                              </span>
-                            </div>
-                            <p
-                              className="text-xs line-clamp-2 mt-0.5"
-                              style={{ color: theme.mutedTextHex }}
-                            >
-                              {s.note}
-                            </p>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p
-                      className="text-xs italic py-1"
-                      style={{ color: theme.mutedTextHex }}
-                    >
-                      Chưa có báo cáo phát hiện mới cho bài đăng này.
+                {activeSubPanel === 'REPORT_SIGHTING' && (
+                  <form
+                    onSubmit={handleSubmitSighting}
+                    className="p-4 rounded-xl bg-white border border-[#DDDCD4] space-y-3"
+                  >
+                    <p className="text-xs font-bold text-[#AF421F]">
+                      Báo tin vừa nhìn thấy bé ngoài đường
                     </p>
-                  )}
-                </div>
-
-                <AnimatePresence mode="wait">
-                  {activeSubPanel === 'REPORT_SIGHTING' && (
-                    <motion.form
-                      key="sighting-form"
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: 'auto' }}
-                      exit={{ opacity: 0, height: 0 }}
-                      onSubmit={submitSighting}
-                      className="p-4 rounded-3xl space-y-3"
-                      style={{ backgroundColor: theme.frostedCardBg }}
-                    >
-                      <p className="text-xs font-bold text-[#E07A5F]">
-                        📸 Báo tin vừa nhìn thấy bé cho người đăng
-                      </p>
-                      <textarea
-                        rows={2}
-                        required
-                        value={sightingNote}
-                        onChange={(e) => setSightingNote(e.target.value)}
-                        placeholder="Ghi chú vị trí cụ thể bạn vừa nhìn thấy bé..."
-                        className="w-full rounded-2xl p-3 text-xs outline-none"
-                        style={{
-                          backgroundColor: theme.pillBg,
-                          color: theme.textHex,
-                        }}
-                      />
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        <label className="cursor-pointer px-3 py-1.5 rounded-full text-xs font-semibold bg-[#E07A5F]/15 text-[#E07A5F] flex items-center gap-1.5">
-                          <Camera className="w-3.5 h-3.5" />
-                          {sightingPhotoUrl ? 'Đã đính kèm ảnh' : 'Đính kèm ảnh thật'}
-                          <input
-                            type="file"
-                            accept="image/*"
-                            onChange={handleSightingFileChange}
-                            className="hidden"
-                          />
-                        </label>
-
-                        <div className="flex items-center gap-2">
-                          <button
-                            type="button"
-                            onClick={() => setActiveSubPanel('NONE')}
-                            className="px-3 py-1.5 rounded-full text-xs font-medium"
-                          >
-                            Hủy
-                          </button>
-                          <button
-                            type="submit"
-                            className="px-4 py-1.5 rounded-full text-xs font-bold text-white bg-[#E07A5F] flex items-center gap-1"
-                          >
-                            <Send className="w-3 h-3" />
-                            Gửi báo tin
-                          </button>
-                        </div>
-                      </div>
-                    </motion.form>
-                  )}
-
-                  {activeSubPanel === 'UNLOCK_CONTACT' && (
-                    <motion.form
-                      key="unlock-form"
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: 'auto' }}
-                      exit={{ opacity: 0, height: 0 }}
-                      onSubmit={submitUnlockContact}
-                      className="p-4 rounded-3xl space-y-3"
-                      style={{ backgroundColor: theme.frostedCardBg }}
-                    >
-                      <p className="text-xs font-bold text-[#2A9D8F]">
-                        💬 Gửi lời nhắn & Mở khóa SĐT người đăng trên Web
-                      </p>
+                    <input
+                      type="text"
+                      value={sightingArea}
+                      onChange={(e) => setSightingArea(e.target.value)}
+                      placeholder="Vị trí nhìn thấy (VD: Hẻm 12 Thảo Điền)..."
+                      className="w-full h-11 px-3 rounded-[10px] bg-[#FAF7F1] border border-[#DDDCD4] text-xs text-[#142820] outline-none focus:border-[#0E513B]"
+                    />
+                    <textarea
+                      value={sightingNote}
+                      onChange={(e) => setSightingNote(e.target.value)}
+                      rows={2}
+                      placeholder="Mô tả tình trạng của bé khi bạn nhìn thấy..."
+                      className="w-full p-3 rounded-[10px] bg-[#FAF7F1] border border-[#DDDCD4] text-xs text-[#142820] outline-none focus:border-[#0E513B]"
+                      required
+                    />
+                    <div className="flex flex-wrap items-center justify-between gap-2">
                       <input
-                        type="text"
-                        value={unlockMessage}
-                        onChange={(e) => setUnlockMessage(e.target.value)}
-                        placeholder="Lời nhắn ngắn gửi tới người đăng bài..."
-                        className="w-full rounded-2xl p-3 text-xs outline-none"
-                        style={{
-                          backgroundColor: theme.pillBg,
-                          color: theme.textHex,
-                        }}
+                        ref={sightingFileRef}
+                        type="file"
+                        accept="image/*"
+                        onChange={handleSightingFileChange}
+                        className="hidden"
                       />
-                      <div className="flex justify-end gap-2">
+                      <button
+                        type="button"
+                        onClick={() => sightingFileRef.current?.click()}
+                        className="min-h-[40px] px-3 rounded-[10px] bg-[#F1EFE8] text-xs font-semibold text-[#142820] inline-flex items-center gap-1.5"
+                      >
+                        <Camera className="w-3.5 h-3.5" />
+                        <span>
+                          {uploadingSighting
+                            ? 'Đang nén ảnh...'
+                            : sightingImage
+                            ? 'Đã đính kèm 1 ảnh'
+                            : 'Đính kèm ảnh'}
+                        </span>
+                      </button>
+
+                      <div className="flex items-center gap-2">
                         <button
                           type="button"
                           onClick={() => setActiveSubPanel('NONE')}
-                          className="px-3 py-1.5 rounded-full text-xs"
+                          className="min-h-[40px] px-3 rounded-[10px] text-xs font-semibold text-[#52605A]"
                         >
-                          Đóng
+                          Hủy
                         </button>
                         <button
                           type="submit"
-                          className="px-4 py-1.5 rounded-full text-xs font-bold text-white bg-[#2A9D8F]"
+                          className="min-h-[40px] px-4 rounded-[10px] bg-[#AF421F] text-white text-xs font-bold"
                         >
-                          Gửi & Xem SĐT
+                          Gửi manh mối
                         </button>
                       </div>
-                    </motion.form>
-                  )}
+                    </div>
+                  </form>
+                )}
 
-                  {activeSubPanel === 'QR_POSTER' && (
-                    <motion.div
-                      key="qr-poster-panel"
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: 'auto' }}
-                      exit={{ opacity: 0, height: 0 }}
-                      className="p-4 rounded-3xl space-y-3 text-center"
-                      style={{ backgroundColor: theme.frostedCardBg }}
-                    >
-                      {generatingPoster ? (
-                        <p className="text-xs py-6 opacity-75">
-                          Đang tạo Poster QR...
-                        </p>
-                      ) : (
-                        posterDataUrl && (
-                          <div className="space-y-3">
-                            <img
-                              src={posterDataUrl}
-                              alt="Poster QR Tìm Thú Lạc"
-                              className="w-56 mx-auto rounded-2xl shadow-md"
-                            />
-                            <div className="flex items-center justify-center gap-2">
-                              <a
-                                href={posterDataUrl}
-                                download={`Poster-Tim-Thu-Lac-${spot.id}.png`}
-                                className="px-4 py-2 rounded-full text-xs font-bold text-white bg-[#E63946] inline-flex items-center gap-1.5"
-                              >
-                                <Download className="w-3.5 h-3.5" />
-                                Tải Poster QR (.PNG)
-                              </a>
-                              <button
-                                type="button"
-                                onClick={() => setActiveSubPanel('NONE')}
-                                className="px-3 py-2 rounded-full text-xs font-medium"
-                              >
-                                Thu gọn
-                              </button>
-                            </div>
+                {activeSubPanel === 'UNLOCK_CONTACT' && (
+                  <form
+                    onSubmit={handleSubmitUnlockContact}
+                    className="p-4 rounded-xl bg-white border border-[#DDDCD4] space-y-3"
+                  >
+                    <p className="text-xs font-bold text-[#0E513B]">
+                      Liên hệ người đăng để hỗ trợ hoặc nhận nuôi
+                    </p>
+                    <div className="grid grid-cols-3 gap-1.5">
+                      {[
+                        { id: 'ADOPT_REQUEST', label: 'Xin nhận nuôi' },
+                        { id: 'FOSTER_OFFER', label: 'Nhận nuôi tạm' },
+                        { id: 'SIGHTING_REPORT', label: 'Báo manh mối' },
+                      ].map((opt) => (
+                        <button
+                          key={opt.id}
+                          type="button"
+                          onClick={() =>
+                            setContactRequestType(opt.id as typeof contactRequestType)
+                          }
+                          className={`min-h-[38px] px-2 rounded-[10px] text-[11px] font-bold transition-colors ${
+                            contactRequestType === opt.id
+                              ? 'bg-[#0E513B] text-white'
+                              : 'bg-[#F1EFE8] text-[#142820]'
+                          }`}
+                        >
+                          {opt.label}
+                        </button>
+                      ))}
+                    </div>
+                    <textarea
+                      value={contactMessage}
+                      onChange={(e) => setContactMessage(e.target.value)}
+                      rows={2}
+                      placeholder="Lời nhắn gửi tới người đăng tin..."
+                      className="w-full p-3 rounded-[10px] bg-[#FAF7F1] border border-[#DDDCD4] text-xs text-[#142820] outline-none focus:border-[#0E513B]"
+                      required
+                    />
+                    <div className="flex justify-end gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setActiveSubPanel('NONE')}
+                        className="min-h-[40px] px-3 rounded-[10px] text-xs font-semibold text-[#52605A]"
+                      >
+                        Đóng
+                      </button>
+                      <button
+                        type="submit"
+                        className="min-h-[40px] px-4 rounded-[10px] bg-[#0E513B] text-white text-xs font-bold"
+                      >
+                        Gửi &amp; Xem SĐT
+                      </button>
+                    </div>
+                  </form>
+                )}
+
+                {activeSubPanel === 'QR_POSTER' && (
+                  <div className="p-4 rounded-xl bg-white border border-[#DDDCD4] space-y-3 text-center">
+                    {generatingPoster ? (
+                      <p className="text-xs py-6 text-[#52605A]">
+                        Đang tạo Poster QR...
+                      </p>
+                    ) : (
+                      posterDataUrl && (
+                        <div className="space-y-3">
+                          <img
+                            src={posterDataUrl}
+                            alt="Poster QR Tìm Thú Lạc"
+                            className="w-56 mx-auto rounded-xl border border-[#DDDCD4]"
+                          />
+                          <div className="flex items-center justify-center gap-2">
+                            <a
+                              href={posterDataUrl}
+                              download={`Poster-Tim-Thu-Lac-${spot.id}.png`}
+                              className="min-h-[40px] px-4 rounded-[10px] text-xs font-bold text-white bg-[#AF421F] inline-flex items-center gap-1.5"
+                            >
+                              <Download className="w-3.5 h-3.5" />
+                              <span>Tải Poster QR (.PNG)</span>
+                            </a>
+                            <button
+                              type="button"
+                              onClick={() => setActiveSubPanel('NONE')}
+                              className="min-h-[40px] px-3 rounded-[10px] text-xs font-semibold text-[#52605A]"
+                            >
+                              Thu gọn
+                            </button>
                           </div>
-                        )
-                      )}
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-
-                {spot.spotType !== 'GREEN_PEACE' && isAuthor && (
-                  <div className="pt-1">
-                    <button
-                      type="button"
-                      onClick={() => onResolveSpotToPeace(spot.id)}
-                      className="w-full py-2.5 rounded-2xl text-xs font-bold flex items-center justify-center gap-2 bg-[#2A9D8F]/15 text-[#2A9D8F]"
-                    >
-                      <CheckCircle2 className="w-4 h-4" />
-                      Đánh dấu: Đã tìm thấy / Đã nhận nuôi (Chuyển sang Đốm Xanh Bình Yên)
-                    </button>
+                        </div>
+                      )
+                    )}
                   </div>
                 )}
 
-                <div className="pt-1 grid grid-cols-2 gap-3">
+                {spot.spotType !== 'GREEN_PEACE' && isAuthor && (
                   <button
                     type="button"
-                    onClick={() =>
-                      setActiveSubPanel((curr) =>
-                        curr === 'REPORT_SIGHTING' ? 'NONE' : 'REPORT_SIGHTING'
-                      )
-                    }
-                    className="py-3.5 px-4 rounded-full text-xs sm:text-sm font-bold text-white flex items-center justify-center gap-2 shadow-lg transition-transform active:scale-95"
-                    style={{ backgroundColor: '#E07A5F' }}
+                    onClick={() => onResolveSpotToPeace(spot.id)}
+                    className="w-full min-h-[44px] px-4 rounded-[10px] text-xs font-bold flex items-center justify-center gap-2 bg-[#E8EFE6] text-[#0E513B]"
                   >
-                    <Camera className="w-4 h-4" />
-                    <span>📸 Báo phát hiện</span>
+                    <CheckCircle2 className="w-4 h-4" />
+                    <span>Đánh dấu: Đã tìm thấy / Đã nhận nuôi</span>
                   </button>
-
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setActiveSubPanel((curr) =>
-                        curr === 'UNLOCK_CONTACT' ? 'NONE' : 'UNLOCK_CONTACT'
-                      )
-                    }
-                    className="py-3.5 px-4 rounded-full text-xs sm:text-sm font-bold text-white flex items-center justify-center gap-2 shadow-lg transition-transform active:scale-95"
-                    style={{ backgroundColor: '#2A9D8F' }}
-                  >
-                    <MessageCircle className="w-4 h-4" />
-                    <span>💬 Liên hệ người đăng</span>
-                  </button>
-                </div>
-              </>
+                )}
+              </div>
             )}
           </div>
-        </motion.div>
-      </motion.div>
+
+          <footer className="shrink-0 bg-[#FAF7F1] border-t border-[#DDDCD4] px-4 sm:px-6 py-3 pb-[max(12px,env(safe-area-inset-bottom,0px))] flex items-center gap-2.5">
+            {!isUserPost && spot.sourceUrl ? (
+              <a
+                href={spot.sourceUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex-1 min-h-[48px] px-4 rounded-[10px] bg-[#0E513B] hover:bg-[#0A412F] text-white text-sm font-bold flex items-center justify-center gap-2 transition-colors shadow-sm"
+              >
+                <span>Đọc bài gốc ({platformBadge.shortLabel})</span>
+                <ExternalLink className="w-4 h-4 shrink-0" />
+              </a>
+            ) : (
+              <button
+                type="button"
+                onClick={() => openSubPanelAndScroll('UNLOCK_CONTACT')}
+                className="flex-1 min-h-[48px] px-4 rounded-[10px] bg-[#0E513B] hover:bg-[#0A412F] text-white text-sm font-bold flex items-center justify-center gap-2 transition-colors shadow-sm"
+              >
+                <MessageCircle className="w-4 h-4 shrink-0" />
+                <span>Liên hệ người đăng</span>
+              </button>
+            )}
+
+            {onToggleSave && (
+              <button
+                type="button"
+                onClick={() => onToggleSave(spot)}
+                aria-pressed={isSaved}
+                aria-label={isSaved ? 'Bỏ lưu bài viết' : 'Lưu bài viết'}
+                title={isSaved ? 'Bỏ lưu bài viết' : 'Lưu bài viết'}
+                className={`min-w-[48px] min-h-[48px] rounded-[10px] border flex items-center justify-center shrink-0 transition-colors ${
+                  isSaved
+                    ? 'bg-[#FFF0E5] border-[#AF421F] text-[#AF421F]'
+                    : 'bg-white border-[#DDDCD4] text-[#142820] hover:border-[#0E513B]'
+                }`}
+              >
+                <Heart
+                  className={`w-5 h-5 ${isSaved ? 'fill-[#AF421F]' : ''}`}
+                />
+              </button>
+            )}
+          </footer>
+        </div>
+      </div>
 
       <ImageLightboxModal
         key="spot-detail-lightbox"
-        images={spot.images}
+        images={safeImages}
         initialIndex={imageIndex}
         isOpen={isLightboxOpen}
         onClose={() => setIsLightboxOpen(false)}
+        onIndexChange={(nextIdx) => setImageIndex(nextIdx)}
         title={spot.title}
       />
-    </AnimatePresence>
+    </>
   );
 }

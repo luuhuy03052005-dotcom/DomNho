@@ -1,19 +1,21 @@
 'use client';
 
-import React, { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import React, { useEffect, useRef, useState } from 'react';
 import {
-  CalendarHeart,
   Camera,
   CheckCircle2,
-  Flame,
   Footprints,
-  QrCode,
+  Heart,
+  ImagePlus,
+  Send,
+  ShieldCheck,
+  Sparkles,
+  UserCheck,
   Users,
   X,
+  Zap,
 } from 'lucide-react';
 import { DomSpot, MemorySnap, ThemeId, UserSession } from '@/lib/types';
-import { DOM_THEMES } from '@/lib/themes';
 import { compressImageToWebpClient } from '@/lib/image-compressor';
 
 interface ProfileMemoryModalProps {
@@ -40,7 +42,6 @@ interface ProfileMemoryModalProps {
 
 export default function ProfileMemoryModal({
   isOpen,
-  themeId,
   userSession,
   spots,
   memorySnaps,
@@ -53,453 +54,495 @@ export default function ProfileMemoryModal({
   onActivateEmergencyBoost,
   onLinkPartnerName,
 }: ProfileMemoryModalProps) {
-  const theme = DOM_THEMES[themeId];
-  const [activeTab, setActiveTab] = useState<'MEMORY_PACT' | 'MY_SPOTS' | 'COUPLE_PATROL'>(
-    'MEMORY_PACT'
-  );
+  const [activeTab, setActiveTab] = useState<
+    'MY_SPOTS' | 'WEEKLY_SNAP' | 'COUPLE_WALK'
+  >('WEEKLY_SNAP');
+
   const [showAddSnapForm, setShowAddSnapForm] = useState(false);
-  const [petName, setPetName] = useState('');
+  const [petName, setPetName] = useState('Mướp');
   const [caption, setCaption] = useState('');
-  const [moodTag] = useState('Bình yên & Quấn chủ');
-  const [weightKg, setWeightKg] = useState('');
-  const [snapPhotoUrl, setSnapPhotoUrl] = useState('');
-  const [partnerInput, setPartnerInput] = useState('');
+  const [moodTag, setMoodTag] = useState('Ngủ khò ấm áp');
+  const [weightKg, setWeightKg] = useState('3.5');
+  const [snapImage, setSnapImage] = useState<string>('');
+  const [uploadingSnap, setUploadingSnap] = useState(false);
+  const [snapFormError, setSnapFormError] = useState<string | null>(null);
+
+  const [partnerInput, setPartnerInput] = useState(
+    userSession?.partnerName || ''
+  );
+
+  const snapFileRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    if (!isOpen || typeof document === 'undefined') return;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
-  const mySpots = spots.filter(
-    (s) => !!userSession && s.authorId === userSession.id
-  );
+  const mySpots = userSession
+    ? spots.filter((s) => s.authorId === userSession.id)
+    : [];
 
-  const handleSnapPhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleSnapFileChange = async (
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    setUploadingSnap(true);
     try {
       const compressed = await compressImageToWebpClient(file, 960, 0.8);
-      setSnapPhotoUrl(compressed.dataUrl);
-    } catch {
-      // ignore
+      setSnapImage(compressed.dataUrl);
+      setSnapFormError(null);
+    } finally {
+      setUploadingSnap(false);
     }
   };
 
-  const handleSubmitSnap = (e: React.FormEvent) => {
+  const handleCreateMemorySnap = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!caption.trim() || !snapPhotoUrl) return;
-    const w = parseFloat(weightKg);
+    if (!caption.trim()) {
+      setSnapFormError('Vui lòng viết đôi dòng nhật ký cho bức ảnh kỷ niệm.');
+      return;
+    }
+    if (!snapImage) {
+      setSnapFormError(
+        'Vui lòng chọn tải lên bức ảnh thật của bé từ máy của bạn.'
+      );
+      return;
+    }
+    setSnapFormError(null);
     onAddWeeklyMemorySnap({
       petName: petName.trim() || 'Bé cưng',
       caption: caption.trim(),
       moodTag,
-      weightKg: Number.isFinite(w) && w > 0 ? w : undefined,
-      imageUrl: snapPhotoUrl,
+      weightKg: parseFloat(weightKg) || undefined,
+      imageUrl: snapImage,
     });
     setCaption('');
-    setSnapPhotoUrl('');
+    setSnapImage('');
     setShowAddSnapForm(false);
   };
 
   return (
-    <AnimatePresence>
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        onClick={onClose}
-        className="fixed inset-0 z-50 bg-black/45 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4"
+    <div
+      onClick={onClose}
+      className="fixed inset-0 z-[80] bg-black/55 flex items-end sm:items-center justify-center sm:p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Tài khoản và kỷ niệm"
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="w-full max-h-[92dvh] sm:max-h-[88dvh] sm:max-w-xl bg-[#FAF7F1] text-[#142820] rounded-t-2xl sm:rounded-2xl border border-[#DDDCD4] shadow-2xl flex flex-col overflow-hidden"
       >
-        <motion.div
-          initial={{ scale: 0.92, y: 24, opacity: 0 }}
-          animate={{ scale: 1, y: 0, opacity: 1 }}
-          exit={{ scale: 0.92, y: 24, opacity: 0 }}
-          transition={{ type: 'spring', stiffness: 270, damping: 26 }}
-          onClick={(e) => e.stopPropagation()}
-          className="w-full max-w-xl max-h-[88dvh] rounded-[32px] shadow-2xl backdrop-blur-2xl overflow-hidden flex flex-col"
-          style={{
-            backgroundColor: theme.frostedSheetBg,
-            color: theme.textHex,
-          }}
-        >
-          <div className="p-5 pb-3 flex items-start justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <div
-                className="w-12 h-12 rounded-2xl flex items-center justify-center text-white font-bold text-lg shadow-md"
-                style={{
-                  background: 'linear-gradient(135deg, #2A9D8F 0%, #E07A5F 100%)',
-                }}
-              >
-                {userSession ? userSession.displayName.charAt(0).toUpperCase() : 'Đ'}
+        <header className="shrink-0 bg-[#FAF7F1] border-b border-[#DDDCD4] px-4 sm:px-5 pt-3.5 pb-3 space-y-3">
+          <div className="flex items-center justify-between gap-2">
+            <h2 className="text-base sm:text-lg font-extrabold text-[#142820]">
+              Tài khoản &amp; Kỷ niệm
+            </h2>
+
+            <button
+              type="button"
+              onClick={onClose}
+              className="min-w-[44px] min-h-[44px] -mr-1 rounded-[10px] bg-white border border-[#DDDCD4] hover:border-[#0E513B] text-[#142820] flex items-center justify-center shrink-0 transition-colors"
+              aria-label="Đóng hộp thoại tài khoản"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+
+          <div className="p-3.5 rounded-xl bg-white border border-[#DDDCD4] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-start gap-3 min-w-0">
+              <div className="w-11 h-11 rounded-xl bg-[#0E513B] text-white font-extrabold text-base flex items-center justify-center shrink-0">
+                {userSession ? userSession.displayName.slice(0, 1) : 'Đ'}
               </div>
-              <div>
-                <div className="flex items-center gap-2 flex-wrap">
-                  <h3 className="text-base sm:text-lg font-bold">
+
+              <div className="min-w-0 flex-1 space-y-1">
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <h3 className="text-sm sm:text-base font-extrabold text-[#142820]">
                     {userSession
-                      ? userSession.partnerName
-                        ? `${userSession.displayName} & ${userSession.partnerName}`
-                        : userSession.displayName
+                      ? userSession.displayName
                       : 'Khách Đi Dạo • Chế Độ Xem Tự Do'}
                   </h3>
-                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-[#2A9D8F]/15 text-[#2A9D8F]">
-                    {userSession ? 'Tài khoản đã xác thực' : 'Chưa định danh'}
+                  <span className="px-2 py-0.5 rounded bg-[#E8EFE6] text-[#0E513B] text-[11px] font-bold inline-flex items-center gap-1">
+                    <ShieldCheck className="w-3 h-3 shrink-0" />
+                    <span>{userSession ? 'Đã lưu' : 'Chưa định danh'}</span>
                   </span>
                 </div>
-                <p className="text-xs mt-0.5" style={{ color: theme.mutedTextHex }}>
+
+                <p className="text-xs text-[#52605A] leading-relaxed">
                   {userSession
-                    ? `SĐT bảo mật: ${userSession.maskedPhone} • Mã phòng đôi: ${userSession.coupleRoomCode}`
-                    : 'Chạm tạo biệt danh 3 giây để lưu bài tự đăng và Bản đồ Kỷ niệm'}
+                    ? `SĐT bảo mật: ${userSession.maskedPhone} • Mã ghép đôi: ${userSession.coupleRoomCode}`
+                    : 'Chạm tạo biệt danh 3 giây để lưu bài tự đăng và Bản đồ Kỷ niệm.'}
                 </p>
               </div>
             </div>
 
-            <div className="flex items-center gap-2">
-              {!userSession && (
-                <button
-                  type="button"
-                  onClick={onRequireAuth}
-                  className="px-3.5 py-2 rounded-full text-xs font-bold text-white bg-[#E07A5F]"
-                >
-                  Định danh 3 giây
-                </button>
-              )}
+            {!userSession && (
               <button
                 type="button"
-                onClick={onClose}
-                className="w-9 h-9 rounded-full flex items-center justify-center"
-                style={{ backgroundColor: theme.pillBg }}
+                onClick={onRequireAuth}
+                className="w-full sm:w-auto min-h-[44px] px-4 rounded-[10px] bg-[#AF421F] hover:bg-[#933516] text-white text-xs font-bold flex items-center justify-center gap-1.5 shrink-0 transition-colors"
               >
-                <X className="w-4 h-4" />
+                <UserCheck className="w-4 h-4 shrink-0" />
+                <span>Định danh 3 giây</span>
               </button>
-            </div>
+            )}
           </div>
 
-          <div className="px-5 flex items-center gap-2 flex-wrap">
+          <div
+            className="flex flex-wrap gap-1.5"
+            role="tablist"
+            aria-label="Các mục trong tài khoản"
+          >
             {[
-              { id: 'MY_SPOTS', label: `Bài tự đăng của tôi (${mySpots.length})` },
-              { id: 'MEMORY_PACT', label: 'Chạm Ảnh Mỗi Tuần' },
-              { id: 'COUPLE_PATROL', label: 'Đi Dạo Cùng Nhau' },
+              {
+                id: 'MY_SPOTS',
+                label: `Bài tự đăng của tôi (${mySpots.length})`,
+              },
+              {
+                id: 'WEEKLY_SNAP',
+                label: 'Chạm ảnh mỗi tuần',
+              },
+              {
+                id: 'COUPLE_WALK',
+                label: 'Đi dạo cùng nhau',
+              },
             ].map((t) => {
-              const active = activeTab === t.id;
+              const isActive = activeTab === t.id;
               return (
                 <button
                   key={t.id}
                   type="button"
-                  onClick={() => setActiveTab(t.id as any)}
-                  className="px-3.5 py-2 rounded-full text-xs font-bold transition-all"
-                  style={{
-                    backgroundColor: active ? theme.textHex : theme.pillBg,
-                    color: active ? theme.bgHex : theme.textHex,
-                  }}
+                  role="tab"
+                  aria-selected={isActive}
+                  onClick={() => setActiveTab(t.id as typeof activeTab)}
+                  className={`min-h-[40px] px-3 py-1.5 rounded-[10px] text-xs font-bold border transition-colors ${
+                    isActive
+                      ? 'bg-[#0E513B] text-white border-[#0E513B]'
+                      : 'bg-white text-[#142820] border-[#DDDCD4] hover:bg-[#F1EFE8]'
+                  }`}
                 >
                   {t.label}
                 </button>
               );
             })}
           </div>
+        </header>
 
-          <div className="p-5 overflow-y-auto no-scrollbar space-y-4">
-            {activeTab === 'MEMORY_PACT' && (
-              <div className="space-y-4">
-                <div
-                  className="p-4 rounded-3xl flex items-center justify-between gap-3"
-                  style={{ backgroundColor: theme.frostedCardBg }}
-                >
-                  <div>
-                    <p className="text-xs font-bold text-[#2A9D8F] flex items-center gap-1.5">
-                      <CalendarHeart className="w-4 h-4" />
-                      Cam Kết Kỷ Niệm • Chạm Ảnh Mỗi Tuần
-                    </p>
-                    <p
-                      className="text-xs mt-1 leading-relaxed"
-                      style={{ color: theme.mutedTextHex }}
-                    >
-                      Mỗi tuần chụp 1 bức ảnh cập nhật sau khi nhận nuôi: vừa gửi báo tin bình an cho người cứu hộ cũ, vừa ghép thành Nhật ký trưởng thành.
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setShowAddSnapForm((v) => !v)}
-                    className="px-4 py-2.5 rounded-full text-xs font-bold text-white bg-[#2A9D8F] shrink-0 flex items-center gap-1.5 shadow"
-                  >
-                    <Camera className="w-3.5 h-3.5" />
-                    Chạm ảnh tuần mới
-                  </button>
+        <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-4 sm:p-5 pb-[max(28px,env(safe-area-inset-bottom,0px))] space-y-4">
+          {activeTab === 'WEEKLY_SNAP' && (
+            <div className="space-y-4">
+              <div className="p-4 rounded-xl bg-white border border-[#DDDCD4] flex flex-col sm:flex-row sm:items-center justify-between gap-3.5">
+                <div className="space-y-1.5 min-w-0 flex-1">
+                  <p className="text-xs font-extrabold uppercase tracking-wider text-[#0E513B] flex items-center gap-1.5">
+                    <Sparkles className="w-4 h-4 shrink-0" />
+                    <span>Cam kết kỷ niệm • Chạm ảnh mỗi tuần</span>
+                  </p>
+                  <p className="text-xs sm:text-sm text-[#52605A] leading-relaxed">
+                    Mỗi tuần chụp 1 bức ảnh cập nhật sau khi nhận nuôi: vừa gửi
+                    báo tin bình an cho người cứu hộ cũ, vừa ghép thành Nhật ký
+                    trưởng thành.
+                  </p>
                 </div>
 
-                {showAddSnapForm && (
-                  <form
-                    onSubmit={handleSubmitSnap}
-                    className="p-4 rounded-3xl space-y-3"
-                    style={{ backgroundColor: theme.frostedCardBg }}
-                  >
-                    <div className="grid grid-cols-2 gap-2">
-                      <input
-                        type="text"
-                        value={petName}
-                        onChange={(e) => setPetName(e.target.value)}
-                        placeholder="Tên bé (VD: Bé Muối)"
-                        className="rounded-2xl px-3 py-2 text-xs outline-none"
-                        style={{
-                          backgroundColor: theme.pillBg,
-                          color: theme.textHex,
-                        }}
-                      />
-                      <input
-                        type="text"
-                        value={weightKg}
-                        onChange={(e) => setWeightKg(e.target.value)}
-                        placeholder="Cân nặng (kg)"
-                        className="rounded-2xl px-3 py-2 text-xs outline-none"
-                        style={{
-                          backgroundColor: theme.pillBg,
-                          color: theme.textHex,
-                        }}
-                      />
-                    </div>
+                <button
+                  type="button"
+                  onClick={() => setShowAddSnapForm((v) => !v)}
+                  className="w-full sm:w-auto min-h-[46px] px-4 rounded-[10px] text-xs sm:text-sm font-bold text-white bg-[#0E513B] hover:bg-[#0A412F] flex items-center justify-center gap-2 shrink-0 transition-colors"
+                >
+                  <Camera className="w-4 h-4 shrink-0" />
+                  <span>Chạm ảnh tuần mới</span>
+                </button>
+              </div>
+
+              {showAddSnapForm && (
+                <form
+                  onSubmit={handleCreateMemorySnap}
+                  className="p-4 rounded-xl bg-white border border-[#0E513B] space-y-3"
+                >
+                  <p className="text-xs font-bold text-[#0E513B]">
+                    Thêm ảnh Nhật ký tuần mới (gửi thông báo tới Người cứu hộ)
+                  </p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                     <input
                       type="text"
-                      required
-                      value={caption}
-                      onChange={(e) => setCaption(e.target.value)}
-                      placeholder="Khoảnh khắc đáng nhớ tuần này của bé..."
-                      className="w-full rounded-2xl px-3 py-2.5 text-xs outline-none"
-                      style={{
-                        backgroundColor: theme.pillBg,
-                        color: theme.textHex,
-                      }}
+                      value={petName}
+                      onChange={(e) => setPetName(e.target.value)}
+                      placeholder="Tên bé (VD: Mướp)"
+                      className="w-full h-11 px-3 rounded-[10px] bg-[#FAF7F1] border border-[#DDDCD4] text-xs text-[#142820] outline-none focus:border-[#0E513B]"
                     />
-                    <div className="flex items-center justify-between gap-2 flex-wrap">
-                      <label className="cursor-pointer px-3 py-1.5 rounded-full text-xs font-semibold bg-[#2A9D8F]/15 text-[#2A9D8F] flex items-center gap-1.5">
-                        <Camera className="w-3.5 h-3.5" />
-                        {snapPhotoUrl ? 'Đã chọn ảnh tuần này' : 'Chọn ảnh thật của bé (bắt buộc)'}
-                        <input
-                          type="file"
-                          accept="image/*"
-                          capture="environment"
-                          onChange={handleSnapPhotoChange}
-                          className="hidden"
-                        />
-                      </label>
-                      {snapPhotoUrl && (
-                        <img
-                          src={snapPhotoUrl}
-                          alt="Ảnh kỷ niệm tuần này"
-                          className="w-12 h-12 rounded-xl object-cover"
-                        />
-                      )}
-                    </div>
-                    <div className="flex justify-end gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setShowAddSnapForm(false)}
-                        className="px-3 py-1.5 rounded-full text-xs"
-                      >
-                        Hủy
-                      </button>
-                      <button
-                        type="submit"
-                        disabled={!snapPhotoUrl}
-                        className="px-4 py-1.5 rounded-full text-xs font-bold text-white bg-[#2A9D8F] disabled:opacity-50"
-                      >
-                        Lưu Kỷ Niệm
-                      </button>
-                    </div>
-                  </form>
-                )}
-
-                <div className="space-y-3">
-                  {memorySnaps.map((snap) => (
-                    <div
-                      key={snap.id}
-                      className="p-3.5 rounded-3xl flex gap-3.5 items-center"
-                      style={{ backgroundColor: theme.frostedCardBg }}
-                    >
-                      <img
-                        src={snap.imageUrl}
-                        alt={snap.petName}
-                        className="w-20 h-20 rounded-2xl object-cover shrink-0"
-                      />
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-[#2A9D8F]/15 text-[#2A9D8F]">
-                            Tuần thứ {snap.weekNumber} • {snap.petName}
-                            {snap.weightKg ? ` (${snap.weightKg}kg)` : ''}
-                          </span>
-                          <span className="text-[10px] opacity-65">
-                            {snap.createdAt}
-                          </span>
-                        </div>
-                        <p className="text-xs font-medium mt-1.5 leading-relaxed">
-                          “{snap.caption}”
-                        </p>
-                        <div className="flex items-center justify-between mt-1.5 text-[11px] opacity-75">
-                          <span>📍 {snap.areaLabel}</span>
-                          {snap.sentToRescuer && snap.rescuerName && (
-                            <span className="text-[#2A9D8F] font-semibold">
-                              ✓ Đã gửi cho {snap.rescuerName}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                  {memorySnaps.length === 0 && (
-                    <p className="text-xs italic py-2" style={{ color: theme.mutedTextHex }}>
-                      Chưa có kỷ niệm nào. Bấm “Chạm ảnh tuần mới” và chọn ảnh thật của bé để bắt đầu nhật ký.
+                    <input
+                      type="number"
+                      step="0.1"
+                      value={weightKg}
+                      onChange={(e) => setWeightKg(e.target.value)}
+                      placeholder="Cân nặng (kg)"
+                      className="w-full h-11 px-3 rounded-[10px] bg-[#FAF7F1] border border-[#DDDCD4] text-xs text-[#142820] outline-none focus:border-[#0E513B]"
+                    />
+                  </div>
+                  <input
+                    type="text"
+                    value={moodTag}
+                    onChange={(e) => setMoodTag(e.target.value)}
+                    placeholder="Cảm xúc tuần này (VD: Ăn khỏe, thích tắm nắng)"
+                    className="w-full h-11 px-3 rounded-[10px] bg-[#FAF7F1] border border-[#DDDCD4] text-xs text-[#142820] outline-none focus:border-[#0E513B]"
+                  />
+                  <textarea
+                    value={caption}
+                    onChange={(e) => setCaption(e.target.value)}
+                    rows={2}
+                    placeholder="Chia sẻ khoảnh khắc đáng yêu tuần này của bé..."
+                    className="w-full p-3 rounded-[10px] bg-[#FAF7F1] border border-[#DDDCD4] text-xs text-[#142820] outline-none focus:border-[#0E513B]"
+                    required
+                  />
+                  {snapFormError && (
+                    <p className="text-xs font-bold text-[#AF421F]">
+                      {snapFormError}
                     </p>
                   )}
-                </div>
-              </div>
-            )}
-
-            {activeTab === 'COUPLE_PATROL' && (
-              <div className="space-y-4">
-                <div
-                  className="p-4 rounded-3xl flex items-center justify-between gap-3"
-                  style={{ backgroundColor: theme.frostedCardBg }}
-                >
-                  <div className="flex items-start gap-3">
-                    <div className="w-10 h-10 rounded-2xl bg-[#2A9D8F]/15 text-[#2A9D8F] flex items-center justify-center shrink-0">
-                      <Footprints className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-bold">
-                        Chế độ Đi Dạo Cùng Nhau (Radar 500m)
-                      </p>
-                      <p
-                        className="text-xs mt-0.5 leading-relaxed"
-                        style={{ color: theme.mutedTextHex }}
-                      >
-                        Khi đi dạo phố trong bán kính 500m của một Đốm Đỏ, hệ thống gửi thông báo để hai bạn cùng để mắt tìm phụ.
-                      </p>
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={onTogglePatrolMode}
-                    className="px-4 py-2 rounded-full text-xs font-bold shrink-0"
-                    style={{
-                      backgroundColor: patrolModeActive ? '#2A9D8F' : theme.pillBg,
-                      color: patrolModeActive ? '#FFFFFF' : theme.textHex,
-                    }}
-                  >
-                    {patrolModeActive ? 'Đang Bật' : 'Đang Tắt'}
-                  </button>
-                </div>
-
-                <div
-                  className="p-4 rounded-3xl space-y-3"
-                  style={{ backgroundColor: theme.frostedCardBg }}
-                >
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-bold flex items-center gap-1.5">
-                        <Users className="w-4 h-4 text-[#E07A5F]" />
-                        Không Gian Kỷ Niệm Cặp Đôi
-                      </p>
-                      <p
-                        className="text-xs mt-0.5"
-                        style={{ color: theme.mutedTextHex }}
-                      >
-                        Cùng người thương chia sẻ các Đốm Xanh kỷ niệm và hành trình cứu hộ.
-                      </p>
-                    </div>
-                    <span className="px-3 py-1.5 rounded-2xl text-xs font-bold bg-[#E07A5F]/15 text-[#E07A5F] flex items-center gap-1">
-                      <QrCode className="w-3.5 h-3.5" />
-                      {userSession?.coupleRoomCode || 'DN-LOVE'}
-                    </span>
-                  </div>
-
-                  <div className="flex gap-2">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
                     <input
-                      type="text"
-                      value={partnerInput}
-                      onChange={(e) => setPartnerInput(e.target.value)}
-                      placeholder="Nhập tên người thương / bạn đồng hành (VD: Minh Khôi)..."
-                      className="flex-1 rounded-2xl px-3.5 py-2.5 text-xs outline-none"
-                      style={{
-                        backgroundColor: theme.pillBg,
-                        color: theme.textHex,
-                      }}
+                      ref={snapFileRef}
+                      type="file"
+                      accept="image/*"
+                      onChange={handleSnapFileChange}
+                      className="hidden"
                     />
                     <button
                       type="button"
-                      onClick={() => {
-                        if (partnerInput.trim()) {
-                          onLinkPartnerName(partnerInput.trim());
-                          setPartnerInput('');
-                        }
-                      }}
-                      className="px-4 py-2.5 rounded-2xl text-xs font-bold text-white bg-[#E07A5F]"
+                      onClick={() => snapFileRef.current?.click()}
+                      className="min-h-[42px] px-3.5 rounded-[10px] bg-[#F1EFE8] hover:bg-[#E8EFE6] text-xs font-semibold text-[#142820] inline-flex items-center justify-center gap-1.5"
                     >
-                      Ghép Đôi Bản Đồ
+                      <ImagePlus className="w-4 h-4 text-[#0E513B]" />
+                      <span>
+                        {uploadingSnap
+                          ? 'Đang nén WebP...'
+                          : snapImage
+                          ? 'Đã chọn ảnh tuần mới'
+                          : 'Chọn ảnh từ máy'}
+                      </span>
+                    </button>
+
+                    <button
+                      type="submit"
+                      className="min-h-[44px] px-4 rounded-[10px] text-xs font-bold text-white bg-[#0E513B] hover:bg-[#0A412F] inline-flex items-center justify-center gap-1.5"
+                    >
+                      <Send className="w-3.5 h-3.5" />
+                      <span>Lưu &amp; Báo bình an</span>
                     </button>
                   </div>
-                </div>
-              </div>
-            )}
+                </form>
+              )}
 
-            {activeTab === 'MY_SPOTS' && (
-              <div className="space-y-3">
-                {mySpots.length === 0 ? (
-                  <p className="text-xs italic py-2" style={{ color: theme.mutedTextHex }}>
-                    Bạn chưa đăng bài nào trên Web. Hãy bấm nút “+ Đăng bài” trên thanh công cụ để đăng tin cứu hộ hoặc nhận nuôi.
+              {memorySnaps.length === 0 ? (
+                <div className="p-6 rounded-xl bg-white border border-[#DDDCD4] text-center space-y-2">
+                  <p className="text-xs sm:text-sm text-[#52605A] leading-relaxed">
+                    Chưa có kỷ niệm nào. Bấm “Chạm ảnh tuần mới” và chọn ảnh
+                    thật của bé để bắt đầu nhật ký.
                   </p>
-                ) : (
-                  mySpots.map((spot) => (
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                  {memorySnaps.map((snap) => (
                     <div
-                      key={spot.id}
-                      className="p-3.5 rounded-3xl flex items-center justify-between gap-3"
-                      style={{ backgroundColor: theme.frostedCardBg }}
+                      key={snap.id}
+                      className="rounded-xl overflow-hidden bg-white border border-[#DDDCD4] flex flex-col justify-between"
                     >
-                      <div className="flex items-center gap-3 min-w-0">
+                      <div className="relative h-40 w-full bg-[#F1EFE8]">
                         <img
-                          src={spot.images[0]}
-                          alt={spot.title}
-                          className="w-14 h-14 rounded-2xl object-cover shrink-0"
+                          src={snap.imageUrl}
+                          alt={snap.petName}
+                          className="w-full h-full object-cover"
                         />
-                        <div className="min-w-0">
-                          <p className="text-xs font-bold truncate">{spot.title}</p>
-                          <p
-                            className="text-[11px] mt-0.5"
-                            style={{ color: theme.mutedTextHex }}
-                          >
-                            {spot.areaLabel} • Độ sáng: {spot.lightPower}%
-                          </p>
-                          <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-                            {spot.spotType !== 'GREEN_PEACE' ? (
-                              <>
-                                <button
-                                  type="button"
-                                  onClick={() => onResolveSpotToPeace(spot.id)}
-                                  className="px-2.5 py-1 rounded-full text-[11px] font-bold bg-[#2A9D8F] text-white flex items-center gap-1"
-                                >
-                                  <CheckCircle2 className="w-3 h-3" />
-                                  Đã tìm thấy / Chuyển Đốm Xanh
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => onActivateEmergencyBoost(spot.id)}
-                                  className="px-2.5 py-1 rounded-full text-[11px] font-bold bg-[#E63946]/15 text-[#E63946] flex items-center gap-1"
-                                >
-                                  <Flame className="w-3 h-3" />
-                                  Truyền Lửa Khẩn Cấp 5km
-                                </button>
-                              </>
-                            ) : (
-                              <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-[#2A9D8F]/15 text-[#2A9D8F]">
-                                🌿 Đốm Xanh Bình Yên • Đã lưu kỷ niệm
-                              </span>
-                            )}
-                          </div>
+                        <div className="absolute top-2.5 left-2.5 px-2.5 py-1 rounded-md text-[10px] font-bold bg-[#0E513B] text-white">
+                          Tuần thứ {snap.weekNumber} • {snap.petName}
                         </div>
+                        {snap.weightKg && (
+                          <div className="absolute bottom-2 right-2 px-2 py-0.5 rounded-md text-[10px] font-bold bg-black/70 text-white">
+                            {snap.weightKg} kg
+                          </div>
+                        )}
+                      </div>
+                      <div className="p-3.5 space-y-1.5">
+                        <div className="flex items-center justify-between text-[11px]">
+                          <span className="font-bold text-[#AF421F]">
+                            #{snap.moodTag}
+                          </span>
+                          <span className="text-[#52605A]">{snap.createdAt}</span>
+                        </div>
+                        <p className="text-xs leading-relaxed text-[#142820]">
+                          {snap.caption}
+                        </p>
+                        {snap.rescuerName && (
+                          <div className="pt-1 flex items-center gap-1 text-[10px] font-semibold text-[#0E513B]">
+                            <CheckCircle2 className="w-3 h-3 shrink-0" />
+                            <span>Đã gửi báo bình an tới {snap.rescuerName}</span>
+                          </div>
+                        )}
                       </div>
                     </div>
-                  ))
-                )}
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {activeTab === 'COUPLE_WALK' && (
+            <div className="space-y-4">
+              <div className="p-4 rounded-xl bg-white border border-[#DDDCD4] space-y-3">
+                <div className="flex items-start gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-[#FFF0E5] text-[#AF421F] flex items-center justify-center shrink-0">
+                    <Footprints className="w-5 h-5" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <h4 className="text-sm font-bold text-[#142820]">
+                      Bản đồ Kỷ niệm • Chế độ Đi dạo cùng nhau
+                    </h4>
+                    <p className="text-xs text-[#52605A] leading-relaxed mt-0.5">
+                      Khi bật chế độ Đi dạo, hệ thống tự động ưu tiên hiển thị
+                      các bài tìm thú lạc và cứu trợ trong bán kính 1.5km quanh
+                      bạn.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pt-2 border-t border-[#F1EFE8]">
+                  <span className="text-xs font-semibold text-[#142820]">
+                    Trạng thái Radar tuần tra quanh bạn:
+                  </span>
+                  <button
+                    type="button"
+                    onClick={onTogglePatrolMode}
+                    aria-pressed={patrolModeActive}
+                    className={`min-h-[42px] px-4 rounded-[10px] text-xs font-bold transition-colors ${
+                      patrolModeActive
+                        ? 'bg-[#0E513B] text-white'
+                        : 'bg-[#F1EFE8] text-[#142820]'
+                    }`}
+                  >
+                    {patrolModeActive
+                      ? 'Đang bật Đi dạo (1.5km)'
+                      : 'Đang tắt • Bấm để bật'}
+                  </button>
+                </div>
               </div>
-            )}
-          </div>
-        </motion.div>
-      </motion.div>
-    </AnimatePresence>
+
+              <div className="p-4 rounded-xl bg-white border border-[#DDDCD4] space-y-3">
+                <div className="flex items-center gap-2">
+                  <Users className="w-4 h-4 text-[#AF421F] shrink-0" />
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-[#142820]">
+                    Ghép đôi Không gian Đi dạo &amp; Nuôi thú cưng
+                  </h4>
+                </div>
+                <p className="text-xs text-[#52605A] leading-relaxed">
+                  Nhập tên người đồng hành để lưu chung Sổ tay vị trí và Nhật ký
+                  Chạm ảnh mỗi tuần:
+                </p>
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <input
+                    type="text"
+                    value={partnerInput}
+                    onChange={(e) => setPartnerInput(e.target.value)}
+                    placeholder="Tên người thương / bạn đồng hành..."
+                    className="flex-1 h-11 px-3.5 rounded-[10px] bg-[#FAF7F1] border border-[#DDDCD4] text-xs text-[#142820] outline-none focus:border-[#0E513B]"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (partnerInput.trim()) {
+                        onLinkPartnerName(partnerInput.trim());
+                      }
+                    }}
+                    className="min-h-[44px] px-4 rounded-[10px] text-xs font-bold text-white bg-[#AF421F] hover:bg-[#933516] inline-flex items-center justify-center gap-1.5 shrink-0 transition-colors"
+                  >
+                    <Heart className="w-3.5 h-3.5 fill-current" />
+                    <span>Kết nối</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'MY_SPOTS' && (
+            <div className="space-y-3">
+              {mySpots.length === 0 ? (
+                <div className="p-6 rounded-xl bg-white border border-[#DDDCD4] text-center space-y-2">
+                  <p className="text-sm font-bold text-[#142820]">
+                    Bạn chưa tự đăng bài viết nào trên thiết bị này
+                  </p>
+                  <p className="text-xs text-[#52605A] leading-relaxed">
+                    Khi bạn đăng tin tìm thú lạc, cứu trợ hoặc nhận nuôi, bài
+                    viết sẽ xuất hiện tại đây để bạn quản lý.
+                  </p>
+                </div>
+              ) : (
+                mySpots.map((sp) => (
+                  <div
+                    key={sp.id}
+                    className="p-3.5 rounded-xl bg-white border border-[#DDDCD4] flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <img
+                        src={sp.images[0]}
+                        alt={sp.title}
+                        className="w-14 h-14 rounded-[10px] object-cover shrink-0 bg-[#F1EFE8]"
+                      />
+                      <div className="min-w-0 flex-1">
+                        <h4 className="text-xs sm:text-sm font-bold text-[#142820] truncate">
+                          {sp.title}
+                        </h4>
+                        <p className="text-[11px] text-[#52605A] truncate">
+                          {sp.areaLabel} • Độ sáng: {sp.lightPower}%
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-2 shrink-0">
+                      {sp.spotType === 'RED_SOS' && !sp.isEmergencyBoosted && (
+                        <button
+                          type="button"
+                          onClick={() => onActivateEmergencyBoost(sp.id)}
+                          className="min-h-[38px] px-3 rounded-[10px] text-[11px] font-bold bg-[#AF421F] text-white inline-flex items-center gap-1"
+                        >
+                          <Zap className="w-3.5 h-3.5" />
+                          <span>Kích hoạt Khẩn cấp</span>
+                        </button>
+                      )}
+                      {sp.spotType !== 'GREEN_PEACE' && (
+                        <button
+                          type="button"
+                          onClick={() => onResolveSpotToPeace(sp.id)}
+                          className="min-h-[38px] px-3 rounded-[10px] text-[11px] font-bold bg-[#E8EFE6] text-[#0E513B] inline-flex items-center gap-1"
+                        >
+                          <CheckCircle2 className="w-3.5 h-3.5" />
+                          <span>Đã đoàn tụ / Bình yên</span>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
   );
 }

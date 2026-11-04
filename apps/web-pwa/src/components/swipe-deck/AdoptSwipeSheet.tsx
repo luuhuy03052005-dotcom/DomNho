@@ -337,7 +337,7 @@ export default function AdoptSwipeSheet({
                       >
                         <MapPin className="w-3 h-3 text-[#F4A261]" />
                         {activeHasPin
-                          ? `Cách bạn ${formatDistanceVi(
+                          ? `${formatDistanceVi(
                               calculateDistanceMeters(
                                 userCoords.lat,
                                 userCoords.lng,

@@ -568,7 +568,7 @@ export default function SpotListView({
                           {distMeters !== null ? (
                             <span className="px-3 py-1 rounded-full text-xs font-black bg-[#D2673B] text-white shadow-md flex items-center gap-1 shrink-0 ring-1 ring-white/30">
                               <MapPin className="w-3.5 h-3.5 fill-current" />
-                              <span>Cách bạn {formatDistanceVi(distMeters)}</span>
+                              <span>{formatDistanceVi(distMeters)}</span>
                             </span>
                           ) : (
                             <span className="px-2.5 py-1 rounded-full text-[11px] font-bold bg-[#133E35] text-white shadow-sm flex items-center gap-1 shrink-0">
@@ -614,7 +614,7 @@ export default function SpotListView({
                         <div className="flex items-center gap-1.5 text-[11px] font-semibold truncate">
                           {distMeters !== null && (
                             <span className="font-bold text-[#F4A261]">
-                              Cách bạn {formatDistanceVi(distMeters)} •
+                              {formatDistanceVi(distMeters)} •
                             </span>
                           )}
                           <span className="truncate">
@@ -685,7 +685,7 @@ export default function SpotListView({
                                 <div className="flex items-center gap-1.5 flex-wrap">
                                   {distMeters !== null && (
                                     <span className="px-2 py-0.5 rounded-full text-xs font-black bg-[#D2673B]/15 text-[#D2673B]">
-                                      Cách bạn {formatDistanceVi(distMeters)}
+                                      {formatDistanceVi(distMeters)}
                                     </span>
                                   )}
                                   <span className="text-xs font-bold truncate text-[#133E35]">

@@ -57,9 +57,10 @@ export function calculateDistanceMeters(
 
 export function formatDistanceVi(meters: number): string {
   if (meters < 1000) {
-    return `Cách bạn ${Math.max(50, Math.round(meters / 10) * 10)}m`;
+    return `Cách bạn ${Math.max(50, Math.round(meters / 10) * 10)} m`;
   }
-  return `Cách bạn ${(meters / 1000).toFixed(1)}km`;
+  const kmText = (meters / 1000).toFixed(1).replace('.', ',');
+  return `Cách bạn ${kmText} km`;
 }
 
 /**

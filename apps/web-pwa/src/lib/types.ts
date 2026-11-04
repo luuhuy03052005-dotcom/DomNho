@@ -148,6 +148,75 @@ export function isUserWebPost(spot: Pick<DomSpot, 'sourceType'>): boolean {
   return spot.sourceType === 'USER_POST';
 }
 
+export interface SpotBadgeMeta {
+  label: string;
+  uppercaseLabel: string;
+  bgHex: string;
+  textHex: string;
+  categoryKind: 'RESCUE' | 'LOST' | 'ADOPT';
+}
+
+export function getSpotBadgeMeta(spot: DomSpot): SpotBadgeMeta {
+  const userPost = isUserWebPost(spot);
+
+  if (spot.spotType === 'ORANGE_SIGHT') {
+    return {
+      label: userPost ? 'Tìm thú lạc' : 'Tin tìm thú lạc',
+      uppercaseLabel: 'THÚ LẠC',
+      bgHex: '#FFF3D8',
+      textHex: '#80570D',
+      categoryKind: 'LOST',
+    };
+  }
+
+  if (spot.spotType === 'RED_SOS') {
+    return {
+      label: userPost ? 'Cần cứu trợ' : 'Tin cứu hộ',
+      uppercaseLabel: userPost ? 'CỨU TRỢ' : 'TIN CỨU HỘ',
+      bgHex: '#FFF0E5',
+      textHex: '#AF421F',
+      categoryKind: 'RESCUE',
+    };
+  }
+
+  if (!userPost) {
+    if (spot.entityCategory === 'RESCUE_CENTER') {
+      return {
+        label: 'Trạm & Mái ấm',
+        uppercaseLabel: 'TRẠM & NHẬN NUÔI',
+        bgHex: '#E8EFE6',
+        textHex: '#0E513B',
+        categoryKind: 'ADOPT',
+      };
+    }
+    return {
+      label: 'Tin cứu hộ',
+      uppercaseLabel: 'TIN CỨU HỘ',
+      bgHex: '#FFF0E5',
+      textHex: '#AF421F',
+      categoryKind: 'RESCUE',
+    };
+  }
+
+  if (spot.spotType === 'GREEN_PEACE') {
+    return {
+      label: 'Đã tìm được nhà',
+      uppercaseLabel: 'MÁI ẤM',
+      bgHex: '#E8EFE6',
+      textHex: '#0E513B',
+      categoryKind: 'ADOPT',
+    };
+  }
+
+  return {
+    label: 'Chờ nhận nuôi',
+    uppercaseLabel: 'NHẬN NUÔI',
+    bgHex: '#E8EFE6',
+    textHex: '#0E513B',
+    categoryKind: 'ADOPT',
+  };
+}
+
 export function detectPlatformFromUrl(
   url?: string | null,
   fallback: CrawlPlatform = 'SOCIAL_MEDIA'
