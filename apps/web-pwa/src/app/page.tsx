@@ -49,6 +49,7 @@ import {
 } from '@/lib/security';
 import {
   broadcastCommunitySpotRealtime,
+  broadcastDeleteSpotRealtime,
   clearPermanentSession,
   linkCouplePartnerInSupabase,
   loadPermanentSession,
@@ -116,6 +117,7 @@ export default function DomNhoHomePage() {
   const [patrolModeActive, setPatrolModeActive] = useState<boolean>(true);
   const [selectedSpot, setSelectedSpot] = useState<DomSpot | null>(null);
   const [detailSpot, setDetailSpot] = useState<DomSpot | null>(null);
+  const [editingSpot, setEditingSpot] = useState<DomSpot | null>(null);
 
   const [isLocationPickerOpen, setIsLocationPickerOpen] = useState<boolean>(false);
   const [isFilterModalOpen, setIsFilterModalOpen] = useState<boolean>(false);
@@ -260,12 +262,20 @@ export default function DomNhoHomePage() {
         if (!data?.ok) return;
 
         if (Array.isArray(data.spots)) {
-          const trustedIncoming = filterTrustedSpots(data.spots as DomSpot[]);
+          const deletedSet = new Set<string>(
+            Array.isArray(data.deletedSpotIds) ? data.deletedSpotIds : []
+          );
+          const trustedIncoming = filterTrustedSpots(
+            data.spots as DomSpot[]
+          ).filter((s) => !deletedSet.has(s.id));
           updateSpotsAndPersist((prev) => {
             const incomingIds = new Set(trustedIncoming.map((s) => s.id));
             // Giữ lại các bài crawl thêm từ phiên hiện tại chưa có trong batch đầu
             const extraCrawled = prev.filter(
-              (s) => s.sourceType !== 'USER_POST' && !incomingIds.has(s.id)
+              (s) =>
+                s.sourceType !== 'USER_POST' &&
+                !incomingIds.has(s.id) &&
+                !deletedSet.has(s.id)
             );
             return [...trustedIncoming, ...extraCrawled];
           });
@@ -288,23 +298,46 @@ export default function DomNhoHomePage() {
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    const unsubscribe = subscribeToRealtimeCommunityFeed((incomingSpot) => {
-      if (incomingSpot && incomingSpot.id) {
-        updateSpotsAndPersist((prev) => [
-          incomingSpot,
-          ...prev.filter((s) => s.id !== incomingSpot.id),
-        ]);
-        fetch('/api/spots', {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            action: 'SYNC_SPOT',
-            spot: incomingSpot,
-          }),
-        }).catch(() => null);
+    const unsubscribe = subscribeToRealtimeCommunityFeed(
+      (incomingSpot, deletedSpotId) => {
+        if (deletedSpotId) {
+          updateSpotsAndPersist((prev) =>
+            prev.filter((s) => s.id !== deletedSpotId)
+          );
+          setSelectedSpot((curr) =>
+            curr && curr.id === deletedSpotId ? null : curr
+          );
+          setDetailSpot((curr) =>
+            curr && curr.id === deletedSpotId ? null : curr
+          );
+          fetch('/api/spots', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              action: 'SYNC_DELETE_SPOT',
+              spotId: deletedSpotId,
+            }),
+          }).catch(() => null);
+          return;
+        }
+
+        if (incomingSpot && incomingSpot.id) {
+          updateSpotsAndPersist((prev) => [
+            incomingSpot,
+            ...prev.filter((s) => s.id !== incomingSpot.id),
+          ]);
+          fetch('/api/spots', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              action: 'SYNC_SPOT',
+              spot: incomingSpot,
+            }),
+          }).catch(() => null);
+        }
+        syncCommunityFeed(userSession?.id);
       }
-      syncCommunityFeed(userSession?.id);
-    });
+    );
 
     const handleFocus = () => {
       syncCommunityFeed(userSession?.id);
@@ -742,6 +775,195 @@ export default function DomNhoHomePage() {
     ]
   );
 
+  const handleOpenCreatePost = useCallback(() => {
+    setEditingSpot(null);
+    setIsCameraModalOpen(true);
+  }, []);
+
+  const handleOpenEditSpot = useCallback((spot: DomSpot) => {
+    setDetailSpot(null);
+    setEditingSpot(spot);
+    setIsCameraModalOpen(true);
+  }, []);
+
+  const handleUpdateExistingSpot = useCallback(
+    (
+      spotId: string,
+      payload: {
+        spotType: SpotType;
+        title: string;
+        story: string;
+        species: 'cat' | 'dog' | 'other';
+        breed: string;
+        coatColor: string;
+        traits: string[];
+        images: string[];
+        compressedSizeKB: number;
+        allowFoster: boolean;
+        hasExactLocation: boolean;
+        customAddress: string;
+        pinnedLat?: number;
+        pinnedLng?: number;
+      }
+    ) => {
+      ensureAuthenticated(
+        'Chỉnh sửa bài đăng của bạn',
+        async (session) => {
+          const effectiveAddress = payload.customAddress || coords.label;
+          try {
+            const res = await fetch('/api/spots', {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                action: 'UPDATE_SPOT',
+                spotId,
+                authorId: session.id,
+                authorName: session.displayName,
+                rawPhone: session.rawPhone,
+                spotType: payload.spotType,
+                title: payload.title,
+                story: payload.story,
+                species: payload.species,
+                breed: payload.breed,
+                coatColor: payload.coatColor,
+                traits: payload.traits,
+                images: payload.images,
+                exactLat: payload.pinnedLat,
+                exactLng: payload.pinnedLng,
+                hasExactLocation: payload.hasExactLocation,
+                areaLabel: effectiveAddress,
+                formattedAddress: effectiveAddress,
+                allowFoster: payload.allowFoster,
+              }),
+            });
+
+            const data = await res.json().catch(() => null);
+            if (!res.ok || !data?.ok) {
+              showToast(
+                'Không thể lưu chỉnh sửa',
+                data?.error ||
+                  'Vui lòng kiểm tra thông tin bài viết và thử lại.',
+                'error'
+              );
+              return;
+            }
+
+            let updatedSpotToBroadcast: DomSpot | null = data.spot || null;
+
+            updateSpotsAndPersist((prev) =>
+              prev.map((s) => {
+                if (s.id !== spotId) return s;
+                const merged: DomSpot = {
+                  ...s,
+                  ...(data.spot || {}),
+                  spotType: payload.spotType,
+                  title: payload.title,
+                  story: payload.story,
+                  species: payload.species,
+                  breed: payload.breed,
+                  coatColor: payload.coatColor,
+                  traits: payload.traits,
+                  images: payload.images,
+                  areaLabel: effectiveAddress,
+                  formattedAddress: effectiveAddress,
+                  hasExactLocation: payload.hasExactLocation,
+                  allowFoster: payload.allowFoster,
+                };
+                updatedSpotToBroadcast = merged;
+                return merged;
+              })
+            );
+
+            if (updatedSpotToBroadcast) {
+              setSelectedSpot((curr) =>
+                curr && curr.id === spotId ? updatedSpotToBroadcast : curr
+              );
+              setDetailSpot((curr) =>
+                curr && curr.id === spotId ? updatedSpotToBroadcast : curr
+              );
+              broadcastCommunitySpotRealtime(updatedSpotToBroadcast);
+            }
+
+            setIsCameraModalOpen(false);
+            setEditingSpot(null);
+            showToast(
+              'Đã cập nhật bài đăng',
+              'Thông tin bài viết đã được lưu và đồng bộ tới cộng đồng.',
+              'success'
+            );
+          } catch {
+            showToast(
+              'Lỗi kết nối máy chủ',
+              'Không thể cập nhật bài viết lúc này. Vui lòng thử lại.',
+              'error'
+            );
+          }
+        }
+      );
+    },
+    [ensureAuthenticated, coords.label, updateSpotsAndPersist, showToast]
+  );
+
+  const handleDeleteSpot = useCallback(
+    (spotId: string) => {
+      ensureAuthenticated('Xóa bài đăng của bạn', async (session) => {
+        try {
+          const res = await fetch('/api/spots', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              action: 'DELETE_SPOT',
+              spotId,
+              authorId: session.id,
+              rawPhone: session.rawPhone,
+            }),
+          });
+          const data = await res.json().catch(() => null);
+          if (!res.ok || !data?.ok) {
+            showToast(
+              'Không thể xóa bài đăng',
+              data?.error || 'Bạn chỉ có thể xóa bài viết do chính mình đăng.',
+              'error'
+            );
+            return;
+          }
+
+          updateSpotsAndPersist((prev) =>
+            prev.filter((s) => s.id !== spotId)
+          );
+          setSavedSpotIds((prev) => {
+            if (!prev.has(spotId)) return prev;
+            const next = new Set(prev);
+            next.delete(spotId);
+            if (typeof window !== 'undefined') {
+              window.localStorage.setItem(
+                SAVED_SPOT_IDS_KEY,
+                JSON.stringify(Array.from(next))
+              );
+            }
+            return next;
+          });
+          setSelectedSpot((curr) => (curr && curr.id === spotId ? null : curr));
+          setDetailSpot((curr) => (curr && curr.id === spotId ? null : curr));
+          broadcastDeleteSpotRealtime(spotId);
+
+          showToast(
+            'Đã xóa bài đăng',
+            'Bài viết của bạn đã được xóa khỏi hệ thống và danh sách cộng đồng.',
+            'info'
+          );
+        } catch {
+          showToast(
+            'Lỗi kết nối máy chủ',
+            'Không thể xóa bài viết lúc này. Vui lòng thử lại.',
+            'error'
+          );
+        }
+      });
+    },
+    [ensureAuthenticated, updateSpotsAndPersist, showToast]
+  );
+
   const handleUnlockContactOrAdopt = useCallback(
     (
       spot: DomSpot,
@@ -1108,7 +1330,7 @@ export default function DomNhoHomePage() {
         onChangeTab={handleTabChange}
         locationLabel={coords.label}
         onOpenLocationPicker={() => setIsLocationPickerOpen(true)}
-        onOpenCreatePost={() => setIsCameraModalOpen(true)}
+        onOpenCreatePost={handleOpenCreatePost}
         onOpenProfile={() => setIsProfileModalOpen(true)}
         userSession={userSession}
         savedCount={savedSpotIds.size}
@@ -1129,7 +1351,7 @@ export default function DomNhoHomePage() {
             onOpenLocationPicker={() => setIsLocationPickerOpen(true)}
             onRequestRealGps={handleRequestUserGpsWithToast}
             onBackToExplore={() => handleTabChange('explore')}
-            onOpenCreatePost={() => setIsCameraModalOpen(true)}
+            onOpenCreatePost={handleOpenCreatePost}
             vetStations={vetStations}
           />
         ) : mainTab === 'stories' ? (
@@ -1159,6 +1381,9 @@ export default function DomNhoHomePage() {
             onBackToExplore={() => handleTabChange('explore')}
             onTriggerUpdate={() => handleTriggerLiveCrawl('ALL')}
             isUpdating={isUpdatingFeed}
+            currentUserId={userSession?.id}
+            onEditSpot={handleOpenEditSpot}
+            onDeleteSpot={handleDeleteSpot}
           />
         )}
       </main>
@@ -1166,7 +1391,7 @@ export default function DomNhoHomePage() {
       <DomNhoFooter
         activeTab={mainTab}
         onChangeTab={handleTabChange}
-        onOpenCreatePost={() => setIsCameraModalOpen(true)}
+        onOpenCreatePost={handleOpenCreatePost}
         onOpenLocationPicker={() => setIsLocationPickerOpen(true)}
         onOpenProfile={() => setIsProfileModalOpen(true)}
         savedCount={savedSpotIds.size}
@@ -1328,6 +1553,8 @@ export default function DomNhoHomePage() {
         }}
         isSaved={detailSpot ? savedSpotIds.has(detailSpot.id) : false}
         onToggleSave={handleToggleSaveSpot}
+        onEditSpot={handleOpenEditSpot}
+        onDeleteSpot={handleDeleteSpot}
       />
 
       <CameraQuickModal
@@ -1335,13 +1562,19 @@ export default function DomNhoHomePage() {
         themeId="morning_sun"
         userCoords={coords}
         existingSpots={spots}
+        editingSpot={editingSpot}
         onSelectMatchedSpot={(spot) => {
           setIsCameraModalOpen(false);
+          setEditingSpot(null);
           setSelectedSpot(spot);
           setDetailSpot(spot);
         }}
-        onClose={() => setIsCameraModalOpen(false)}
+        onClose={() => {
+          setIsCameraModalOpen(false);
+          setEditingSpot(null);
+        }}
         onCreateSpot={handleCreateNewSpot}
+        onUpdateSpot={handleUpdateExistingSpot}
       />
 
       <ProfileMemoryModal
@@ -1408,6 +1641,13 @@ export default function DomNhoHomePage() {
           );
         }}
         onLinkPartnerName={handleLinkPartnerName}
+        onOpenCreatePost={handleOpenCreatePost}
+        onOpenEditSpot={handleOpenEditSpot}
+        onDeleteSpot={handleDeleteSpot}
+        onSelectSpotDetail={(spot) => {
+          setSelectedSpot(spot);
+          setDetailSpot(spot);
+        }}
       />
 
       <GoogleMapsVaultModal

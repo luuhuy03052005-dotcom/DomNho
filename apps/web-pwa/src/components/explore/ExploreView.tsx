@@ -53,6 +53,9 @@ interface ExploreViewProps {
   onBackToExplore?: () => void;
   onTriggerUpdate?: () => void;
   isUpdating?: boolean;
+  currentUserId?: string;
+  onEditSpot?: (spot: DomSpot) => void;
+  onDeleteSpot?: (spotId: string) => void;
 }
 
 type SortOption = 'NEAREST' | 'NEWEST' | 'URGENT';
@@ -96,6 +99,9 @@ export default function ExploreView({
   onBackToExplore,
   onTriggerUpdate,
   isUpdating = false,
+  currentUserId,
+  onEditSpot,
+  onDeleteSpot,
 }: ExploreViewProps) {
   const [category, setCategory] = useState<ExploreCategory>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
@@ -686,6 +692,11 @@ export default function ExploreView({
                     onSelectDetail={onSelectDetail}
                     onToggleSave={onToggleSaveSpot}
                     isSaved={savedSpotIds.has(spot.id)}
+                    isAuthor={Boolean(
+                      currentUserId && spot.authorId === currentUserId
+                    )}
+                    onEditSpot={onEditSpot}
+                    onDeleteSpot={onDeleteSpot}
                     matchInfo={
                       visualSearchImage
                         ? visualMatchMap.get(spot.id)

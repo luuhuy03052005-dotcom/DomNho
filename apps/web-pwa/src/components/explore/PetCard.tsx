@@ -7,6 +7,8 @@ import {
   ExternalLink,
   Heart,
   MapPin,
+  Pencil,
+  Trash2,
   ZoomIn,
 } from 'lucide-react';
 import ImageLightboxModal from '@/components/modals/ImageLightboxModal';
@@ -28,6 +30,9 @@ interface PetCardProps {
   onSelectDetail: (spot: DomSpot) => void;
   onToggleSave: (spot: DomSpot) => void;
   isSaved?: boolean;
+  isAuthor?: boolean;
+  onEditSpot?: (spot: DomSpot) => void;
+  onDeleteSpot?: (spotId: string) => void;
   matchInfo?: {
     matchPercent: number;
     matchReasons: string[];
@@ -40,10 +45,14 @@ export default function PetCard({
   onSelectDetail,
   onToggleSave,
   isSaved = false,
+  isAuthor = false,
+  onEditSpot,
+  onDeleteSpot,
   matchInfo,
 }: PetCardProps) {
   const [imgError, setImgError] = useState(false);
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   const hasMapPin = isSpotPinAllowedOnMap(spot);
   const isUserPost = isUserWebPost(spot);
@@ -112,6 +121,12 @@ export default function PetCard({
             <div className="absolute top-2.5 left-2.5 px-2.5 py-1 rounded-md bg-[#0E513B] text-white text-xs font-bold flex items-center gap-1 shadow-sm">
               <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
               <span>Trùng khớp {matchInfo.matchPercent}%</span>
+            </div>
+          )}
+
+          {isAuthor && !matchInfo && (
+            <div className="absolute top-2.5 left-2.5 px-2.5 py-1 rounded-md bg-[#0E513B]/90 text-white text-[11px] font-bold shadow-sm">
+              Bài của bạn
             </div>
           )}
 
@@ -198,6 +213,62 @@ export default function PetCard({
             >
               Xem chi tiết
             </button>
+
+            {isAuthor && onEditSpot && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onEditSpot(spot);
+                }}
+                title="Chỉnh sửa bài đăng này"
+                className="min-h-[44px] px-3 rounded-[10px] border border-[#DDDCD4] bg-[#FAF7F1] hover:bg-[#E8EFE6] hover:border-[#0E513B] text-[#0E513B] text-xs font-bold inline-flex items-center justify-center gap-1 transition-colors shrink-0"
+              >
+                <Pencil className="w-3.5 h-3.5 shrink-0" />
+                <span>Sửa</span>
+              </button>
+            )}
+
+            {isAuthor &&
+              onDeleteSpot &&
+              (confirmDelete ? (
+                <div className="flex items-center gap-1 shrink-0">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setConfirmDelete(false);
+                      onDeleteSpot(spot.id);
+                    }}
+                    className="min-h-[44px] px-2.5 rounded-[10px] bg-[#AF421F] hover:bg-[#933516] text-white text-xs font-bold inline-flex items-center justify-center gap-1 transition-colors"
+                  >
+                    <Trash2 className="w-3.5 h-3.5 shrink-0" />
+                    <span>Xóa?</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setConfirmDelete(false);
+                    }}
+                    className="min-h-[44px] px-2 rounded-[10px] border border-[#DDDCD4] bg-[#FAF7F1] text-xs font-semibold text-[#52605A]"
+                  >
+                    Hủy
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setConfirmDelete(true);
+                  }}
+                  title="Xóa bài đăng này"
+                  className="min-w-[44px] min-h-[44px] rounded-[10px] border border-[#DDDCD4] bg-[#FAF7F1] hover:bg-[#FFF0E5] hover:border-[#AF421F] text-[#AF421F] flex items-center justify-center transition-colors shrink-0"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              ))}
 
             {spot.sourceUrl && !isUserPost && (
               <a

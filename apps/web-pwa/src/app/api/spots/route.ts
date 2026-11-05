@@ -13,11 +13,14 @@ import {
   boostSpotInServerStore,
   createMemorySnapInServerStore,
   createSpotInServerStore,
+  deleteSpotInServerStore,
   listCommunitySpotsFromServerStore,
+  listDeletedSpotIdsFromServerStore,
   listMemorySnapsFromServerStore,
   resolveSpotToPeaceInServerStore,
   syncIncomingPeerSpotInServerStore,
   unlockContactInServerStore,
+  updateSpotInServerStore,
 } from '@/lib/server-community-store';
 import {
   activateEmergencyBoostInSupabase,
@@ -25,10 +28,12 @@ import {
   boostSpotLightInSupabase,
   createMemorySnapInSupabase,
   createSpotInSupabase,
+  deleteSpotInSupabase,
   fetchCommunitySpotsFromSupabase,
   fetchMemorySnapsFromSupabase,
   resolveSpotToPeaceInSupabase,
   unlockSpotContactInSupabase,
+  updateSpotInSupabase,
 } from '@/lib/supabase';
 import { DomSpot, MemorySnap, SpotMatchResult, SpotType } from '@/lib/types';
 
@@ -57,21 +62,23 @@ export async function GET(request: NextRequest) {
   ]);
 
   const serverSpots = listCommunitySpotsFromServerStore(viewerId);
+  const deletedSpotIds = listDeletedSpotIdsFromServerStore();
+  const deletedSet = new Set(deletedSpotIds);
   const serverMemories = includeMemories
     ? listMemorySnapsFromServerStore()
     : [];
 
   const seenSpotIds = new Set<string>();
   const communitySpots: DomSpot[] = [];
-  for (const sp of [...dbSpots, ...serverSpots]) {
-    if (!sp || seenSpotIds.has(sp.id)) continue;
+  for (const sp of [...serverSpots, ...dbSpots]) {
+    if (!sp || seenSpotIds.has(sp.id) || deletedSet.has(sp.id)) continue;
     seenSpotIds.add(sp.id);
     communitySpots.push(sp);
   }
 
   const combinedSpots: DomSpot[] = [...communitySpots];
   for (const spot of INITIAL_DOM_SPOTS) {
-    if (!spot || seenSpotIds.has(spot.id)) continue;
+    if (!spot || seenSpotIds.has(spot.id) || deletedSet.has(spot.id)) continue;
     seenSpotIds.add(spot.id);
     combinedSpots.push(spot);
   }
@@ -119,6 +126,7 @@ export async function GET(request: NextRequest) {
     count: visibleSpots.length,
     spots: visibleSpots,
     communityCount: communitySpots.length,
+    deletedSpotIds,
     memorySnaps,
     vetStations: VET_EMERGENCY_STATIONS,
   });
@@ -352,6 +360,147 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ ok: true });
     }
 
+    if (action === 'SYNC_DELETE_SPOT') {
+      const spotId = String(body.spotId || '').trim();
+      if (spotId) {
+        deleteSpotInServerStore({ spotId, skipOwnershipCheck: true });
+      }
+      return NextResponse.json({ ok: true, spotId });
+    }
+
+    if (action === 'UPDATE_SPOT') {
+      const spotId = String(body.spotId || '').trim();
+      const authorId = String(body.authorId || '').trim();
+      const authorName = String(body.authorName || '').trim();
+      const rawPhone = String(body.rawPhone || '').trim();
+      const title = String(body.title || '').trim();
+      const story = String(body.story || '').trim();
+      const breed = String(body.breed || '').trim();
+      const coatColor = String(body.coatColor || '').trim();
+      const areaLabel = String(
+        body.areaLabel || body.customAddress || ''
+      ).trim();
+      const formattedAddress = String(
+        body.formattedAddress || body.customAddress || areaLabel
+      ).trim();
+      const images: string[] = Array.isArray(body.images)
+        ? body.images.filter(
+            (img: unknown) => typeof img === 'string' && img.length > 0
+          )
+        : [];
+
+      if (!spotId) {
+        return NextResponse.json(
+          { ok: false, error: 'Thiếu mã bài đăng cần chỉnh sửa.' },
+          { status: 400 }
+        );
+      }
+      if (!title) {
+        return NextResponse.json(
+          { ok: false, error: 'Tiêu đề bài đăng không được để trống.' },
+          { status: 400 }
+        );
+      }
+      if (images.length === 0) {
+        return NextResponse.json(
+          {
+            ok: false,
+            error: 'Bài đăng cần có ít nhất 1 bức ảnh thực tế của thú cưng.',
+          },
+          { status: 400 }
+        );
+      }
+
+      const spotType = (body.spotType as SpotType) || 'RED_SOS';
+      const species =
+        body.species === 'dog' || body.species === 'other'
+          ? body.species
+          : 'cat';
+      const traits = Array.isArray(body.traits) ? body.traits.map(String) : [];
+      const exactLat = Number(body.exactLat ?? body.pinnedLat ?? 0);
+      const exactLng = Number(body.exactLng ?? body.pinnedLng ?? 0);
+      const hasExactLocation = Boolean(body.hasExactLocation ?? true);
+      const allowFoster = Boolean(body.allowFoster);
+
+      const srvUpdated = updateSpotInServerStore({
+        spotId,
+        authorId,
+        authorName,
+        rawPhone,
+        spotType,
+        title,
+        story,
+        species,
+        breed,
+        coatColor,
+        traits,
+        images,
+        exactLat: exactLat > 0 ? exactLat : undefined,
+        exactLng: exactLng > 0 ? exactLng : undefined,
+        hasExactLocation,
+        areaLabel,
+        formattedAddress,
+        allowFoster,
+      });
+
+      const dbUpdated = await updateSpotInSupabase({
+        spotId,
+        authorId,
+        authorName,
+        rawPhone,
+        spotType,
+        title,
+        story,
+        species,
+        breed,
+        coatColor,
+        traits,
+        images,
+        exactLat: exactLat > 0 ? exactLat : undefined,
+        exactLng: exactLng > 0 ? exactLng : undefined,
+        hasExactLocation,
+        areaLabel,
+        formattedAddress,
+        allowFoster,
+      }).catch(() => null);
+
+      const finalUpdated = srvUpdated || dbUpdated;
+      if (finalUpdated) {
+        syncIncomingPeerSpotInServerStore(finalUpdated);
+      }
+
+      return NextResponse.json({
+        ok: true,
+        spot: finalUpdated,
+      });
+    }
+
+    if (action === 'DELETE_SPOT') {
+      const spotId = String(body.spotId || '').trim();
+      const authorId = String(body.authorId || '').trim();
+      const rawPhone = String(body.rawPhone || '').trim();
+
+      if (!spotId) {
+        return NextResponse.json(
+          { ok: false, error: 'Thiếu mã bài đăng cần xóa.' },
+          { status: 400 }
+        );
+      }
+
+      deleteSpotInServerStore({
+        spotId,
+        authorId,
+        rawPhone,
+      });
+
+      await deleteSpotInSupabase(spotId).catch(() => false);
+
+      return NextResponse.json({
+        ok: true,
+        spotId,
+      });
+    }
+
     if (action === 'BOOST_LIGHT') {
       const spotId = String(body.spotId || '');
       const delta = Number(body.delta || 20);
@@ -516,6 +665,49 @@ export async function PATCH(request: NextRequest) {
       {
         ok: false,
         error: err?.message || 'Không thể xử lý yêu cầu lúc này.',
+      },
+      { status: 400 }
+    );
+  }
+}
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const body = await request.json().catch(() => ({}));
+    const spotId = String(
+      body.spotId || searchParams.get('spotId') || ''
+    ).trim();
+    const authorId = String(
+      body.authorId || searchParams.get('authorId') || ''
+    ).trim();
+    const rawPhone = String(
+      body.rawPhone || searchParams.get('rawPhone') || ''
+    ).trim();
+
+    if (!spotId) {
+      return NextResponse.json(
+        { ok: false, error: 'Thiếu mã bài đăng cần xóa.' },
+        { status: 400 }
+      );
+    }
+
+    deleteSpotInServerStore({
+      spotId,
+      authorId,
+      rawPhone,
+    });
+    await deleteSpotInSupabase(spotId).catch(() => false);
+
+    return NextResponse.json({
+      ok: true,
+      spotId,
+    });
+  } catch (err: any) {
+    return NextResponse.json(
+      {
+        ok: false,
+        error: err?.message || 'Không thể xóa bài đăng lúc này.',
       },
       { status: 400 }
     );

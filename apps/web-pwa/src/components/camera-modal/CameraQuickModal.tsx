@@ -42,6 +42,7 @@ interface CameraQuickModalProps {
   themeId: ThemeId;
   userCoords: { lat: number; lng: number; label: string };
   existingSpots?: DomSpot[];
+  editingSpot?: DomSpot | null;
   onSelectMatchedSpot?: (spot: DomSpot) => void;
   onClose: () => void;
   onCreateSpot: (payload: {
@@ -60,6 +61,25 @@ interface CameraQuickModalProps {
     pinnedLat?: number;
     pinnedLng?: number;
   }) => void;
+  onUpdateSpot?: (
+    spotId: string,
+    payload: {
+      spotType: SpotType;
+      title: string;
+      story: string;
+      species: 'cat' | 'dog' | 'other';
+      breed: string;
+      coatColor: string;
+      traits: string[];
+      images: string[];
+      compressedSizeKB: number;
+      allowFoster: boolean;
+      hasExactLocation: boolean;
+      customAddress: string;
+      pinnedLat?: number;
+      pinnedLng?: number;
+    }
+  ) => void;
 }
 
 const BREED_PRESETS: Record<'cat' | 'dog' | 'other', string[]> = {
@@ -164,9 +184,11 @@ export default function CameraQuickModal({
   isOpen,
   userCoords,
   existingSpots = [],
+  editingSpot = null,
   onSelectMatchedSpot,
   onClose,
   onCreateSpot,
+  onUpdateSpot,
 }: CameraQuickModalProps) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -204,6 +226,53 @@ export default function CameraQuickModal({
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    if (editingSpot) {
+      setSpotType(
+        editingSpot.spotType === 'GREEN_PEACE'
+          ? 'YELLOW_ADOPT'
+          : editingSpot.spotType
+      );
+      setSpecies(editingSpot.species || 'cat');
+      setTitle(editingSpot.title || '');
+      setStory(editingSpot.story || '');
+      setBreed(editingSpot.breed || '');
+      setCoatColor(editingSpot.coatColor || '');
+      setSelectedTraits(
+        Array.isArray(editingSpot.traits) ? editingSpot.traits : []
+      );
+      setImages(Array.isArray(editingSpot.images) ? editingSpot.images : []);
+      setCustomAddress(
+        editingSpot.formattedAddress || editingSpot.areaLabel || ''
+      );
+      setPinnedCoords(
+        editingSpot.publicLat && editingSpot.publicLng
+          ? { lat: editingSpot.publicLat, lng: editingSpot.publicLng }
+          : null
+      );
+      setHasExactLocation(editingSpot.hasExactLocation ?? true);
+      setAiStatusText('');
+      setLastAiAnalysis(null);
+    } else {
+      setSpotType('RED_SOS');
+      setSpecies('cat');
+      setTitle('');
+      setStory('');
+      setBreed('');
+      setCoatColor('');
+      setSelectedTraits([]);
+      setCustomTraitInput('');
+      setImages([]);
+      setCompressedKB(0);
+      setAiStatusText('');
+      setLastAiAnalysis(null);
+      setCustomAddress('');
+      setPinnedCoords(null);
+      setHasExactLocation(true);
+    }
+  }, [isOpen, editingSpot]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -277,12 +346,15 @@ export default function CameraQuickModal({
     };
     return rankSpotsByVisualSimilarity(
       effectiveAnalysis,
-      existingSpots,
+      editingSpot
+        ? existingSpots.filter((s) => s.id !== editingSpot.id)
+        : existingSpots,
       effectiveCoords
     ).slice(0, 4);
   }, [
     images.length,
     existingSpots,
+    editingSpot,
     lastAiAnalysis,
     species,
     breed,
@@ -453,7 +525,7 @@ export default function CameraQuickModal({
         ? `Tìm thú lạc: ${effectiveBreed} (${effectiveColor}) tại ${effectiveAddress}`
         : `${effectiveBreed} (${effectiveColor}) chờ đón mái ấm tại ${effectiveAddress}`;
 
-    onCreateSpot({
+    const payload = {
       spotType,
       title: title.trim() || defaultTitle,
       story:
@@ -470,7 +542,14 @@ export default function CameraQuickModal({
       customAddress: effectiveAddress,
       pinnedLat: pinnedCoords?.lat,
       pinnedLng: pinnedCoords?.lng,
-    });
+    };
+
+    if (editingSpot && onUpdateSpot) {
+      onUpdateSpot(editingSpot.id, payload);
+      return;
+    }
+
+    onCreateSpot(payload);
   };
 
   const currentBreedPresets = BREED_PRESETS[species];
@@ -513,10 +592,14 @@ export default function CameraQuickModal({
               </button>
               <div className="min-w-0">
                 <h3 className="text-base sm:text-lg font-extrabold text-[#142820] truncate">
-                  Đăng tin cứu hộ &amp; tìm thú lạc
+                  {editingSpot
+                    ? 'Chỉnh sửa bài đăng'
+                    : 'Đăng tin cứu hộ & tìm thú lạc'}
                 </h3>
                 <p className="text-xs text-[#52605A] truncate">
-                  Điền thông tin hoặc chọn gợi ý nhanh bên dưới
+                  {editingSpot
+                    ? 'Cập nhật hình ảnh, thông tin nhận diện và vị trí bài viết'
+                    : 'Điền thông tin hoặc chọn gợi ý nhanh bên dưới'}
                 </p>
               </div>
             </div>
@@ -1074,7 +1157,11 @@ export default function CameraQuickModal({
               className="flex-1 h-11 rounded-xl bg-[#0E513B] hover:bg-[#0A412F] text-white text-xs sm:text-sm font-bold flex items-center justify-center gap-2 shadow-sm transition-all"
             >
               <CheckCircle2 className="w-4 h-4 shrink-0" />
-              <span>Đăng tin ngay ({images.length} ảnh)</span>
+              <span>
+                {editingSpot
+                  ? `Lưu thay đổi (${images.length} ảnh)`
+                  : `Đăng tin ngay (${images.length} ảnh)`}
+              </span>
             </button>
           </div>
         </motion.div>

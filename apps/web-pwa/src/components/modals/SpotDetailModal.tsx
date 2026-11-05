@@ -18,9 +18,11 @@ import {
   MapPin,
   MessageCircle,
   Navigation,
+  Pencil,
   Phone,
   QrCode,
   ShieldCheck,
+  Trash2,
   X,
   ZoomIn,
 } from 'lucide-react';
@@ -63,6 +65,8 @@ interface SpotDetailModalProps {
   onFocusSpotOnMap: (spot: DomSpot) => void;
   isSaved?: boolean;
   onToggleSave?: (spot: DomSpot) => void;
+  onEditSpot?: (spot: DomSpot) => void;
+  onDeleteSpot?: (spotId: string) => void;
 }
 
 export default function SpotDetailModal({
@@ -78,10 +82,13 @@ export default function SpotDetailModal({
   onFocusSpotOnMap,
   isSaved = false,
   onToggleSave,
+  onEditSpot,
+  onDeleteSpot,
 }: SpotDetailModalProps) {
   const [imageIndex, setImageIndex] = useState(0);
   const [failedImages, setFailedImages] = useState<Record<number, boolean>>({});
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const [activeSubPanel, setActiveSubPanel] = useState<
     'NONE' | 'REPORT_SIGHTING' | 'UNLOCK_CONTACT' | 'QR_POSTER'
   >('NONE');
@@ -110,6 +117,7 @@ export default function SpotDetailModal({
       setImageIndex(0);
       setFailedImages({});
       setIsLightboxOpen(false);
+      setConfirmDelete(false);
       setActiveSubPanel('NONE');
       setPosterDataUrl(null);
       setSightingArea(userCoords.label);
@@ -857,15 +865,74 @@ export default function SpotDetailModal({
                   </div>
                 )}
 
-                {spot.spotType !== 'GREEN_PEACE' && isAuthor && (
-                  <button
-                    type="button"
-                    onClick={() => onResolveSpotToPeace(spot.id)}
-                    className="w-full min-h-[44px] px-4 rounded-[10px] text-xs font-bold flex items-center justify-center gap-2 bg-[#E8EFE6] text-[#0E513B]"
-                  >
-                    <CheckCircle2 className="w-4 h-4" />
-                    <span>Đánh dấu: Đã tìm thấy / Đã nhận nuôi</span>
-                  </button>
+                {isAuthor && (
+                  <div className="p-3.5 rounded-xl bg-white border border-[#0E513B]/40 space-y-2.5">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-xs font-extrabold uppercase tracking-wider text-[#0E513B]">
+                        Quản lý bài đăng của bạn
+                      </p>
+                      <span className="text-[11px] font-semibold text-[#52605A]">
+                        Chủ bài viết
+                      </span>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-2">
+                      {onEditSpot && (
+                        <button
+                          type="button"
+                          onClick={() => onEditSpot(spot)}
+                          className="flex-1 min-w-[140px] min-h-[42px] px-3.5 rounded-[10px] text-xs font-bold bg-[#0E513B] hover:bg-[#0A412F] text-white inline-flex items-center justify-center gap-1.5 transition-colors"
+                        >
+                          <Pencil className="w-3.5 h-3.5" />
+                          <span>Chỉnh sửa bài viết</span>
+                        </button>
+                      )}
+
+                      {spot.spotType !== 'GREEN_PEACE' && (
+                        <button
+                          type="button"
+                          onClick={() => onResolveSpotToPeace(spot.id)}
+                          className="flex-1 min-w-[160px] min-h-[42px] px-3.5 rounded-[10px] text-xs font-bold bg-[#E8EFE6] hover:bg-[#D7E4D4] text-[#0E513B] inline-flex items-center justify-center gap-1.5 transition-colors"
+                        >
+                          <CheckCircle2 className="w-4 h-4" />
+                          <span>Đánh dấu: Đã đoàn tụ</span>
+                        </button>
+                      )}
+
+                      {onDeleteSpot &&
+                        (confirmDelete ? (
+                          <div className="flex items-center gap-1.5 w-full sm:w-auto">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setConfirmDelete(false);
+                                onDeleteSpot(spot.id);
+                              }}
+                              className="flex-1 sm:flex-none min-h-[42px] px-3.5 rounded-[10px] text-xs font-bold bg-[#AF421F] hover:bg-[#933516] text-white inline-flex items-center justify-center gap-1.5 transition-colors"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                              <span>Xác nhận xóa bài</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setConfirmDelete(false)}
+                              className="min-h-[42px] px-3 rounded-[10px] text-xs font-semibold text-[#52605A] bg-[#FAF7F1] border border-[#DDDCD4]"
+                            >
+                              Hủy
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => setConfirmDelete(true)}
+                            className="min-h-[42px] px-3.5 rounded-[10px] text-xs font-bold text-[#AF421F] bg-[#FFF0E5] hover:bg-[#AF421F] hover:text-white border border-[#AF421F]/30 inline-flex items-center justify-center gap-1.5 transition-colors"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                            <span>Xóa bài đăng</span>
+                          </button>
+                        ))}
+                    </div>
+                  </div>
                 )}
               </div>
             )}

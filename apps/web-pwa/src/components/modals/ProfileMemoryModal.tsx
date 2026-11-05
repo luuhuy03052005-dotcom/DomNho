@@ -5,19 +5,29 @@ import { createPortal } from 'react-dom';
 import {
   Camera,
   CheckCircle2,
+  Eye,
   Footprints,
   Heart,
   ImagePlus,
   LogIn,
   LogOut,
+  Pencil,
+  Plus,
   Send,
   ShieldCheck,
   Sparkles,
+  Trash2,
   Users,
   X,
   Zap,
 } from 'lucide-react';
-import { DomSpot, MemorySnap, ThemeId, UserSession } from '@/lib/types';
+import {
+  DomSpot,
+  MemorySnap,
+  ThemeId,
+  UserSession,
+  getSpotBadgeMeta,
+} from '@/lib/types';
 import { compressImageToWebpClient } from '@/lib/image-compressor';
 
 interface ProfileMemoryModalProps {
@@ -41,6 +51,10 @@ interface ProfileMemoryModalProps {
   }) => void;
   onActivateEmergencyBoost: (spotId: string) => void;
   onLinkPartnerName: (partnerName: string) => void;
+  onOpenCreatePost?: () => void;
+  onOpenEditSpot?: (spot: DomSpot) => void;
+  onDeleteSpot?: (spotId: string) => void;
+  onSelectSpotDetail?: (spot: DomSpot) => void;
 }
 
 export default function ProfileMemoryModal({
@@ -57,11 +71,16 @@ export default function ProfileMemoryModal({
   onAddWeeklyMemorySnap,
   onActivateEmergencyBoost,
   onLinkPartnerName,
+  onOpenCreatePost,
+  onOpenEditSpot,
+  onDeleteSpot,
+  onSelectSpotDetail,
 }: ProfileMemoryModalProps) {
   const [mounted, setMounted] = useState(false);
   const [activeTab, setActiveTab] = useState<
     'MY_SPOTS' | 'WEEKLY_SNAP' | 'COUPLE_WALK'
-  >('WEEKLY_SNAP');
+  >('MY_SPOTS');
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   const [showAddSnapForm, setShowAddSnapForm] = useState(false);
   const [petName, setPetName] = useState('');
@@ -253,7 +272,7 @@ export default function ProfileMemoryModal({
             {[
               {
                 id: 'MY_SPOTS',
-                label: `Bài tự đăng của tôi (${mySpots.length})`,
+                label: `Quản lý bài đăng (${mySpots.length})`,
               },
               {
                 id: 'WEEKLY_SNAP',
@@ -525,63 +544,206 @@ export default function ProfileMemoryModal({
           )}
 
           {activeTab === 'MY_SPOTS' && (
-            <div className="space-y-3">
+            <div className="space-y-3.5">
+              <div className="p-4 rounded-xl bg-white border border-[#DDDCD4] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="space-y-1 min-w-0 flex-1">
+                  <p className="text-xs font-extrabold uppercase tracking-wider text-[#0E513B]">
+                    Quản lý bài đăng của bạn ({mySpots.length} bài)
+                  </p>
+                  <p className="text-xs text-[#52605A] leading-relaxed">
+                    Thêm bài đăng mới, chỉnh sửa hình ảnh &amp; thông tin nhận
+                    diện, đánh dấu đoàn tụ hoặc xóa bài viết.
+                  </p>
+                </div>
+
+                {onOpenCreatePost && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onClose();
+                      onOpenCreatePost();
+                    }}
+                    className="w-full sm:w-auto min-h-[42px] px-4 rounded-[10px] bg-[#0E513B] hover:bg-[#0A412F] text-white text-xs font-bold inline-flex items-center justify-center gap-1.5 shrink-0 transition-colors shadow-sm"
+                  >
+                    <Plus className="w-4 h-4 shrink-0" />
+                    <span>Đăng bài mới</span>
+                  </button>
+                )}
+              </div>
+
               {mySpots.length === 0 ? (
-                <div className="p-6 rounded-xl bg-white border border-[#DDDCD4] text-center space-y-2">
+                <div className="p-6 rounded-xl bg-white border border-[#DDDCD4] text-center space-y-3">
                   <p className="text-sm font-bold text-[#142820]">
-                    Bạn chưa tự đăng bài viết nào trên tài khoản này
+                    {userSession
+                      ? 'Bạn chưa đăng bài viết nào trên tài khoản này'
+                      : 'Vui lòng đăng nhập để quản lý các bài viết của bạn'}
                   </p>
                   <p className="text-xs text-[#52605A] leading-relaxed">
                     Khi bạn đăng tin tìm thú lạc, cứu trợ hoặc nhận nuôi, bài
-                    viết sẽ xuất hiện tại đây để bạn quản lý.
+                    viết sẽ xuất hiện tại đây để bạn chỉnh sửa, cập nhật trạng
+                    thái hoặc xóa bất cứ lúc nào.
                   </p>
+                  {!userSession ? (
+                    <button
+                      type="button"
+                      onClick={onRequireAuth}
+                      className="min-h-[42px] px-4 rounded-[10px] bg-[#AF421F] hover:bg-[#933516] text-white text-xs font-bold inline-flex items-center justify-center gap-1.5"
+                    >
+                      <LogIn className="w-4 h-4 shrink-0" />
+                      <span>Đăng nhập nhanh để bắt đầu</span>
+                    </button>
+                  ) : (
+                    onOpenCreatePost && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          onClose();
+                          onOpenCreatePost();
+                        }}
+                        className="min-h-[42px] px-4 rounded-[10px] bg-[#0E513B] hover:bg-[#0A412F] text-white text-xs font-bold inline-flex items-center justify-center gap-1.5"
+                      >
+                        <Plus className="w-4 h-4 shrink-0" />
+                        <span>Đăng bài đầu tiên</span>
+                      </button>
+                    )
+                  )}
                 </div>
               ) : (
-                mySpots.map((sp) => (
-                  <div
-                    key={sp.id}
-                    className="p-3.5 rounded-xl bg-white border border-[#DDDCD4] flex flex-col sm:flex-row sm:items-center justify-between gap-3"
-                  >
-                    <div className="flex items-center gap-3 min-w-0">
-                      <img
-                        src={sp.images[0]}
-                        alt={sp.title}
-                        className="w-14 h-14 rounded-[10px] object-cover shrink-0 bg-[#F1EFE8]"
-                      />
-                      <div className="min-w-0 flex-1">
-                        <h4 className="text-xs sm:text-sm font-bold text-[#142820] truncate">
-                          {sp.title}
-                        </h4>
-                        <p className="text-[11px] text-[#52605A] truncate">
-                          {sp.areaLabel} • Độ sáng: {sp.lightPower}%
-                        </p>
+                mySpots.map((sp) => {
+                  const badge = getSpotBadgeMeta(sp);
+                  const isConfirmingDelete = confirmDeleteId === sp.id;
+                  return (
+                    <div
+                      key={sp.id}
+                      className="p-3.5 rounded-xl bg-white border border-[#DDDCD4] space-y-3"
+                    >
+                      <div className="flex items-start gap-3 min-w-0">
+                        <img
+                          src={sp.images[0]}
+                          alt={sp.title}
+                          className="w-16 h-16 rounded-[10px] object-cover shrink-0 bg-[#F1EFE8] border border-[#DDDCD4]"
+                        />
+                        <div className="min-w-0 flex-1 space-y-1">
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <span
+                              className="px-2 py-0.5 rounded text-[10px] font-extrabold uppercase tracking-wider"
+                              style={{
+                                backgroundColor: badge.bgHex,
+                                color: badge.textHex,
+                              }}
+                            >
+                              {badge.uppercaseLabel}
+                            </span>
+                            {sp.isEmergencyBoosted && (
+                              <span className="px-2 py-0.5 rounded bg-[#FFF0E5] text-[#AF421F] text-[10px] font-bold">
+                                Khẩn cấp 48h
+                              </span>
+                            )}
+                          </div>
+                          <h4 className="text-xs sm:text-sm font-extrabold text-[#142820] line-clamp-1">
+                            {sp.title}
+                          </h4>
+                          <p className="text-[11px] text-[#52605A] truncate">
+                            {sp.formattedAddress || sp.areaLabel} • Quan tâm:{' '}
+                            {sp.boostCount || 1} • Manh mối:{' '}
+                            {sp.sightings?.length || 0}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="pt-2.5 border-t border-[#F1EFE8] flex flex-wrap items-center justify-between gap-2">
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          {onSelectSpotDetail && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                onClose();
+                                onSelectSpotDetail(sp);
+                              }}
+                              className="min-h-[36px] px-3 rounded-[9px] text-xs font-bold bg-[#FAF7F1] hover:bg-[#F1EFE8] text-[#142820] border border-[#DDDCD4] inline-flex items-center gap-1.5 transition-colors"
+                            >
+                              <Eye className="w-3.5 h-3.5 text-[#0E513B]" />
+                              <span>Xem</span>
+                            </button>
+                          )}
+
+                          {onOpenEditSpot && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                onClose();
+                                onOpenEditSpot(sp);
+                              }}
+                              className="min-h-[36px] px-3 rounded-[9px] text-xs font-bold bg-[#E8EFE6] hover:bg-[#0E513B] text-[#0E513B] hover:text-white inline-flex items-center gap-1.5 transition-colors"
+                            >
+                              <Pencil className="w-3.5 h-3.5" />
+                              <span>Sửa bài</span>
+                            </button>
+                          )}
+
+                          {sp.spotType !== 'GREEN_PEACE' && (
+                            <button
+                              type="button"
+                              onClick={() => onResolveSpotToPeace(sp.id)}
+                              className="min-h-[36px] px-3 rounded-[9px] text-xs font-bold bg-[#FAF7F1] hover:bg-[#E8EFE6] text-[#0E513B] border border-[#DDDCD4] inline-flex items-center gap-1.5 transition-colors"
+                            >
+                              <CheckCircle2 className="w-3.5 h-3.5" />
+                              <span>Đã đoàn tụ</span>
+                            </button>
+                          )}
+
+                          {sp.spotType === 'RED_SOS' &&
+                            !sp.isEmergencyBoosted && (
+                              <button
+                                type="button"
+                                onClick={() => onActivateEmergencyBoost(sp.id)}
+                                className="min-h-[36px] px-3 rounded-[9px] text-xs font-bold bg-[#FFF0E5] hover:bg-[#AF421F] text-[#AF421F] hover:text-white inline-flex items-center gap-1.5 transition-colors"
+                              >
+                                <Zap className="w-3.5 h-3.5" />
+                                <span>Khẩn cấp</span>
+                              </button>
+                            )}
+                        </div>
+
+                        {onDeleteSpot && (
+                          <div className="flex items-center gap-1.5">
+                            {isConfirmingDelete ? (
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setConfirmDeleteId(null);
+                                    onDeleteSpot(sp.id);
+                                  }}
+                                  className="min-h-[36px] px-3 rounded-[9px] text-xs font-bold bg-[#AF421F] hover:bg-[#933516] text-white inline-flex items-center gap-1 transition-colors"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                  <span>Xác nhận xóa</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setConfirmDeleteId(null)}
+                                  className="min-h-[36px] px-2.5 rounded-[9px] text-xs font-semibold text-[#52605A] hover:bg-[#F1EFE8]"
+                                >
+                                  Hủy
+                                </button>
+                              </>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => setConfirmDeleteId(sp.id)}
+                                className="min-h-[36px] px-3 rounded-[9px] text-xs font-bold text-[#AF421F] bg-[#FFF0E5]/70 hover:bg-[#AF421F] hover:text-white border border-[#AF421F]/25 inline-flex items-center gap-1.5 transition-colors"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                                <span>Xóa bài</span>
+                              </button>
+                            )}
+                          </div>
+                        )}
                       </div>
                     </div>
-
-                    <div className="flex flex-wrap items-center gap-2 shrink-0">
-                      {sp.spotType === 'RED_SOS' && !sp.isEmergencyBoosted && (
-                        <button
-                          type="button"
-                          onClick={() => onActivateEmergencyBoost(sp.id)}
-                          className="min-h-[38px] px-3 rounded-[10px] text-[11px] font-bold bg-[#AF421F] text-white inline-flex items-center gap-1"
-                        >
-                          <Zap className="w-3.5 h-3.5" />
-                          <span>Kích hoạt Khẩn cấp</span>
-                        </button>
-                      )}
-                      {sp.spotType !== 'GREEN_PEACE' && (
-                        <button
-                          type="button"
-                          onClick={() => onResolveSpotToPeace(sp.id)}
-                          className="min-h-[38px] px-3 rounded-[10px] text-[11px] font-bold bg-[#E8EFE6] text-[#0E513B] inline-flex items-center gap-1"
-                        >
-                          <CheckCircle2 className="w-3.5 h-3.5" />
-                          <span>Đã đoàn tụ / Bình yên</span>
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                ))
+                  );
+                })
               )}
             </div>
           )}

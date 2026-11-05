@@ -49,6 +49,7 @@ interface CommunityStoreData {
   posts: ServerPostRecord[];
   unlockRequests: ContactUnlockRequest[];
   memorySnaps: MemorySnap[];
+  deletedSpotIds?: string[];
 }
 
 const STORE_FILE_PATH = path.join(
@@ -67,6 +68,7 @@ function createEmptyStore(): CommunityStoreData {
     posts: [],
     unlockRequests: [],
     memorySnaps: [],
+    deletedSpotIds: [],
   };
 }
 
@@ -85,6 +87,9 @@ export function loadServerCommunityStore(): CommunityStoreData {
               : [],
             memorySnaps: Array.isArray(parsed.memorySnaps)
               ? parsed.memorySnaps
+              : [],
+            deletedSpotIds: Array.isArray(parsed.deletedSpotIds)
+              ? parsed.deletedSpotIds
               : [],
           };
         }
@@ -108,6 +113,9 @@ export function loadServerCommunityStore(): CommunityStoreData {
             : [],
           memorySnaps: Array.isArray(parsed.memorySnaps)
             ? parsed.memorySnaps
+            : [],
+          deletedSpotIds: Array.isArray(parsed.deletedSpotIds)
+            ? parsed.deletedSpotIds
             : [],
         };
         return globalThis.__domNhoCommunityStoreV1;
@@ -427,28 +435,31 @@ export function listCommunitySpotsFromServerStore(
   viewerId?: string | null
 ): DomSpot[] {
   const store = loadServerCommunityStore();
+  const deletedSet = new Set(store.deletedSpotIds || []);
   const now = Date.now();
 
-  return store.posts.map((rec) => {
-    const isOwner = Boolean(viewerId && rec.spot.authorId === viewerId);
-    const isUnlocked =
-      isOwner ||
-      Boolean(viewerId && rec.unlockedByViewerIds.includes(viewerId));
-    const hoursAgo = Math.max(
-      0,
-      Math.round((now - Date.parse(rec.spot.createdAt)) / 3_600_000)
-    );
-    const digits = (rec.rawPhone || '').replace(/\D/g, '');
+  return store.posts
+    .filter((rec) => !deletedSet.has(rec.spot.id))
+    .map((rec) => {
+      const isOwner = Boolean(viewerId && rec.spot.authorId === viewerId);
+      const isUnlocked =
+        isOwner ||
+        Boolean(viewerId && rec.unlockedByViewerIds.includes(viewerId));
+      const hoursAgo = Math.max(
+        0,
+        Math.round((now - Date.parse(rec.spot.createdAt)) / 3_600_000)
+      );
+      const digits = (rec.rawPhone || '').replace(/\D/g, '');
 
-    return {
-      ...rec.spot,
-      hoursAgo,
-      rawPhoneSecret: isUnlocked && rec.rawPhone ? rec.rawPhone : undefined,
-      zaloLink:
-        isUnlocked && digits ? `https://zalo.me/${digits}` : undefined,
-      isContactUnlockedForViewer: isUnlocked,
-    };
-  });
+      return {
+        ...rec.spot,
+        hoursAgo,
+        rawPhoneSecret: isUnlocked && rec.rawPhone ? rec.rawPhone : undefined,
+        zaloLink:
+          isUnlocked && digits ? `https://zalo.me/${digits}` : undefined,
+        isContactUnlockedForViewer: isUnlocked,
+      };
+    });
 }
 
 export function boostSpotInServerStore(
@@ -641,6 +652,9 @@ export function listMemorySnapsFromServerStore(): MemorySnap[] {
 export function syncIncomingPeerSpotInServerStore(spot: DomSpot): void {
   if (!spot || !spot.id || !spot.title) return;
   const store = loadServerCommunityStore();
+  if (store.deletedSpotIds && store.deletedSpotIds.includes(spot.id)) {
+    return;
+  }
   const existingIdx = store.posts.findIndex((p) => p.spot.id === spot.id);
   if (existingIdx >= 0) {
     store.posts[existingIdx].spot = {
@@ -661,5 +675,167 @@ export function syncIncomingPeerSpotInServerStore(spot: DomSpot): void {
     });
   }
   saveServerCommunityStore(store);
+}
+
+export function listDeletedSpotIdsFromServerStore(): string[] {
+  const store = loadServerCommunityStore();
+  return Array.isArray(store.deletedSpotIds) ? store.deletedSpotIds : [];
+}
+
+export function updateSpotInServerStore(params: {
+  spotId: string;
+  authorId: string;
+  authorName: string;
+  rawPhone: string;
+  spotType: SpotType;
+  title: string;
+  story: string;
+  species: 'cat' | 'dog' | 'other';
+  breed: string;
+  coatColor: string;
+  traits: string[];
+  images: string[];
+  exactLat?: number;
+  exactLng?: number;
+  publicLat?: number;
+  publicLng?: number;
+  hasExactLocation: boolean;
+  areaLabel: string;
+  formattedAddress?: string;
+  allowFoster: boolean;
+}): DomSpot | null {
+  const store = loadServerCommunityStore();
+  const cleanPhone = (params.rawPhone || '').trim();
+  const normalizedPhone = cleanPhone.replace(/\D/g, '');
+  const idx = store.posts.findIndex((p) => p.spot.id === params.spotId);
+
+  if (idx >= 0) {
+    const rec = store.posts[idx];
+    const recPhoneNorm = (rec.rawPhone || '').replace(/\D/g, '');
+    const isOwnerById = Boolean(
+      params.authorId && rec.spot.authorId === params.authorId
+    );
+    const isOwnerByPhone = Boolean(
+      normalizedPhone && recPhoneNorm && normalizedPhone === recPhoneNorm
+    );
+    if (!isOwnerById && !isOwnerByPhone) {
+      throw new Error(
+        'Bạn chỉ có quyền chỉnh sửa bài đăng do chính tài khoản của mình tạo.'
+      );
+    }
+
+    const nextExactLat =
+      typeof params.exactLat === 'number' && params.exactLat > 0
+        ? params.exactLat
+        : rec.exactLat;
+    const nextExactLng =
+      typeof params.exactLng === 'number' && params.exactLng > 0
+        ? params.exactLng
+        : rec.exactLng;
+    const coordsChanged =
+      Math.abs(nextExactLat - rec.exactLat) > 0.0001 ||
+      Math.abs(nextExactLng - rec.exactLng) > 0.0001;
+
+    const fuzzed =
+      params.publicLat && params.publicLng
+        ? {
+            publicLat: params.publicLat,
+            publicLng: params.publicLng,
+            fuzzRadiusMeters: 200,
+          }
+        : coordsChanged && params.hasExactLocation && nextExactLat && nextExactLng
+        ? fuzzCoordinates(nextExactLat, nextExactLng)
+        : {
+            publicLat: rec.spot.publicLat,
+            publicLng: rec.spot.publicLng,
+            fuzzRadiusMeters: rec.spot.fuzzRadiusMeters || 200,
+          };
+
+    rec.exactLat = nextExactLat;
+    rec.exactLng = nextExactLng;
+    if (cleanPhone) {
+      rec.rawPhone = cleanPhone;
+    }
+
+    rec.spot = {
+      ...rec.spot,
+      authorName: params.authorName.trim() || rec.spot.authorName,
+      spotType: params.spotType,
+      title: params.title.trim(),
+      story: params.story.trim(),
+      species: params.species,
+      breed: params.breed.trim(),
+      coatColor: params.coatColor.trim(),
+      traits: params.traits,
+      images: params.images,
+      publicLat: fuzzed.publicLat,
+      publicLng: fuzzed.publicLng,
+      fuzzRadiusMeters: fuzzed.fuzzRadiusMeters,
+      areaLabel: params.areaLabel.trim(),
+      formattedAddress: (params.formattedAddress || params.areaLabel).trim(),
+      hasExactLocation: params.hasExactLocation,
+      allowFoster: Boolean(params.allowFoster),
+      googleMapsUrl:
+        fuzzed.publicLat && fuzzed.publicLng
+          ? `https://www.google.com/maps/search/?api=1&query=${fuzzed.publicLat},${fuzzed.publicLng}`
+          : rec.spot.googleMapsUrl,
+      googleMapsDirectionsUrl:
+        fuzzed.publicLat && fuzzed.publicLng
+          ? `https://www.google.com/maps/dir/?api=1&destination=${fuzzed.publicLat},${fuzzed.publicLng}`
+          : rec.spot.googleMapsDirectionsUrl,
+    };
+
+    saveServerCommunityStore(store);
+
+    const digits = (rec.rawPhone || '').replace(/\D/g, '');
+    return {
+      ...rec.spot,
+      rawPhoneSecret: rec.rawPhone || undefined,
+      zaloLink: digits ? `https://zalo.me/${digits}` : undefined,
+      isContactUnlockedForViewer: true,
+    };
+  }
+
+  return null;
+}
+
+export function deleteSpotInServerStore(params: {
+  spotId: string;
+  authorId?: string;
+  rawPhone?: string;
+  skipOwnershipCheck?: boolean;
+}): boolean {
+  const store = loadServerCommunityStore();
+  const normalizedPhone = (params.rawPhone || '').replace(/\D/g, '');
+  const idx = store.posts.findIndex((p) => p.spot.id === params.spotId);
+
+  if (idx >= 0) {
+    const rec = store.posts[idx];
+    if (!params.skipOwnershipCheck) {
+      const recPhoneNorm = (rec.rawPhone || '').replace(/\D/g, '');
+      const isOwnerById = Boolean(
+        params.authorId && rec.spot.authorId === params.authorId
+      );
+      const isOwnerByPhone = Boolean(
+        normalizedPhone && recPhoneNorm && normalizedPhone === recPhoneNorm
+      );
+      if (!isOwnerById && !isOwnerByPhone) {
+        throw new Error(
+          'Bạn chỉ có quyền xóa bài đăng do chính tài khoản của mình tạo.'
+        );
+      }
+    }
+    store.posts.splice(idx, 1);
+  }
+
+  if (!Array.isArray(store.deletedSpotIds)) {
+    store.deletedSpotIds = [];
+  }
+  if (params.spotId && !store.deletedSpotIds.includes(params.spotId)) {
+    store.deletedSpotIds.push(params.spotId);
+  }
+
+  saveServerCommunityStore(store);
+  return true;
 }
 

@@ -1496,6 +1496,119 @@ export async function linkCouplePartnerInSupabase(
 let activeRealtimeChannel: ReturnType<SupabaseClient['channel']> | null = null;
 
 /**
+ * Chỉnh sửa bài đăng trên bảng public.dom_nho_posts của Supabase
+ */
+export async function updateSpotInSupabase(params: {
+  spotId: string;
+  authorId: string;
+  authorName: string;
+  rawPhone: string;
+  spotType: SpotType;
+  title: string;
+  story: string;
+  species: 'cat' | 'dog' | 'other';
+  breed: string;
+  coatColor: string;
+  traits: string[];
+  images: string[];
+  exactLat?: number;
+  exactLng?: number;
+  hasExactLocation: boolean;
+  areaLabel: string;
+  formattedAddress?: string;
+  allowFoster: boolean;
+}): Promise<DomSpot | null> {
+  if (!supabase || !isValidUuid(params.spotId)) return null;
+
+  const cleanPhone = (params.rawPhone || '').trim();
+  const maskedPhone = cleanPhone
+    ? maskPhoneNumber(cleanPhone)
+    : 'Chưa cung cấp SĐT';
+
+  const metaString = encodePostMeta({
+    maskedPhone,
+    formattedAddress: params.formattedAddress || params.areaLabel,
+    hasExactLocation: params.hasExactLocation,
+  });
+
+  const updatePayload: Record<string, any> = {
+    author_name: params.authorName.trim(),
+    spot_type: params.spotType,
+    title: params.title.trim(),
+    story: params.story.trim(),
+    species: params.species,
+    breed: params.breed.trim(),
+    coat_color: params.coatColor.trim(),
+    traits: params.traits,
+    images: params.images,
+    area_label: params.areaLabel.trim(),
+    allow_foster: Boolean(params.allowFoster),
+    content_simhash: metaString,
+    updated_at: new Date().toISOString(),
+  };
+
+  if (
+    typeof params.exactLat === 'number' &&
+    typeof params.exactLng === 'number' &&
+    params.exactLat > 0 &&
+    params.exactLng > 0
+  ) {
+    updatePayload.public_lat = params.exactLat;
+    updatePayload.public_lng = params.exactLng;
+    updatePayload.public_location = `POINT(${params.exactLng} ${params.exactLat})`;
+  }
+
+  const { data: updatedRow, error } = await supabase
+    .from('dom_nho_posts')
+    .update(updatePayload)
+    .eq('id', params.spotId)
+    .select('*')
+    .maybeSingle();
+
+  if (error || !updatedRow) return null;
+
+  const { data: sightRows } = await supabase
+    .from('spot_sightings')
+    .select('*')
+    .eq('post_id', params.spotId)
+    .order('created_at', { ascending: false });
+
+  return mapDbPostRowToDomSpot(updatedRow, {
+    sightings: (sightRows || []).map(mapDbSightingRowToItem),
+    viewerId: params.authorId,
+    authorRawPhone: cleanPhone || null,
+  });
+}
+
+/**
+ * Xóa bài đăng khỏi bảng public.dom_nho_posts của Supabase
+ */
+export async function deleteSpotInSupabase(spotId: string): Promise<boolean> {
+  if (!supabase || !isValidUuid(spotId)) return false;
+
+  const { error: deleteErr } = await supabase
+    .from('dom_nho_posts')
+    .delete()
+    .eq('id', spotId);
+
+  if (!deleteErr) {
+    return true;
+  }
+
+  // Fallback sang cập nhật trạng thái FADED / light_power = 0 nếu chính sách RLS DELETE chưa được bật
+  const { error: fadeErr } = await supabase
+    .from('dom_nho_posts')
+    .update({
+      status: 'FADED',
+      light_power: 0,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', spotId);
+
+  return !fadeErr;
+}
+
+/**
  * Phát sóng bài đăng mới / cập nhật qua Supabase Realtime Broadcast
  * để mọi thiết bị đang mở web nhận được ngay lập tức (kể cả khi khác máy chủ vùng).
  */
@@ -1521,11 +1634,29 @@ export async function broadcastCommunitySpotRealtime(
 }
 
 /**
+ * Phát sóng sự kiện xóa bài đăng qua Supabase Realtime Broadcast
+ */
+export async function broadcastDeleteSpotRealtime(
+  spotId: string
+): Promise<void> {
+  if (!activeRealtimeChannel || !spotId) return;
+  try {
+    await activeRealtimeChannel.send({
+      type: 'broadcast',
+      event: 'community_spot_deleted',
+      payload: { spotId },
+    });
+  } catch {
+    // Ignore broadcast error
+  }
+}
+
+/**
  * Đăng ký kênh Realtime (Supabase Postgres Changes + Broadcast) để mọi người dùng trên mọi thiết bị
- * thấy bài đăng mới, lượt truyền lửa, dấu vết phát hiện mới và cập nhật trạng thái ngay lập tức.
+ * thấy bài đăng mới, chỉnh sửa, xóa bài, lượt truyền lửa và dấu vết phát hiện mới ngay lập tức.
  */
 export function subscribeToRealtimeCommunityFeed(
-  onFeedChanged: (incomingSpot?: DomSpot) => void
+  onFeedChanged: (incomingSpot?: DomSpot, deletedSpotId?: string) => void
 ): () => void {
   if (!supabase) return () => {};
 
@@ -1555,6 +1686,17 @@ export function subscribeToRealtimeCommunityFeed(
       (msg: { payload?: { spot?: DomSpot } }) => {
         if (msg?.payload?.spot) {
           onFeedChanged(msg.payload.spot);
+        } else {
+          onFeedChanged();
+        }
+      }
+    )
+    .on(
+      'broadcast',
+      { event: 'community_spot_deleted' },
+      (msg: { payload?: { spotId?: string } }) => {
+        if (msg?.payload?.spotId) {
+          onFeedChanged(undefined, msg.payload.spotId);
         } else {
           onFeedChanged();
         }
