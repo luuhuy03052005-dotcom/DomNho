@@ -43,15 +43,18 @@ import {
   VET_EMERGENCY_STATIONS,
 } from '@/lib/seed-data';
 import {
-  calculateDistanceMeters,
+  checkAndIncrementBoostRateLimit,
   checkAndIncrementDeviceRateLimit,
   findDoubleMatchesWithin3Km,
-  fuzzCoordinates,
 } from '@/lib/security';
 import {
+  broadcastCommunitySpotRealtime,
   clearPermanentSession,
+  linkCouplePartnerInSupabase,
   loadPermanentSession,
   persistPermanentSession,
+  subscribeToRealtimeCommunityFeed,
+  syncPatrolModeInSupabase,
 } from '@/lib/supabase';
 import { useGeolocation } from '@/hooks/useGeolocation';
 import { usePushNotification } from '@/hooks/usePushNotification';
@@ -228,16 +231,91 @@ export default function DomNhoHomePage() {
       setSpots((prev) => {
         const next = updater(prev);
         if (typeof window !== 'undefined') {
-          window.localStorage.setItem(
-            REAL_SPOTS_STORAGE_KEY,
-            JSON.stringify(next)
-          );
+          try {
+            window.localStorage.setItem(
+              REAL_SPOTS_STORAGE_KEY,
+              JSON.stringify(next)
+            );
+          } catch {
+            // Bỏ qua nếu vượt hạn mức localStorage (dữ liệu chính lưu trên Supabase)
+          }
         }
         return next;
       });
     },
     []
   );
+
+  const syncCommunityFeed = useCallback(
+    async (viewerId?: string | null) => {
+      try {
+        const query = new URLSearchParams({ includeMemories: '1' });
+        if (viewerId) query.set('viewerId', viewerId);
+        const res = await fetch(`/api/spots?${query.toString()}`, {
+          method: 'GET',
+          cache: 'no-store',
+        });
+        if (!res.ok) return;
+        const data = await res.json().catch(() => null);
+        if (!data?.ok) return;
+
+        if (Array.isArray(data.spots)) {
+          const trustedIncoming = filterTrustedSpots(data.spots as DomSpot[]);
+          updateSpotsAndPersist((prev) => {
+            const incomingIds = new Set(trustedIncoming.map((s) => s.id));
+            // Giữ lại các bài crawl thêm từ phiên hiện tại chưa có trong batch đầu
+            const extraCrawled = prev.filter(
+              (s) => s.sourceType !== 'USER_POST' && !incomingIds.has(s.id)
+            );
+            return [...trustedIncoming, ...extraCrawled];
+          });
+        }
+
+        if (Array.isArray(data.memorySnaps) && data.memorySnaps.length > 0) {
+          setMemorySnaps(data.memorySnaps as MemorySnap[]);
+        }
+      } catch {
+        // Giữ danh sách hiện có nếu ngoại tuyến
+      }
+    },
+    [updateSpotsAndPersist]
+  );
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    syncCommunityFeed(userSession?.id);
+  }, [syncCommunityFeed, userSession?.id]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const unsubscribe = subscribeToRealtimeCommunityFeed((incomingSpot) => {
+      if (incomingSpot && incomingSpot.id) {
+        updateSpotsAndPersist((prev) => [
+          incomingSpot,
+          ...prev.filter((s) => s.id !== incomingSpot.id),
+        ]);
+        fetch('/api/spots', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'SYNC_SPOT',
+            spot: incomingSpot,
+          }),
+        }).catch(() => null);
+      }
+      syncCommunityFeed(userSession?.id);
+    });
+
+    const handleFocus = () => {
+      syncCommunityFeed(userSession?.id);
+    };
+    window.addEventListener('focus', handleFocus);
+
+    return () => {
+      unsubscribe();
+      window.removeEventListener('focus', handleFocus);
+    };
+  }, [syncCommunityFeed, updateSpotsAndPersist, userSession?.id]);
 
   const handleToggleSaveSpot = useCallback((spot: DomSpot) => {
     setSavedSpotIds((prev) => {
@@ -354,6 +432,8 @@ export default function DomNhoHomePage() {
           }
         }
 
+        await syncCommunityFeed(userSession?.id);
+
         if (!isAuto) {
           if (newlyAddedCount > 0) {
             showToast(
@@ -381,7 +461,7 @@ export default function DomNhoHomePage() {
         setIsUpdatingFeed(false);
       }
     },
-    [updateSpotsAndPersist, showToast]
+    [updateSpotsAndPersist, syncCommunityFeed, userSession?.id, showToast]
   );
 
   useEffect(() => {
@@ -420,26 +500,67 @@ export default function DomNhoHomePage() {
   );
 
   const handleBoostLight = useCallback(
-    (spotId: string) => {
-      const rateCheck = checkAndIncrementDeviceRateLimit();
+    async (spotId: string) => {
+      const rateCheck = checkAndIncrementBoostRateLimit(spotId);
       if (!rateCheck.allowed) {
         showToast(
           'Bạn thao tác quá nhanh',
-          'Vui lòng chờ giây lát trước khi tiếp tục thắp lửa.'
+          rateCheck.reason ||
+            'Vui lòng chờ giây lát trước khi tiếp tục thắp lửa.'
         );
         return;
       }
+
       updateSpotsAndPersist((prev) =>
         prev.map((s) =>
           s.id === spotId
             ? {
                 ...s,
-                lightPower: Math.min(s.lightPower + 40, 300),
+                lightPower: Math.min(s.lightPower + 20, 500),
                 boostCount: (s.boostCount || 0) + 1,
               }
             : s
         )
       );
+
+      setDetailSpot((curr) =>
+        curr && curr.id === spotId
+          ? {
+              ...curr,
+              lightPower: Math.min(curr.lightPower + 20, 500),
+              boostCount: (curr.boostCount || 0) + 1,
+            }
+          : curr
+      );
+
+      try {
+        const res = await fetch('/api/spots', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'BOOST_LIGHT',
+            spotId,
+            delta: 20,
+          }),
+        });
+        const data = await res.json().catch(() => null);
+        if (res.ok && data?.ok && typeof data.lightPower === 'number') {
+          updateSpotsAndPersist((prev) =>
+            prev.map((s) =>
+              s.id === spotId
+                ? {
+                    ...s,
+                    lightPower: data.lightPower,
+                    boostCount: data.boostCount ?? s.boostCount,
+                  }
+                : s
+            )
+          );
+        }
+      } catch {
+        // Giữ cập nhật tức thời nếu mạng chậm
+      }
+
       showToast(
         'Đã tiếp thêm hy vọng',
         'Bài viết đã nhận thêm sự quan tâm từ cộng đồng!'
@@ -465,119 +586,151 @@ export default function DomNhoHomePage() {
       pinnedLat?: number;
       pinnedLng?: number;
     }) => {
-      ensureAuthenticated('Đăng tin tìm kiếm hoặc cứu hộ thú cưng', (session) => {
-        const rateCheck = checkAndIncrementDeviceRateLimit();
-        if (!rateCheck.allowed) {
-          showToast(
-            'Giới hạn tạo tin',
-            'Bạn đã tạo nhiều tin trong hôm nay. Vui lòng thử lại sau.'
-          );
-          return;
-        }
+      ensureAuthenticated(
+        'Đăng tin tìm kiếm hoặc cứu hộ thú cưng',
+        async (session) => {
+          if (!Array.isArray(payload.images) || payload.images.length === 0) {
+            showToast(
+              'Thiếu hình ảnh thực tế',
+              'Vui lòng chụp hoặc tải lên ít nhất 1 bức ảnh thực tế của bé.',
+              'error'
+            );
+            return;
+          }
 
-        const exactLoc = payload.hasExactLocation;
-        let coordsToUse = { publicLat: 0, publicLng: 0, fuzzRadiusMeters: 0 };
+          const rateCheck = checkAndIncrementDeviceRateLimit();
+          if (!rateCheck.allowed) {
+            showToast(
+              'Giới hạn tạo tin',
+              rateCheck.reason ||
+                'Mỗi tài khoản được đăng tối đa 3 bài/ngày để chống tin rác.',
+              'error'
+            );
+            return;
+          }
 
-        if (payload.pinnedLat && payload.pinnedLng) {
-          coordsToUse = {
-            publicLat: payload.pinnedLat,
-            publicLng: payload.pinnedLng,
-            fuzzRadiusMeters: 50,
-          };
-        } else if (exactLoc) {
-          coordsToUse = fuzzCoordinates(coords.lat, coords.lng);
-        }
+          const exactLat = payload.pinnedLat || coords.lat;
+          const exactLng = payload.pinnedLng || coords.lng;
+          const effectiveAddress = payload.customAddress || coords.label;
 
-        const newSpot: DomSpot = {
-          id: `spot-${Date.now()}`,
-          authorId: session.id,
-          authorName: session.displayName,
-          spotType: payload.spotType,
-          status: 'ACTIVE',
-          visibility: 'PUBLIC',
-          title: payload.title,
-          story: payload.story,
-          species: payload.species,
-          breed: payload.breed || 'Chưa rõ giống',
-          coatColor: payload.coatColor || 'Chưa rõ màu lông',
-          traits: payload.traits,
-          images:
-            payload.images.length > 0
-              ? payload.images
-              : [
-                  'https://images.unsplash.com/photo-1543852786-1cf6624b9987?auto=format&fit=crop&w=800&q=80',
-                ],
-          publicLat: coordsToUse.publicLat,
-          publicLng: coordsToUse.publicLng,
-          fuzzRadiusMeters: coordsToUse.fuzzRadiusMeters,
-          areaLabel: payload.customAddress || coords.label,
-          formattedAddress: payload.customAddress || coords.label,
-          hasExactLocation: exactLoc,
-          publishedDate: new Date().toISOString(),
-          hoursAgo: 0,
-          createdAt: new Date().toISOString(),
-          isSavedToGoogleMaps: false,
-          lightPower: 120,
-          boostCount: 1,
-          allowFoster: payload.allowFoster,
-          maskedPhone: session.maskedPhone,
-          rawPhoneSecret: session.rawPhone,
-          sourceType: 'USER_POST',
-          sourcePlatform: 'RESCUE_PORTAL',
-          isVerified: true,
-          sightings: [],
-        };
+          try {
+            const res = await fetch('/api/spots', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                authorId: session.id,
+                authorName: session.displayName,
+                rawPhone: session.rawPhone,
+                pinCode: session.pinCode,
+                spotType: payload.spotType,
+                title: payload.title,
+                story: payload.story,
+                species: payload.species,
+                breed: payload.breed,
+                coatColor: payload.coatColor,
+                traits: payload.traits,
+                images: payload.images,
+                exactLat,
+                exactLng,
+                hasExactLocation: payload.hasExactLocation,
+                areaLabel: effectiveAddress,
+                formattedAddress: effectiveAddress,
+                allowFoster: payload.allowFoster,
+              }),
+            });
 
-        updateSpotsAndPersist((prev) => [newSpot, ...prev]);
-        setIsCameraModalOpen(false);
+            const data = await res.json().catch(() => null);
+            if (!res.ok || !data?.ok || !data.spot) {
+              showToast(
+                'Không thể đăng tin',
+                data?.error ||
+                  'Vui lòng kiểm tra kết nối mạng hoặc thông tin bài đăng.',
+                'error'
+              );
+              return;
+            }
 
-        const visualMatches = rankSpotsByVisualSimilarity(
-          {
-            species: newSpot.species,
-            breed: newSpot.breed,
-            coatColor: newSpot.coatColor,
-            primaryColors: [newSpot.coatColor],
-            coatPattern: '',
-            traits: newSpot.traits,
-            suggestedTitle: newSpot.title,
-          },
-          spots,
-          coordsToUse.publicLat > 0
-            ? { lat: coordsToUse.publicLat, lng: coordsToUse.publicLng }
-            : { lat: coords.lat, lng: coords.lng },
-          newSpot.id
-        ).filter((m) => m.matchPercent >= 62);
+            const createdSpot: DomSpot = data.spot;
 
-        if (visualMatches.length > 0) {
-          const alertMatches: SpotMatchResult[] = visualMatches
-            .slice(0, 4)
-            .map((m) => ({
-              matchedSpot: m.spot,
-              distanceMeters: m.distanceMeters || 0,
-              similarityScore: m.matchPercent / 100,
-              commonTraits: m.matchReasons,
-            }));
-          setDoubleMatches(alertMatches);
-          triggerWebPushAlert(
-            'Phát hiện bài viết trùng khớp!',
-            `Có ${alertMatches.length} bài viết có hình ảnh & đặc điểm rất giống bé bạn vừa đăng.`
-          );
-        } else if (exactLoc && coordsToUse.publicLat > 0) {
-          const matched = findDoubleMatchesWithin3Km(newSpot, spots);
-          if (matched.length > 0) {
-            setDoubleMatches(matched);
-            triggerWebPushAlert(
-              'Tìm thấy thông tin trùng khớp quanh bạn!',
-              `Có ${matched.length} trường hợp rất giống đặc điểm bé bạn vừa đăng trong bán kính 3km.`
+            // Đồng bộ lại ID hồ sơ nếu máy chủ đối chiếu hồ sơ trên Supabase
+            if (createdSpot.authorId && createdSpot.authorId !== session.id) {
+              const syncedSession: UserSession = {
+                ...session,
+                id: createdSpot.authorId,
+              };
+              setUserSession(syncedSession);
+              persistPermanentSession(syncedSession);
+            }
+
+            updateSpotsAndPersist((prev) => [
+              createdSpot,
+              ...prev.filter((s) => s.id !== createdSpot.id),
+            ]);
+            broadcastCommunitySpotRealtime(createdSpot);
+            setIsCameraModalOpen(false);
+
+            const visualMatches = rankSpotsByVisualSimilarity(
+              {
+                species: createdSpot.species,
+                breed: createdSpot.breed,
+                coatColor: createdSpot.coatColor,
+                primaryColors: [createdSpot.coatColor],
+                coatPattern: '',
+                traits: createdSpot.traits,
+                suggestedTitle: createdSpot.title,
+              },
+              spots,
+              createdSpot.publicLat > 0
+                ? { lat: createdSpot.publicLat, lng: createdSpot.publicLng }
+                : { lat: coords.lat, lng: coords.lng },
+              createdSpot.id
+            ).filter((m) => m.matchPercent >= 62);
+
+            if (visualMatches.length > 0) {
+              const alertMatches: SpotMatchResult[] = visualMatches
+                .slice(0, 4)
+                .map((m) => ({
+                  matchedSpot: m.spot,
+                  distanceMeters: m.distanceMeters || 0,
+                  similarityScore: m.matchPercent / 100,
+                  commonTraits: m.matchReasons,
+                }));
+              setDoubleMatches(alertMatches);
+              triggerWebPushAlert(
+                'Phát hiện bài viết trùng khớp!',
+                `Có ${alertMatches.length} bài viết có hình ảnh & đặc điểm rất giống bé bạn vừa đăng.`
+              );
+            } else if (Array.isArray(data.matches) && data.matches.length > 0) {
+              setDoubleMatches(data.matches as SpotMatchResult[]);
+              triggerWebPushAlert(
+                'Tìm thấy thông tin trùng khớp quanh bạn!',
+                `Có ${data.matches.length} trường hợp rất giống đặc điểm bé bạn vừa đăng trong bán kính 3km.`
+              );
+            } else if (payload.hasExactLocation && createdSpot.publicLat > 0) {
+              const matched = findDoubleMatchesWithin3Km(createdSpot, spots);
+              if (matched.length > 0) {
+                setDoubleMatches(matched);
+                triggerWebPushAlert(
+                  'Tìm thấy thông tin trùng khớp quanh bạn!',
+                  `Có ${matched.length} trường hợp rất giống đặc điểm bé bạn vừa đăng trong bán kính 3km.`
+                );
+              }
+            }
+
+            showToast(
+              'Đăng tin thành công',
+              `Bài viết đã được lưu lên hệ thống chung và hiển thị cho mọi người trong cộng đồng Đốm Nhỏ.`,
+              'success'
+            );
+          } catch {
+            showToast(
+              'Lỗi kết nối máy chủ',
+              'Không thể lưu bài viết lên hệ thống lúc này. Vui lòng thử lại.',
+              'error'
             );
           }
         }
-
-        showToast(
-          'Đăng tin thành công',
-          `Đã chia sẻ thông tin của bé kèm ${payload.images.length} ảnh đến cộng đồng Đốm Nhỏ.`
-        );
-      });
+      );
     },
     [
       ensureAuthenticated,
@@ -592,8 +745,8 @@ export default function DomNhoHomePage() {
   const handleUnlockContactOrAdopt = useCallback(
     (
       spot: DomSpot,
-      _message: string,
-      _requestType: 'SIGHTING_REPORT' | 'ADOPT_REQUEST' | 'FOSTER_OFFER'
+      message: string,
+      requestType: 'SIGHTING_REPORT' | 'ADOPT_REQUEST' | 'FOSTER_OFFER'
     ) => {
       if (!isUserWebPost(spot)) {
         if (spot.sourceUrl && typeof window !== 'undefined') {
@@ -602,35 +755,82 @@ export default function DomNhoHomePage() {
         return;
       }
 
-      ensureAuthenticated('Mở thông tin liên hệ', () => {
-        updateSpotsAndPersist((prev) =>
-          prev.map((s) =>
-            s.id === spot.id
-              ? { ...s, isContactUnlockedForViewer: true }
-              : s
-          )
-        );
-        setSelectedSpot((curr) =>
-          curr && curr.id === spot.id
-            ? { ...curr, isContactUnlockedForViewer: true }
-            : curr
-        );
-        setDetailSpot((curr) =>
-          curr && curr.id === spot.id
-            ? { ...curr, isContactUnlockedForViewer: true }
-            : curr
-        );
-        showToast(
-          'Đã kết nối thành công',
-          'Bạn đã có thể liên hệ trực tiếp với người chăm sóc bé.'
-        );
+      ensureAuthenticated('Mở thông tin liên hệ', async (session) => {
+        try {
+          const res = await fetch('/api/spots', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              action: 'UNLOCK_CONTACT',
+              spotId: spot.id,
+              requesterId: session.id,
+              requesterName: session.displayName,
+              requesterPhone: session.rawPhone,
+              requestType,
+              message,
+            }),
+          });
+          const data = await res.json().catch(() => null);
+          const unlockedPhone = data?.rawPhone || spot.rawPhoneSecret || '';
+          const unlockedZalo =
+            data?.zaloLink ||
+            (unlockedPhone
+              ? `https://zalo.me/${unlockedPhone.replace(/\D/g, '')}`
+              : '');
+
+          updateSpotsAndPersist((prev) =>
+            prev.map((s) =>
+              s.id === spot.id
+                ? {
+                    ...s,
+                    isContactUnlockedForViewer: true,
+                    rawPhoneSecret: unlockedPhone || s.rawPhoneSecret,
+                    zaloLink: unlockedZalo || s.zaloLink,
+                  }
+                : s
+            )
+          );
+          setSelectedSpot((curr) =>
+            curr && curr.id === spot.id
+              ? {
+                  ...curr,
+                  isContactUnlockedForViewer: true,
+                  rawPhoneSecret: unlockedPhone || curr.rawPhoneSecret,
+                  zaloLink: unlockedZalo || curr.zaloLink,
+                }
+              : curr
+          );
+          setDetailSpot((curr) =>
+            curr && curr.id === spot.id
+              ? {
+                  ...curr,
+                  isContactUnlockedForViewer: true,
+                  rawPhoneSecret: unlockedPhone || curr.rawPhoneSecret,
+                  zaloLink: unlockedZalo || curr.zaloLink,
+                }
+              : curr
+          );
+          showToast(
+            'Đã mở khóa liên hệ thành công',
+            unlockedPhone
+              ? `Số điện thoại liên hệ của người đăng: ${unlockedPhone}`
+              : 'Đã gửi lời nhắn kết nối tới người đăng tin.',
+            'success'
+          );
+        } catch {
+          showToast(
+            'Không thể mở khóa liên hệ',
+            'Vui lòng kiểm tra kết nối mạng và thử lại.',
+            'error'
+          );
+        }
       });
     },
     [ensureAuthenticated, updateSpotsAndPersist, showToast]
   );
 
   const handleResolveSpotToPeace = useCallback(
-    (spotId: string) => {
+    async (spotId: string) => {
       updateSpotsAndPersist((prev) =>
         prev.map((s) =>
           s.id === spotId
@@ -646,26 +846,37 @@ export default function DomNhoHomePage() {
       setSelectedSpot((curr) =>
         curr && curr.id === spotId
           ? {
-                ...curr,
-                spotType: 'GREEN_PEACE',
-                status: 'RESOLVED',
-                lightPower: 200,
-              }
+              ...curr,
+              spotType: 'GREEN_PEACE',
+              status: 'RESOLVED',
+              lightPower: 200,
+            }
           : curr
       );
       setDetailSpot((curr) =>
         curr && curr.id === spotId
           ? {
-                ...curr,
-                spotType: 'GREEN_PEACE',
-                status: 'RESOLVED',
-                lightPower: 200,
-              }
+              ...curr,
+              spotType: 'GREEN_PEACE',
+              status: 'RESOLVED',
+              lightPower: 200,
+            }
           : curr
       );
+
+      await fetch('/api/spots', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'RESOLVE_PEACE',
+          spotId,
+        }),
+      }).catch(() => null);
+
       showToast(
         'Đã cập nhật trạng thái',
-        'Bé đã tìm được mái ấm bình yên.'
+        'Bé đã tìm được mái ấm bình yên — thông tin đã đồng bộ tới cộng đồng.',
+        'success'
       );
     },
     [updateSpotsAndPersist, showToast]
@@ -720,7 +931,7 @@ export default function DomNhoHomePage() {
   );
 
   const handleAddWeeklyMemorySnap = useCallback(
-    (snapInput: {
+    async (snapInput: {
       petName: string;
       caption: string;
       moodTag: string;
@@ -728,53 +939,109 @@ export default function DomNhoHomePage() {
       imageUrl: string;
     }) => {
       const nextWeek = memorySnaps.length + 1;
-      const newSnap: MemorySnap = {
-        id: `mem-${Date.now()}`,
-        postId: '',
-        petName: snapInput.petName,
-        weekNumber: nextWeek,
-        imageUrl: snapInput.imageUrl,
-        caption: snapInput.caption,
-        moodTag: snapInput.moodTag,
-        weightKg: snapInput.weightKg,
-        sentToRescuer: false,
-        rescuerName: '',
-        areaLabel: coords.label,
-        googleMapsUrl: `https://www.google.com/maps/search/?api=1&query=${coords.lat},${coords.lng}`,
-        createdAt: new Date().toLocaleDateString('vi-VN'),
-      };
-      setMemorySnaps((prev) => {
-        const updated = [newSnap, ...prev];
-        if (typeof window !== 'undefined') {
-          window.localStorage.setItem(
-            MEMORY_STORAGE_KEY,
-            JSON.stringify(updated)
-          );
-        }
-        return updated;
-      });
-      showToast(
-        `Đã lưu kỷ niệm tuần thứ ${nextWeek}`,
-        'Khoảnh khắc của bé đã được ghi nhớ.'
-      );
+      const myLatestSpot = userSession
+        ? spots.find((s) => s.authorId === userSession.id)
+        : undefined;
+
+      try {
+        const res = await fetch('/api/spots', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'ADD_MEMORY_SNAP',
+            postId: myLatestSpot?.id,
+            authorId: userSession?.id,
+            authorName: userSession?.displayName,
+            authorPhone: userSession?.rawPhone,
+            petName: snapInput.petName,
+            weekNumber: nextWeek,
+            imageUrl: snapInput.imageUrl,
+            caption: snapInput.caption,
+            moodTag: snapInput.moodTag,
+            weightKg: snapInput.weightKg,
+            lat: coords.lat,
+            lng: coords.lng,
+          }),
+        });
+        const data = await res.json().catch(() => null);
+        const savedSnap: MemorySnap = data?.snap || {
+          id: `mem-${Date.now()}`,
+          postId: myLatestSpot?.id || '',
+          petName: snapInput.petName,
+          weekNumber: nextWeek,
+          imageUrl: snapInput.imageUrl,
+          caption: snapInput.caption,
+          moodTag: snapInput.moodTag,
+          weightKg: snapInput.weightKg,
+          sentToRescuer: true,
+          rescuerName: myLatestSpot?.authorName || '',
+          areaLabel: coords.label,
+          googleMapsUrl: `https://www.google.com/maps/search/?api=1&query=${coords.lat},${coords.lng}`,
+          createdAt: new Date().toLocaleDateString('vi-VN'),
+        };
+
+        setMemorySnaps((prev) => {
+          const updated = [
+            savedSnap,
+            ...prev.filter((m) => m.id !== savedSnap.id),
+          ];
+          if (typeof window !== 'undefined') {
+            try {
+              window.localStorage.setItem(
+                MEMORY_STORAGE_KEY,
+                JSON.stringify(updated)
+              );
+            } catch {
+              // Ignore quota
+            }
+          }
+          return updated;
+        });
+
+        showToast(
+          `Đã lưu kỷ niệm tuần thứ ${nextWeek}`,
+          'Khoảnh khắc của bé đã được đồng bộ lên Nhật ký Kỷ niệm.',
+          'success'
+        );
+      } catch {
+        showToast(
+          'Không thể lưu kỷ niệm',
+          'Vui lòng kiểm tra kết nối mạng và thử lại.',
+          'error'
+        );
+      }
     },
-    [memorySnaps.length, coords.label, coords.lat, coords.lng, showToast]
+    [
+      memorySnaps.length,
+      userSession,
+      spots,
+      coords.label,
+      coords.lat,
+      coords.lng,
+      showToast,
+    ]
   );
 
   const handleLinkPartnerName = useCallback(
     (partnerName: string) => {
       ensureAuthenticated(
         'Đăng nhập nhanh để ghép đôi Không gian Đi dạo',
-        (session) => {
+        async (session) => {
+          const linked = await linkCouplePartnerInSupabase(
+            session,
+            partnerName
+          );
           const updated: UserSession = {
             ...session,
             partnerName,
+            coupleRoomCode: linked.roomCode,
           };
           setUserSession(updated);
           persistPermanentSession(updated);
           showToast(
             'Đã kết nối cặp đôi',
-            `Không gian riêng tư của ${updated.displayName} & ${partnerName} đã được kích hoạt.`
+            `Không gian riêng tư ${linked.roomName} (Mã: ${linked.roomCode}) đã được đồng bộ.`,
+            'success'
           );
         }
       );
@@ -989,7 +1256,7 @@ export default function DomNhoHomePage() {
         userSession={userSession}
         onClose={() => setDetailSpot(null)}
         onBoostLight={handleBoostLight}
-        onAddSighting={(spotId, sighting) => {
+        onAddSighting={async (spotId, sighting) => {
           updateSpotsAndPersist((prev) =>
             prev.map((s) =>
               s.id === spotId
@@ -997,7 +1264,59 @@ export default function DomNhoHomePage() {
                 : s
             )
           );
-          showToast('Đã gửi thông tin nhìn thấy', 'Cảm ơn bạn đã hỗ trợ tìm kiếm bé!', 'success');
+          setDetailSpot((curr) =>
+            curr && curr.id === spotId
+              ? { ...curr, sightings: [sighting, ...(curr.sightings || [])] }
+              : curr
+          );
+
+          try {
+            const res = await fetch('/api/spots', {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                action: 'ADD_SIGHTING',
+                spotId,
+                reporterId: userSession?.id,
+                reporterName: sighting.reporterName,
+                reporterPhone: userSession?.rawPhone,
+                imageUrl: sighting.imageUrl,
+                note: sighting.note,
+                emotionTag: sighting.emotionTag,
+                lat: sighting.lat,
+                lng: sighting.lng,
+                originLat: detailSpot?.publicLat || coords.lat,
+                originLng: detailSpot?.publicLng || coords.lng,
+              }),
+            });
+            const data = await res.json().catch(() => null);
+            if (res.ok && data?.ok && data.sighting) {
+              const savedSighting = data.sighting as SightingItem;
+              updateSpotsAndPersist((prev) =>
+                prev.map((s) =>
+                  s.id === spotId
+                    ? {
+                        ...s,
+                        sightings: [
+                          savedSighting,
+                          ...(s.sightings || []).filter(
+                            (st) => st.id !== sighting.id && st.id !== savedSighting.id
+                          ),
+                        ],
+                      }
+                    : s
+                )
+              );
+            }
+          } catch {
+            // Giữ cập nhật tức thời nếu mạng gián đoạn
+          }
+
+          showToast(
+            'Đã gửi thông tin nhìn thấy',
+            'Manh mối đã được đồng bộ lên hệ thống để hỗ trợ tìm kiếm bé!',
+            'success'
+          );
         }}
         onUnlockContactRequest={handleUnlockContactOrAdopt}
         onResolveSpotToPeace={handleResolveSpotToPeace}
@@ -1032,7 +1351,21 @@ export default function DomNhoHomePage() {
         spots={spots}
         memorySnaps={memorySnaps}
         patrolModeActive={patrolModeActive}
-        onTogglePatrolMode={() => setPatrolModeActive((v) => !v)}
+        onTogglePatrolMode={() => {
+          setPatrolModeActive((prev) => {
+            const nextVal = !prev;
+            if (userSession) {
+              const updatedSession: UserSession = {
+                ...userSession,
+                patrolModeActive: nextVal,
+              };
+              setUserSession(updatedSession);
+              persistPermanentSession(updatedSession);
+              syncPatrolModeInSupabase(updatedSession, nextVal);
+            }
+            return nextVal;
+          });
+        }}
         onClose={() => setIsProfileModalOpen(false)}
         onRequireAuth={() => {
           setPendingAuthAction({
@@ -1052,7 +1385,7 @@ export default function DomNhoHomePage() {
         }}
         onResolveSpotToPeace={handleResolveSpotToPeace}
         onAddWeeklyMemorySnap={handleAddWeeklyMemorySnap}
-        onActivateEmergencyBoost={(spotId) => {
+        onActivateEmergencyBoost={async (spotId) => {
           updateSpotsAndPersist((prev) =>
             prev.map((s) =>
               s.id === spotId
@@ -1060,7 +1393,19 @@ export default function DomNhoHomePage() {
                 : s
             )
           );
-          showToast('Đã ưu tiên hiển thị', 'Bài viết đã được đưa lên đầu danh sách.');
+          await fetch('/api/spots', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              action: 'EMERGENCY_BOOST',
+              spotId,
+            }),
+          }).catch(() => null);
+          showToast(
+            'Đã ưu tiên hiển thị',
+            'Bài viết đã được kích hoạt khẩn cấp và đưa lên đầu danh sách cho mọi người.',
+            'success'
+          );
         }}
         onLinkPartnerName={handleLinkPartnerName}
       />

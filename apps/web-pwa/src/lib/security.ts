@@ -26,8 +26,11 @@ export function fuzzCoordinates(
  */
 export function maskPhoneNumber(rawPhone: string): string {
   const digits = (rawPhone || '').replace(/\D/g, '');
+  if (digits.length === 0) {
+    return 'Chưa cung cấp SĐT';
+  }
   if (digits.length < 7) {
-    return '090***456';
+    return `${digits.slice(0, 2)}***${digits.slice(-1)}`;
   }
   return `${digits.slice(0, 3)}***${digits.slice(-3)}`;
 }
@@ -133,6 +136,34 @@ export function checkAndIncrementDeviceRateLimit(): RateLimitCheck {
     };
   } catch {
     return { allowed: true, isShadowbanned: false, remainingToday: 2 };
+  }
+}
+
+const BOOST_RATE_LIMIT_KEY = 'dom_nho_boost_rate_limit_v1';
+
+export function checkAndIncrementBoostRateLimit(spotId: string): {
+  allowed: boolean;
+  reason?: string;
+} {
+  if (typeof window === 'undefined') {
+    return { allowed: true };
+  }
+  try {
+    const now = Date.now();
+    const raw = window.localStorage.getItem(BOOST_RATE_LIMIT_KEY);
+    const map: Record<string, number> = raw ? JSON.parse(raw) : {};
+    const lastBoostAt = map[spotId] || 0;
+    if (now - lastBoostAt < 10_000) {
+      return {
+        allowed: false,
+        reason: 'Bạn vừa tiếp lửa cho bài viết này, vui lòng chờ vài giây.',
+      };
+    }
+    map[spotId] = now;
+    window.localStorage.setItem(BOOST_RATE_LIMIT_KEY, JSON.stringify(map));
+    return { allowed: true };
+  } catch {
+    return { allowed: true };
   }
 }
 

@@ -1,86 +1,523 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { INITIAL_DOM_SPOTS } from '@/lib/seed-data';
+import {
+  INITIAL_DOM_SPOTS,
+  VET_EMERGENCY_STATIONS,
+} from '@/lib/seed-data';
 import {
   calculateDistanceMeters,
-  fuzzCoordinates,
-  maskPhoneNumber,
+  findDoubleMatchesWithin3Km,
 } from '@/lib/security';
-import { DomSpot } from '@/lib/types';
+import {
+  activateEmergencyBoostInServerStore,
+  addSightingInServerStore,
+  boostSpotInServerStore,
+  createMemorySnapInServerStore,
+  createSpotInServerStore,
+  listCommunitySpotsFromServerStore,
+  listMemorySnapsFromServerStore,
+  resolveSpotToPeaceInServerStore,
+  syncIncomingPeerSpotInServerStore,
+  unlockContactInServerStore,
+} from '@/lib/server-community-store';
+import {
+  activateEmergencyBoostInSupabase,
+  addSpotSightingInSupabase,
+  boostSpotLightInSupabase,
+  createMemorySnapInSupabase,
+  createSpotInSupabase,
+  fetchCommunitySpotsFromSupabase,
+  fetchMemorySnapsFromSupabase,
+  resolveSpotToPeaceInSupabase,
+  unlockSpotContactInSupabase,
+} from '@/lib/supabase';
+import { DomSpot, MemorySnap, SpotMatchResult, SpotType } from '@/lib/types';
+
+export const dynamic = 'force-dynamic';
 
 /**
- * API Endpoint: /api/spots
- * - GET: Truy vấn các Đốm sáng trong bán kính (mặc định 5000m) với tọa độ đã làm mờ ±200m
- * - POST: Tạo Đốm sáng mới (Áp dụng Coordinate Fuzzing + Contact Masking tự động)
+ * GET /api/spots
+ * Trả về danh sách bài đăng cộng đồng thời gian thực từ Supabase + Server Community Store kết hợp với bài viết đã xác thực.
+ * Bảo mật: Không bao giờ trả về rawPhone cho người lạ khi chưa mở khóa liên hệ.
  */
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
-  const lat = parseFloat(searchParams.get('lat') || '10.7935');
-  const lng = parseFloat(searchParams.get('lng') || '106.7045');
-  const radius = parseFloat(searchParams.get('radius') || '5000');
+  const lat = Number(searchParams.get('lat') || 0);
+  const lng = Number(searchParams.get('lng') || 0);
+  const radiusMeters = Number(searchParams.get('radius') || 0);
+  const filterType = (searchParams.get('type') || 'ALL') as SpotType | 'ALL';
+  const viewerId = searchParams.get('viewerId') || null;
+  const coupleCode = searchParams.get('coupleCode') || '';
+  const includeMemories = searchParams.get('includeMemories') === '1';
 
-  const nearby = INITIAL_DOM_SPOTS.map((spot) => ({
-    ...spot,
-    rawPhoneSecret: undefined, // Không bao giờ trả số thật qua API công khai
-    distanceMeters: calculateDistanceMeters(
-      lat,
-      lng,
-      spot.publicLat,
-      spot.publicLng
-    ),
-  })).filter((spot) => spot.distanceMeters <= radius);
+  const [dbSpots, dbMemories] = await Promise.all([
+    fetchCommunitySpotsFromSupabase(viewerId).catch(() => [] as DomSpot[]),
+    includeMemories
+      ? fetchMemorySnapsFromSupabase().catch(() => [] as MemorySnap[])
+      : Promise.resolve([] as MemorySnap[]),
+  ]);
+
+  const serverSpots = listCommunitySpotsFromServerStore(viewerId);
+  const serverMemories = includeMemories
+    ? listMemorySnapsFromServerStore()
+    : [];
+
+  const seenSpotIds = new Set<string>();
+  const communitySpots: DomSpot[] = [];
+  for (const sp of [...dbSpots, ...serverSpots]) {
+    if (!sp || seenSpotIds.has(sp.id)) continue;
+    seenSpotIds.add(sp.id);
+    communitySpots.push(sp);
+  }
+
+  const combinedSpots: DomSpot[] = [...communitySpots];
+  for (const spot of INITIAL_DOM_SPOTS) {
+    if (!spot || seenSpotIds.has(spot.id)) continue;
+    seenSpotIds.add(spot.id);
+    combinedSpots.push(spot);
+  }
+
+  const seenMemIds = new Set<string>();
+  const memorySnaps: MemorySnap[] = [];
+  for (const m of [...dbMemories, ...serverMemories]) {
+    if (!m || seenMemIds.has(m.id)) continue;
+    seenMemIds.add(m.id);
+    memorySnaps.push(m);
+  }
+
+  const visibleSpots = combinedSpots.filter((spot) => {
+    if (spot.lightPower <= 0 || spot.status === 'FADED') return false;
+    if (
+      spot.status === 'SHADOWBANNED' &&
+      (!viewerId || spot.authorId !== viewerId)
+    ) {
+      return false;
+    }
+    if (
+      spot.visibility === 'PRIVATE_COUPLE' &&
+      spot.coupleRoomCode &&
+      spot.coupleRoomCode !== coupleCode
+    ) {
+      return false;
+    }
+    if (filterType !== 'ALL' && spot.spotType !== filterType) {
+      return false;
+    }
+    if (radiusMeters > 0 && lat && lng && spot.publicLat && spot.publicLng) {
+      const dist = calculateDistanceMeters(
+        lat,
+        lng,
+        spot.publicLat,
+        spot.publicLng
+      );
+      if (dist > radiusMeters) return false;
+    }
+    return true;
+  });
 
   return NextResponse.json({
     ok: true,
-    count: nearby.length,
-    spots: nearby,
+    count: visibleSpots.length,
+    spots: visibleSpots,
+    communityCount: communitySpots.length,
+    memorySnaps,
+    vetStations: VET_EMERGENCY_STATIONS,
   });
 }
 
+/**
+ * POST /api/spots
+ * Tạo bài đăng mới lưu trực tiếp lên Supabase (public.dom_nho_posts) và Server Community Store
+ * để mọi người dùng trên mọi thiết bị đều thấy ngay lập tức.
+ */
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const exactLat = Number(body.lat || 10.7935);
-    const exactLng = Number(body.lng || 106.7045);
-    const fuzzed = fuzzCoordinates(exactLat, exactLng);
 
-    const createdSpot: DomSpot = {
-      id: `dom-${Date.now().toString(36)}`,
-      authorId: body.authorId || 'usr_guest',
-      authorName: body.authorName || 'Người Bạn Đốm Nhỏ',
-      spotType: body.spotType || 'ORANGE_SIGHT',
-      status: 'ACTIVE',
-      visibility: body.visibility || 'PUBLIC',
-      title: body.title || 'Tín hiệu đốm sáng mới',
-      story: body.story || '',
-      species: body.species || 'cat',
-      breed: body.breed || 'Mèo ta',
-      coatColor: body.coatColor || 'Vàng ấm',
-      traits: Array.isArray(body.traits) ? body.traits : ['Thân thiện'],
-      images: Array.isArray(body.images) ? body.images : [],
-      publicLat: fuzzed.publicLat,
-      publicLng: fuzzed.publicLng,
-      fuzzRadiusMeters: fuzzed.fuzzRadiusMeters,
-      areaLabel: body.areaLabel || 'TP. Hồ Chí Minh',
-      lightPower: 100,
-      boostCount: 1,
-      allowFoster: Boolean(body.allowFoster),
-      maskedPhone: maskPhoneNumber(body.rawPhone || '0908123456'),
-      sourceType: 'USER_POST',
-      hoursAgo: 0,
-      createdAt: new Date().toISOString(),
-      sightings: [],
-    };
+    const authorId = String(body.authorId || '').trim();
+    const authorName = String(body.authorName || '').trim();
+    const rawPhone = String(body.rawPhone || '').trim();
+    const pinCode = String(body.pinCode || '').trim();
+    const title = String(body.title || '').trim();
+    const story = String(body.story || '').trim();
+    const breed = String(body.breed || '').trim();
+    const coatColor = String(body.coatColor || '').trim();
+    const areaLabel = String(
+      body.areaLabel || body.customAddress || ''
+    ).trim();
+    const formattedAddress = String(
+      body.formattedAddress || body.customAddress || areaLabel
+    ).trim();
+    const images: string[] = Array.isArray(body.images)
+      ? body.images.filter(
+          (img: unknown) => typeof img === 'string' && img.length > 0
+        )
+      : [];
+
+    if (!authorName || authorName.length < 2) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: 'Vui lòng cung cấp tên người đăng (tối thiểu 2 ký tự).',
+        },
+        { status: 400 }
+      );
+    }
+
+    if (rawPhone.replace(/\D/g, '').length < 9) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: 'Vui lòng cung cấp số điện thoại liên hệ hợp lệ.',
+        },
+        { status: 400 }
+      );
+    }
+
+    if (!title) {
+      return NextResponse.json(
+        { ok: false, error: 'Tiêu đề bài đăng không được để trống.' },
+        { status: 400 }
+      );
+    }
+
+    if (images.length === 0) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: 'Vui lòng tải lên ít nhất 1 bức ảnh thực tế của thú cưng.',
+        },
+        { status: 400 }
+      );
+    }
+
+    const exactLat = Number(body.exactLat ?? body.pinnedLat ?? 0);
+    const exactLng = Number(body.exactLng ?? body.pinnedLng ?? 0);
+    const spotType = (body.spotType as SpotType) || 'RED_SOS';
+    const visibility =
+      body.visibility === 'PRIVATE_COUPLE' ? 'PRIVATE_COUPLE' : 'PUBLIC';
+    const species =
+      body.species === 'dog' || body.species === 'other'
+        ? body.species
+        : 'cat';
+    const traits = Array.isArray(body.traits) ? body.traits.map(String) : [];
+    const hasExactLocation = Boolean(body.hasExactLocation ?? true);
+    const allowFoster = Boolean(body.allowFoster);
+
+    let finalSpot: DomSpot;
+    let remainingToday = 2;
+    let dbMatches: any[] = [];
+
+    try {
+      const createdDb = await createSpotInSupabase({
+        authorId,
+        authorName,
+        rawPhone,
+        pinCode,
+        spotType,
+        visibility,
+        coupleRoomCode: body.coupleRoomCode || undefined,
+        title,
+        story,
+        species,
+        breed,
+        coatColor,
+        traits,
+        images,
+        exactLat,
+        exactLng,
+        hasExactLocation,
+        areaLabel,
+        formattedAddress,
+        allowFoster,
+      });
+
+      finalSpot = createdDb.spot;
+      remainingToday = createdDb.remainingToday;
+      dbMatches = createdDb.dbMatches;
+
+      // Đồng bộ bản sao vào Server Store để truy xuất tốc độ cao
+      createSpotInServerStore({
+        id: finalSpot.id,
+        authorId: finalSpot.authorId,
+        authorName,
+        rawPhone,
+        pinCode,
+        spotType,
+        visibility,
+        coupleRoomCode: body.coupleRoomCode || undefined,
+        title,
+        story,
+        species,
+        breed,
+        coatColor,
+        traits,
+        images,
+        exactLat,
+        exactLng,
+        publicLat: finalSpot.publicLat,
+        publicLng: finalSpot.publicLng,
+        hasExactLocation,
+        areaLabel,
+        formattedAddress,
+        allowFoster,
+        skipRateLimit: true,
+      });
+    } catch (dbErr: any) {
+      const msg = String(dbErr?.message || '');
+      if (msg.includes('3 bài/ngày')) {
+        return NextResponse.json({ ok: false, error: msg }, { status: 429 });
+      }
+
+      // Lưu vào Server Community Store (áp dụng đúng Rate-Limit 3 bài/ngày, Fuzzing ±150m-300m, Masking SĐT)
+      const createdServer = createSpotInServerStore({
+        authorId,
+        authorName,
+        rawPhone,
+        pinCode,
+        spotType,
+        visibility,
+        coupleRoomCode: body.coupleRoomCode || undefined,
+        title,
+        story,
+        species,
+        breed,
+        coatColor,
+        traits,
+        images,
+        exactLat,
+        exactLng,
+        hasExactLocation,
+        areaLabel,
+        formattedAddress,
+        allowFoster,
+      });
+
+      finalSpot = createdServer.spot;
+      remainingToday = createdServer.remainingToday;
+    }
+
+    const [dbAll, serverAll] = await Promise.all([
+      fetchCommunitySpotsFromSupabase(finalSpot.authorId).catch(
+        () => [] as DomSpot[]
+      ),
+      Promise.resolve(listCommunitySpotsFromServerStore(finalSpot.authorId)),
+    ]);
+
+    const candidatePool = [...dbAll, ...serverAll, ...INITIAL_DOM_SPOTS];
+    const matches: SpotMatchResult[] = findDoubleMatchesWithin3Km(
+      finalSpot,
+      candidatePool
+    );
 
     return NextResponse.json({
       ok: true,
-      spot: createdSpot,
-      securityNote: 'Coordinate fuzzed ±200m and phone number masked.',
+      spot: finalSpot,
+      remainingToday,
+      matches,
+      dbMatches,
     });
   } catch (err: any) {
     return NextResponse.json(
-      { ok: false, error: err?.message || 'Invalid request' },
+      {
+        ok: false,
+        error:
+          err?.message ||
+          'Không thể tạo bài đăng lúc này. Vui lòng kiểm tra thông tin và thử lại.',
+      },
       { status: 400 }
     );
   }
 }
 
+/**
+ * PATCH /api/spots
+ * Thực thi các nghiệp vụ cộng đồng trực tiếp trên Supabase & Server Store:
+ * - BOOST_LIGHT: Truyền lửa (+light_power, +boost_count)
+ * - ADD_SIGHTING: Báo phát hiện mới (lưu vào spot_sightings)
+ * - UNLOCK_CONTACT: Gửi lời nhắn & Mở khóa SĐT (lưu vào contact_unlock_requests & trả về SĐT thật)
+ * - RESOLVE_PEACE: Đóng ca / Đã đoàn tụ (chuyển sang GREEN_PEACE & RESOLVED)
+ * - EMERGENCY_BOOST: Kích hoạt khẩn cấp (ưu tiên hiển thị 48h)
+ * - ADD_MEMORY_SNAP: Lưu ảnh Nhật ký hàng tuần (lưu vào memory_snaps)
+ * - SYNC_SPOT: Đồng bộ bài đăng cộng đồng nhận từ kênh Realtime WebSocket
+ */
+export async function PATCH(request: NextRequest) {
+  try {
+    const body = await request.json();
+    const action = String(body.action || '');
+
+    if (action === 'SYNC_SPOT') {
+      if (body.spot && typeof body.spot === 'object') {
+        syncIncomingPeerSpotInServerStore(body.spot as DomSpot);
+      }
+      return NextResponse.json({ ok: true });
+    }
+
+    if (action === 'BOOST_LIGHT') {
+      const spotId = String(body.spotId || '');
+      const delta = Number(body.delta || 20);
+      const [dbRes, srvRes] = await Promise.all([
+        boostSpotLightInSupabase(spotId, delta).catch(() => null),
+        Promise.resolve(boostSpotInServerStore(spotId, delta)),
+      ]);
+      const result = dbRes || srvRes;
+      return NextResponse.json({
+        ok: true,
+        spotId,
+        lightPower: result?.lightPower ?? null,
+        boostCount: result?.boostCount ?? null,
+      });
+    }
+
+    if (action === 'ADD_SIGHTING') {
+      const spotId = String(body.spotId || '');
+      const srvSighting = addSightingInServerStore({
+        spotId,
+        reporterName: String(body.reporterName || '').trim(),
+        imageUrl: String(body.imageUrl || ''),
+        note: String(body.note || '').trim(),
+        emotionTag: String(body.emotionTag || '').trim(),
+        lat: Number(body.lat || 0),
+        lng: Number(body.lng || 0),
+        originLat: Number(body.originLat || 0),
+        originLng: Number(body.originLng || 0),
+      });
+
+      const dbSighting = await addSpotSightingInSupabase({
+        postId: spotId,
+        reporterId: body.reporterId ? String(body.reporterId) : undefined,
+        reporterName: String(body.reporterName || '').trim(),
+        reporterPhone: body.reporterPhone
+          ? String(body.reporterPhone)
+          : undefined,
+        imageUrl: String(body.imageUrl || ''),
+        note: String(body.note || '').trim(),
+        emotionTag: String(body.emotionTag || '').trim(),
+        lat: Number(body.lat || 0),
+        lng: Number(body.lng || 0),
+        originLat: Number(body.originLat || 0),
+        originLng: Number(body.originLng || 0),
+      }).catch(() => null);
+
+      return NextResponse.json({
+        ok: true,
+        sighting: dbSighting || srvSighting,
+      });
+    }
+
+    if (action === 'UNLOCK_CONTACT') {
+      const spotId = String(body.spotId || '');
+      const reqType =
+        body.requestType === 'ADOPT_REQUEST' ||
+        body.requestType === 'FOSTER_OFFER'
+          ? body.requestType
+          : 'SIGHTING_REPORT';
+
+      const srvUnlocked = unlockContactInServerStore({
+        spotId,
+        requesterId: String(body.requesterId || ''),
+        requesterName: String(body.requesterName || '').trim(),
+        requestType: reqType,
+        message: String(body.message || '').trim(),
+        proofImageUrl: body.proofImageUrl
+          ? String(body.proofImageUrl)
+          : undefined,
+      });
+
+      const dbUnlocked = await unlockSpotContactInSupabase({
+        postId: spotId,
+        requesterId: String(body.requesterId || ''),
+        requesterName: String(body.requesterName || '').trim(),
+        requesterPhone: String(body.requesterPhone || '').trim(),
+        requestType: reqType,
+        message: String(body.message || '').trim(),
+        proofImageUrl: body.proofImageUrl
+          ? String(body.proofImageUrl)
+          : undefined,
+      }).catch(() => null);
+
+      const rawPhone = dbUnlocked?.rawPhone || srvUnlocked.rawPhone || '';
+      const maskedPhone =
+        dbUnlocked?.maskedPhone || srvUnlocked.maskedPhone || '';
+      const zaloLink = dbUnlocked?.zaloLink || srvUnlocked.zaloLink || '';
+
+      return NextResponse.json({
+        ok: true,
+        rawPhone,
+        maskedPhone,
+        zaloLink,
+      });
+    }
+
+    if (action === 'RESOLVE_PEACE') {
+      const spotId = String(body.spotId || '');
+      const srvOk = resolveSpotToPeaceInServerStore(spotId);
+      const dbOk = await resolveSpotToPeaceInSupabase(spotId).catch(
+        () => false
+      );
+      return NextResponse.json({
+        ok: dbOk || srvOk,
+        spotId,
+      });
+    }
+
+    if (action === 'EMERGENCY_BOOST') {
+      const spotId = String(body.spotId || '');
+      const srvOk = activateEmergencyBoostInServerStore(spotId);
+      const dbOk = await activateEmergencyBoostInSupabase(spotId).catch(
+        () => false
+      );
+      return NextResponse.json({
+        ok: dbOk || srvOk,
+        spotId,
+      });
+    }
+
+    if (action === 'ADD_MEMORY_SNAP') {
+      const srvSnap = createMemorySnapInServerStore({
+        postId: body.postId ? String(body.postId) : undefined,
+        petName: String(body.petName || '').trim(),
+        weekNumber: Number(body.weekNumber || 1),
+        imageUrl: String(body.imageUrl || ''),
+        caption: String(body.caption || '').trim(),
+        moodTag: String(body.moodTag || '').trim(),
+        weightKg: body.weightKg ? Number(body.weightKg) : undefined,
+        rescuerName: body.authorName ? String(body.authorName) : undefined,
+        lat: body.lat ? Number(body.lat) : undefined,
+        lng: body.lng ? Number(body.lng) : undefined,
+      });
+
+      const dbSnap = await createMemorySnapInSupabase({
+        postId: body.postId ? String(body.postId) : undefined,
+        authorId: body.authorId ? String(body.authorId) : undefined,
+        authorName: body.authorName ? String(body.authorName) : undefined,
+        authorPhone: body.authorPhone ? String(body.authorPhone) : undefined,
+        petName: String(body.petName || '').trim(),
+        weekNumber: Number(body.weekNumber || 1),
+        imageUrl: String(body.imageUrl || ''),
+        caption: String(body.caption || '').trim(),
+        moodTag: String(body.moodTag || '').trim(),
+        weightKg: body.weightKg ? Number(body.weightKg) : undefined,
+        lat: body.lat ? Number(body.lat) : undefined,
+        lng: body.lng ? Number(body.lng) : undefined,
+      }).catch(() => null);
+
+      return NextResponse.json({
+        ok: true,
+        snap: dbSnap || srvSnap,
+      });
+    }
+
+    return NextResponse.json(
+      { ok: false, error: 'Hành động không hợp lệ.' },
+      { status: 400 }
+    );
+  } catch (err: any) {
+    return NextResponse.json(
+      {
+        ok: false,
+        error: err?.message || 'Không thể xử lý yêu cầu lúc này.',
+      },
+      { status: 400 }
+    );
+  }
+}

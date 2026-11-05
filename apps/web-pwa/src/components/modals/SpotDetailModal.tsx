@@ -86,10 +86,12 @@ export default function SpotDetailModal({
     'NONE' | 'REPORT_SIGHTING' | 'UNLOCK_CONTACT' | 'QR_POSTER'
   >('NONE');
 
+  const [sightingReporterName, setSightingReporterName] = useState('');
   const [sightingNote, setSightingNote] = useState('');
   const [sightingArea, setSightingArea] = useState('');
   const [sightingImage, setSightingImage] = useState<string>('');
   const [uploadingSighting, setUploadingSighting] = useState(false);
+  const [sightingError, setSightingError] = useState<string | null>(null);
 
   const [contactMessage, setContactMessage] = useState('');
   const [contactRequestType, setContactRequestType] = useState<
@@ -111,11 +113,13 @@ export default function SpotDetailModal({
       setActiveSubPanel('NONE');
       setPosterDataUrl(null);
       setSightingArea(userCoords.label);
+      setSightingReporterName(userSession?.displayName || '');
+      setSightingError(null);
       if (bodyScrollRef.current) {
         bodyScrollRef.current.scrollTop = 0;
       }
     }
-  }, [spot?.id, userCoords.label]);
+  }, [spot?.id, userCoords.label, userSession?.displayName]);
 
   useEffect(() => {
     if (!spot || typeof document === 'undefined') return;
@@ -203,22 +207,40 @@ export default function SpotDetailModal({
 
   const handleSubmitSighting = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!sightingNote.trim()) return;
+    const effectiveName = (
+      userSession?.displayName ||
+      sightingReporterName ||
+      ''
+    ).trim();
+    if (effectiveName.length < 2) {
+      setSightingError('Vui lòng nhập tên của bạn (tối thiểu 2 ký tự).');
+      return;
+    }
+    if (!sightingNote.trim()) {
+      setSightingError('Vui lòng mô tả tình trạng và vị trí khi nhìn thấy bé.');
+      return;
+    }
 
     const newSighting: SightingItem = {
       id: `sight-${Date.now()}`,
-      reporterName: userSession?.displayName || 'Người Đi Đường Tốt Bụng',
-      createdAt: 'Vừa xong',
-      note: sightingArea
-        ? `[${sightingArea}] ${sightingNote.trim()}`
+      reporterName: effectiveName,
+      createdAt: new Date().toLocaleString('vi-VN', {
+        hour: '2-digit',
+        minute: '2-digit',
+        day: '2-digit',
+        month: '2-digit',
+      }),
+      note: sightingArea.trim()
+        ? `[${sightingArea.trim()}] ${sightingNote.trim()}`
         : sightingNote.trim(),
-      imageUrl: sightingImage || safeImages[0],
-      emotionTag: 'Vừa bắt gặp',
+      imageUrl: sightingImage,
+      emotionTag: sightingArea.trim() || '',
       distanceFromOriginMeters: distanceMeters,
       lat: userCoords.lat,
       lng: userCoords.lng,
     };
 
+    setSightingError(null);
     onAddSighting(spot.id, newSighting);
     setSightingNote('');
     setSightingImage('');
@@ -553,18 +575,31 @@ export default function SpotDetailModal({
                     <p className="text-xs font-bold text-[#142820]">
                       Đăng bởi: {spot.authorName}
                     </p>
-                    <p className="text-xs text-[#52605A] flex items-center gap-1 mt-0.5">
-                      <Phone className="w-3 h-3" />
-                      {isContactUnlocked ? (
-                        <a
-                          href={`tel:${spot.rawPhoneSecret || '0908123456'}`}
-                          className="font-bold text-[#0E513B] underline"
-                        >
-                          {spot.rawPhoneSecret || '0908123456'} (Bấm để gọi)
-                        </a>
+                    <p className="text-xs text-[#52605A] flex flex-wrap items-center gap-2 mt-0.5">
+                      <Phone className="w-3 h-3 shrink-0" />
+                      {isContactUnlocked && spot.rawPhoneSecret ? (
+                        <span className="inline-flex flex-wrap items-center gap-2">
+                          <a
+                            href={`tel:${spot.rawPhoneSecret}`}
+                            className="font-bold text-[#0E513B] underline"
+                          >
+                            {spot.rawPhoneSecret} (Bấm để gọi)
+                          </a>
+                          <a
+                            href={`https://zalo.me/${spot.rawPhoneSecret.replace(/\D/g, '')}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="px-2 py-0.5 rounded bg-[#E8EFE6] text-[#0E513B] text-[11px] font-bold hover:bg-[#0E513B] hover:text-white transition-colors"
+                          >
+                            Nhắn Zalo
+                          </a>
+                        </span>
                       ) : (
                         <span>
-                          SĐT bảo mật: <strong>{spot.maskedPhone}</strong>
+                          SĐT bảo mật:{' '}
+                          <strong>
+                            {spot.maskedPhone || 'Chưa cung cấp SĐT'}
+                          </strong>
                         </span>
                       )}
                     </p>
@@ -655,6 +690,18 @@ export default function SpotDetailModal({
                     <p className="text-xs font-bold text-[#AF421F]">
                       Báo tin vừa nhìn thấy bé ngoài đường
                     </p>
+                    {!userSession && (
+                      <input
+                        type="text"
+                        value={sightingReporterName}
+                        onChange={(e) =>
+                          setSightingReporterName(e.target.value)
+                        }
+                        placeholder="Tên của bạn (để người đăng biết ai hỗ trợ)..."
+                        className="w-full h-11 px-3 rounded-[10px] bg-[#FAF7F1] border border-[#DDDCD4] text-xs text-[#142820] outline-none focus:border-[#0E513B]"
+                        required
+                      />
+                    )}
                     <input
                       type="text"
                       value={sightingArea}
@@ -670,6 +717,11 @@ export default function SpotDetailModal({
                       className="w-full p-3 rounded-[10px] bg-[#FAF7F1] border border-[#DDDCD4] text-xs text-[#142820] outline-none focus:border-[#0E513B]"
                       required
                     />
+                    {sightingError && (
+                      <p className="text-xs font-bold text-[#AF421F]">
+                        {sightingError}
+                      </p>
+                    )}
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <input
                         ref={sightingFileRef}
@@ -829,6 +881,14 @@ export default function SpotDetailModal({
               >
                 <span>Đọc bài gốc ({platformBadge.shortLabel})</span>
                 <ExternalLink className="w-4 h-4 shrink-0" />
+              </a>
+            ) : isContactUnlocked && spot.rawPhoneSecret ? (
+              <a
+                href={`tel:${spot.rawPhoneSecret}`}
+                className="flex-1 min-h-[48px] px-4 rounded-[10px] bg-[#0E513B] hover:bg-[#0A412F] text-white text-sm font-bold flex items-center justify-center gap-2 transition-colors shadow-sm"
+              >
+                <Phone className="w-4 h-4 shrink-0" />
+                <span>Gọi ngay: {spot.rawPhoneSecret}</span>
               </a>
             ) : (
               <button

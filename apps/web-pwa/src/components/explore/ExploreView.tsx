@@ -23,6 +23,7 @@ import {
   OriginFilter,
   RegionFilter,
   getSpotBadgeMeta,
+  isUserWebPost,
 } from '@/lib/types';
 import { calculateDistanceMeters } from '@/lib/security';
 import { isSpotPinAllowedOnMap } from '@/lib/spot-validation';
@@ -225,6 +226,16 @@ export default function ExploreView({
         if (scoreB !== scoreA) return scoreB - scoreA;
       }
 
+      if (Boolean(a.isEmergencyBoosted) !== Boolean(b.isEmergencyBoosted)) {
+        return a.isEmergencyBoosted ? -1 : 1;
+      }
+
+      const aIsUser = isUserWebPost(a);
+      const bIsUser = isUserWebPost(b);
+      if (aIsUser !== bIsUser) {
+        return aIsUser ? -1 : 1;
+      }
+
       if (sortBy === 'URGENT') {
         const score = (s: DomSpot) =>
           s.spotType === 'RED_SOS'
@@ -238,7 +249,7 @@ export default function ExploreView({
         if (diff !== 0) return diff;
       }
 
-      if (sortBy === 'NEAREST') {
+      if (sortBy === 'NEAREST' && !aIsUser && !bIsUser) {
         const aExact = isSpotPinAllowedOnMap(a);
         const bExact = isSpotPinAllowedOnMap(b);
         if (aExact && !bExact) return -1;
