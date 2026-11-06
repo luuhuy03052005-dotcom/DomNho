@@ -10,6 +10,8 @@ import {
   SpotStatus,
   SpotType,
   SpotVisibility,
+  deterministicAccountIdFromPhone,
+  normalizePhoneDigits,
 } from './types';
 import {
   calculateDistanceMeters,
@@ -172,7 +174,7 @@ export function authenticateOrRegisterInServerStore(params: {
   const cleanName = (params.displayName || '').trim();
   const cleanPhone = (params.rawPhone || '').trim();
   const cleanPin = (params.pinCode || '').trim();
-  const normalizedPhone = cleanPhone.replace(/\D/g, '');
+  const normalizedPhone = normalizePhoneDigits(cleanPhone);
 
   if (normalizedPhone.length < 9 || normalizedPhone.length > 15) {
     throw new Error('Vui lòng nhập số điện thoại hợp lệ (từ 9 đến 11 chữ số).');
@@ -221,7 +223,7 @@ export function authenticateOrRegisterInServerStore(params: {
       params.id
     )
       ? params.id
-      : crypto.randomUUID();
+      : deterministicAccountIdFromPhone(normalizedPhone);
 
   const nowIso = new Date().toISOString();
   const record: ServerAccountRecord = {
@@ -278,7 +280,7 @@ export function createSpotInServerStore(params: {
 } {
   const store = loadServerCommunityStore();
   const cleanPhone = (params.rawPhone || '').trim();
-  const normalizedPhone = cleanPhone.replace(/\D/g, '');
+  const normalizedPhone = normalizePhoneDigits(cleanPhone);
   const today = new Date().toISOString().slice(0, 10);
 
   let account = store.accounts[normalizedPhone];
@@ -289,7 +291,7 @@ export function createSpotInServerStore(params: {
         params.authorId
       )
         ? params.authorId
-        : crypto.randomUUID();
+        : deterministicAccountIdFromPhone(normalizedPhone);
     const nowIso = new Date().toISOString();
     account = {
       id: profileId,
@@ -706,14 +708,18 @@ export function updateSpotInServerStore(params: {
 }): DomSpot | null {
   const store = loadServerCommunityStore();
   const cleanPhone = (params.rawPhone || '').trim();
-  const normalizedPhone = cleanPhone.replace(/\D/g, '');
+  const normalizedPhone = normalizePhoneDigits(cleanPhone);
   const idx = store.posts.findIndex((p) => p.spot.id === params.spotId);
 
   if (idx >= 0) {
     const rec = store.posts[idx];
-    const recPhoneNorm = (rec.rawPhone || '').replace(/\D/g, '');
+    const recPhoneNorm = normalizePhoneDigits(rec.rawPhone);
+    const detAuthorId = normalizedPhone
+      ? deterministicAccountIdFromPhone(normalizedPhone)
+      : '';
     const isOwnerById = Boolean(
-      params.authorId && rec.spot.authorId === params.authorId
+      (params.authorId && rec.spot.authorId === params.authorId) ||
+        (detAuthorId && rec.spot.authorId === detAuthorId)
     );
     const isOwnerByPhone = Boolean(
       normalizedPhone && recPhoneNorm && normalizedPhone === recPhoneNorm
@@ -732,9 +738,13 @@ export function updateSpotInServerStore(params: {
       typeof params.exactLng === 'number' && params.exactLng > 0
         ? params.exactLng
         : rec.exactLng;
-    const coordsChanged =
-      Math.abs(nextExactLat - rec.exactLat) > 0.0001 ||
-      Math.abs(nextExactLng - rec.exactLng) > 0.0001;
+    const matchesOldExact =
+      Math.abs(nextExactLat - rec.exactLat) <= 0.0001 &&
+      Math.abs(nextExactLng - rec.exactLng) <= 0.0001;
+    const matchesOldPublic =
+      Math.abs(nextExactLat - rec.spot.publicLat) <= 0.0001 &&
+      Math.abs(nextExactLng - rec.spot.publicLng) <= 0.0001;
+    const coordsChanged = !matchesOldExact && !matchesOldPublic;
 
     const fuzzed =
       params.publicLat && params.publicLng
@@ -745,14 +755,22 @@ export function updateSpotInServerStore(params: {
           }
         : coordsChanged && params.hasExactLocation && nextExactLat && nextExactLng
         ? fuzzCoordinates(nextExactLat, nextExactLng)
+        : !params.hasExactLocation
+        ? {
+            publicLat: 0,
+            publicLng: 0,
+            fuzzRadiusMeters: 200,
+          }
         : {
             publicLat: rec.spot.publicLat,
             publicLng: rec.spot.publicLng,
             fuzzRadiusMeters: rec.spot.fuzzRadiusMeters || 200,
           };
 
-    rec.exactLat = nextExactLat;
-    rec.exactLng = nextExactLng;
+    if (coordsChanged) {
+      rec.exactLat = nextExactLat;
+      rec.exactLng = nextExactLng;
+    }
     if (cleanPhone) {
       rec.rawPhone = cleanPhone;
     }
@@ -806,15 +824,19 @@ export function deleteSpotInServerStore(params: {
   skipOwnershipCheck?: boolean;
 }): boolean {
   const store = loadServerCommunityStore();
-  const normalizedPhone = (params.rawPhone || '').replace(/\D/g, '');
+  const normalizedPhone = normalizePhoneDigits(params.rawPhone);
   const idx = store.posts.findIndex((p) => p.spot.id === params.spotId);
 
   if (idx >= 0) {
     const rec = store.posts[idx];
+    const recPhoneNorm = normalizePhoneDigits(rec.rawPhone);
     if (!params.skipOwnershipCheck) {
-      const recPhoneNorm = (rec.rawPhone || '').replace(/\D/g, '');
+      const detAuthorId = normalizedPhone
+        ? deterministicAccountIdFromPhone(normalizedPhone)
+        : '';
       const isOwnerById = Boolean(
-        params.authorId && rec.spot.authorId === params.authorId
+        (params.authorId && rec.spot.authorId === params.authorId) ||
+          (detAuthorId && rec.spot.authorId === detAuthorId)
       );
       const isOwnerByPhone = Boolean(
         normalizedPhone && recPhoneNorm && normalizedPhone === recPhoneNorm
@@ -825,6 +847,23 @@ export function deleteSpotInServerStore(params: {
         );
       }
     }
+
+    // Hoàn lại hạn mức đăng bài trong ngày (3 bài/ngày) nếu xóa bài vừa đăng hôm nay
+    const today = new Date().toISOString().slice(0, 10);
+    const postCreatedDate = String(rec.spot.createdAt || '').slice(0, 10);
+    if (postCreatedDate === today) {
+      const ownerAccount =
+        (recPhoneNorm && store.accounts[recPhoneNorm]) ||
+        (normalizedPhone && store.accounts[normalizedPhone]) ||
+        Object.values(store.accounts).find((acc) => acc.id === rec.spot.authorId);
+      if (ownerAccount && ownerAccount.lastPostDate === today) {
+        ownerAccount.dailyPostCount = Math.max(
+          0,
+          (ownerAccount.dailyPostCount || 1) - 1
+        );
+      }
+    }
+
     store.posts.splice(idx, 1);
   }
 

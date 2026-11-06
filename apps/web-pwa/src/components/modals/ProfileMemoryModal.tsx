@@ -27,6 +27,7 @@ import {
   ThemeId,
   UserSession,
   getSpotBadgeMeta,
+  isSpotOwnedByUser,
 } from '@/lib/types';
 import { compressImageToWebpClient } from '@/lib/image-compressor';
 
@@ -128,7 +129,7 @@ export default function ProfileMemoryModal({
   if (!isOpen || !mounted || typeof document === 'undefined') return null;
 
   const mySpots = userSession
-    ? spots.filter((s) => s.authorId === userSession.id)
+    ? spots.filter((s) => isSpotOwnedByUser(s, userSession))
     : [];
 
   const handleSnapFileChange = async (

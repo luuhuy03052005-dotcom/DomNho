@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { INITIAL_DOM_SPOTS } from '@/lib/seed-data';
 import { findDoubleMatchesWithin3Km } from '@/lib/security';
 import { fetchCommunitySpotsFromSupabase } from '@/lib/supabase';
+import {
+  listCommunitySpotsFromServerStore,
+  listDeletedSpotIdsFromServerStore,
+} from '@/lib/server-community-store';
 import { DomSpot } from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
@@ -9,7 +13,7 @@ export const dynamic = 'force-dynamic';
 /**
  * POST /api/match
  * Quét thuật toán Khớp Lệnh Kép (Double-Match) trong bán kính 3.000m (3km)
- * đối chiếu với toàn bộ bài đăng thực tế từ Supabase và dữ liệu xác thực.
+ * đối chiếu với toàn bộ bài đăng thực tế từ Supabase, kho lưu trữ cộng đồng và dữ liệu xác thực.
  */
 export async function POST(request: NextRequest) {
   try {
@@ -18,10 +22,18 @@ export async function POST(request: NextRequest) {
     const targetLat = Number(body.publicLat ?? body.lat ?? 0);
     const targetLng = Number(body.publicLng ?? body.lng ?? 0);
 
+    const deletedIds = new Set(listDeletedSpotIdsFromServerStore());
+    const serverSpots = listCommunitySpotsFromServerStore();
     const communitySpots = await fetchCommunitySpotsFromSupabase().catch(
       () => [] as DomSpot[]
     );
-    const pool = [...communitySpots, ...INITIAL_DOM_SPOTS];
+    const seenIds = new Set<string>();
+    const pool: DomSpot[] = [];
+    for (const sp of [...serverSpots, ...communitySpots, ...INITIAL_DOM_SPOTS]) {
+      if (!sp?.id || deletedIds.has(sp.id) || seenIds.has(sp.id)) continue;
+      seenIds.add(sp.id);
+      pool.push(sp);
+    }
 
     const targetSpot: DomSpot = {
       id: String(body.id || ''),

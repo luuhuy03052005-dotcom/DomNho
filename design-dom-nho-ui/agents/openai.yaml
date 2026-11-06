@@ -1,14 +1,14 @@
 interface:
-  display_name: Đốm Nhỏ · Thiết kế giao diện
-  short_description: Thiết kế Đốm Nhỏ theo mẫu, dễ dùng trên điện thoại
-  default_prompt: Dùng $design-dom-nho-ui để thiết kế giao diện Đốm Nhỏ theo ảnh mẫu,
-    tối ưu desktop và điện thoại, không che nội dung hoặc nút thao tác.
+  display_name: Đốm Nhỏ · UI/UX và hiệu năng
+  short_description: UI/UX đúng nghiệp vụ, đo độ mượt desktop và mobile
+  default_prompt: Dùng $design-dom-nho-ui để triển khai giao diện Đốm Nhỏ theo ba
+    ảnh chuẩn, giữ bản đồ mobile gọn, nối đúng nghiệp vụ và đo hiệu năng trước–sau.
   icon_small: assets/icon.svg
   icon_large: assets/icon.svg
 policy:
+  allow_implicit_invocation: true
   products:
   - chatgpt
   - codex
   - api
   - atlas
-  allow_implicit_invocation: true

@@ -35,6 +35,7 @@ import {
   getFriendlySourceName,
   getPlatformBadgeMeta,
   getSpotBadgeMeta,
+  isSpotOwnedByUser,
   isUserWebPost,
 } from '@/lib/types';
 import { calculateDistanceMeters, formatDistanceVi } from '@/lib/security';
@@ -169,7 +170,7 @@ export default function SpotDetailModal({
       )
     : 0;
 
-  const isAuthor = Boolean(userSession && spot.authorId === userSession.id);
+  const isAuthor = isSpotOwnedByUser(spot, userSession);
   const isContactUnlocked = Boolean(
     isAuthor || spot.isContactUnlockedForViewer
   );

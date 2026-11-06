@@ -148,6 +148,71 @@ export function isUserWebPost(spot: Pick<DomSpot, 'sourceType'>): boolean {
   return spot.sourceType === 'USER_POST';
 }
 
+export function normalizePhoneDigits(rawPhone?: string | null): string {
+  const digits = String(rawPhone || '').replace(/\D/g, '');
+  if (digits.startsWith('84') && digits.length >= 10) {
+    return '0' + digits.slice(2);
+  }
+  return digits;
+}
+
+export function deterministicAccountIdFromPhone(rawPhone?: string | null): string {
+  const clean = normalizePhoneDigits(rawPhone);
+  if (!clean) return '00000000-0000-4000-8000-000000000000';
+  const seedA = `dom_nho_uid_a:${clean}`;
+  const seedB = `dom_nho_uid_b:${clean}`;
+  const seedC = `dom_nho_uid_c:${clean}`;
+  const seedD = `dom_nho_uid_d:${clean}`;
+
+  const fnv32 = (str: string, init: number) => {
+    let h = init >>> 0;
+    for (let i = 0; i < str.length; i++) {
+      h ^= str.charCodeAt(i);
+      h = Math.imul(h, 0x01000193) >>> 0;
+    }
+    return h.toString(16).padStart(8, '0');
+  };
+
+  const p1 = fnv32(seedA, 0x811c9dc5);
+  const p2 = fnv32(seedB, 0x9e3779b9);
+  const p3 = fnv32(seedC, 0x85ebca6b);
+  const p4 = fnv32(seedD, 0xc2b2ae35);
+
+  return `${p1}-${p2.slice(0, 4)}-4${p2.slice(5, 8)}-8${p3.slice(1, 4)}-${p3.slice(4, 8)}${p4}`;
+}
+
+export function isSpotOwnedByUser(
+  spot: Pick<DomSpot, 'sourceType' | 'authorId' | 'rawPhoneSecret'>,
+  sessionOrUserId?: UserSession | string | null
+): boolean {
+  if (!isUserWebPost(spot)) return false;
+  if (!sessionOrUserId) return false;
+
+  if (typeof sessionOrUserId === 'string') {
+    return Boolean(spot.authorId && spot.authorId === sessionOrUserId);
+  }
+
+  if (spot.authorId && spot.authorId === sessionOrUserId.id) {
+    return true;
+  }
+
+  if (sessionOrUserId.rawPhone) {
+    const detId = deterministicAccountIdFromPhone(sessionOrUserId.rawPhone);
+    if (spot.authorId && spot.authorId === detId) {
+      return true;
+    }
+    if (spot.rawPhoneSecret) {
+      const spotPhone = normalizePhoneDigits(spot.rawPhoneSecret);
+      const userPhone = normalizePhoneDigits(sessionOrUserId.rawPhone);
+      if (spotPhone.length >= 8 && spotPhone === userPhone) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
 export interface SpotBadgeMeta {
   label: string;
   uppercaseLabel: string;

@@ -74,6 +74,7 @@ export async function GET(request: NextRequest) {
         ok: true,
         query: q,
         results: candidates,
+        candidates,
       });
     }
 

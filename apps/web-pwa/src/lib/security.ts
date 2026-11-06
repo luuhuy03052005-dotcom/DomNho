@@ -8,16 +8,19 @@ export function fuzzCoordinates(
   exactLat: number,
   exactLng: number
 ): { publicLat: number; publicLng: number; fuzzRadiusMeters: number } {
-  const signLat = Math.random() >= 0.5 ? 1 : -1;
-  const signLng = Math.random() >= 0.5 ? 1 : -1;
-  // 0.0014 - 0.0022 độ tương đương ~160m - 250m ngoài thực tế
-  const offsetLat = signLat * (0.0014 + Math.random() * 0.0008);
-  const offsetLng = signLng * (0.0014 + Math.random() * 0.0008);
+  const distanceMeters = 155 + Math.random() * 135; // 155m - 290m (chuẩn biên độ 150m - 300m)
+  const angleRad = Math.random() * 2 * Math.PI;
+  const latRad = (exactLat * Math.PI) / 180;
+  const metersPerDegLat = 111320;
+  const metersPerDegLng = Math.max(10000, 111320 * Math.cos(latRad));
+
+  const offsetLat = (distanceMeters * Math.cos(angleRad)) / metersPerDegLat;
+  const offsetLng = (distanceMeters * Math.sin(angleRad)) / metersPerDegLng;
 
   return {
     publicLat: Number((exactLat + offsetLat).toFixed(6)),
     publicLng: Number((exactLng + offsetLng).toFixed(6)),
-    fuzzRadiusMeters: 200,
+    fuzzRadiusMeters: Math.round(distanceMeters),
   };
 }
 
@@ -78,14 +81,19 @@ export interface RateLimitCheck {
   reason?: string;
 }
 
-export function checkAndIncrementDeviceRateLimit(): RateLimitCheck {
+export function checkAndIncrementDeviceRateLimit(
+  accountKey?: string
+): RateLimitCheck {
   if (typeof window === 'undefined') {
     return { allowed: true, isShadowbanned: false, remainingToday: 3 };
   }
 
+  const storageKey = accountKey
+    ? `${RATE_LIMIT_KEY}_${accountKey.replace(/\W/g, '')}`
+    : RATE_LIMIT_KEY;
   const today = new Date().toISOString().slice(0, 10);
   try {
-    const raw = window.localStorage.getItem(RATE_LIMIT_KEY);
+    const raw = window.localStorage.getItem(storageKey);
     const parsed = raw
       ? JSON.parse(raw)
       : { date: today, count: 0, spamAttempts: 0, shadowbanned: false };
@@ -110,25 +118,25 @@ export function checkAndIncrementDeviceRateLimit(): RateLimitCheck {
       // Nếu cố tình spam liên tục quá 6 lần trong ngày -> kích hoạt Shadowban
       if (parsed.spamAttempts >= 4) {
         parsed.shadowbanned = true;
-        window.localStorage.setItem(RATE_LIMIT_KEY, JSON.stringify(parsed));
+        window.localStorage.setItem(storageKey, JSON.stringify(parsed));
         return {
           allowed: true,
           isShadowbanned: true,
           remainingToday: 0,
         };
       }
-      window.localStorage.setItem(RATE_LIMIT_KEY, JSON.stringify(parsed));
+      window.localStorage.setItem(storageKey, JSON.stringify(parsed));
       return {
         allowed: false,
         isShadowbanned: false,
         remainingToday: 0,
         reason:
-          'Để bảo vệ bản đồ khỏi tin rác, mỗi thiết bị được Thắp Đốm tối đa 3 lần/ngày. Bạn vẫn có thể Báo tin bắt gặp hoặc Truyền Lửa không giới hạn!',
+          'Để bảo vệ bản đồ khỏi tin rác, mỗi tài khoản được đăng tối đa 3 bài/ngày. Bạn vẫn có thể Báo tin bắt gặp hoặc Tiếp thêm hy vọng không giới hạn!',
       };
     }
 
     parsed.count += 1;
-    window.localStorage.setItem(RATE_LIMIT_KEY, JSON.stringify(parsed));
+    window.localStorage.setItem(storageKey, JSON.stringify(parsed));
     return {
       allowed: true,
       isShadowbanned: false,
@@ -136,6 +144,25 @@ export function checkAndIncrementDeviceRateLimit(): RateLimitCheck {
     };
   } catch {
     return { allowed: true, isShadowbanned: false, remainingToday: 2 };
+  }
+}
+
+export function decrementDeviceRateLimit(accountKey?: string): void {
+  if (typeof window === 'undefined') return;
+  const storageKey = accountKey
+    ? `${RATE_LIMIT_KEY}_${accountKey.replace(/\W/g, '')}`
+    : RATE_LIMIT_KEY;
+  const today = new Date().toISOString().slice(0, 10);
+  try {
+    const raw = window.localStorage.getItem(storageKey);
+    if (!raw) return;
+    const parsed = JSON.parse(raw);
+    if (parsed.date === today && typeof parsed.count === 'number' && parsed.count > 0) {
+      parsed.count = Math.max(0, parsed.count - 1);
+      window.localStorage.setItem(storageKey, JSON.stringify(parsed));
+    }
+  } catch {
+    // ignore
   }
 }
 
@@ -180,6 +207,16 @@ export function findDoubleMatchesWithin3Km(
     return [];
   }
 
+  if (
+    newSpot.hasExactLocation === false ||
+    !Number.isFinite(newSpot.publicLat) ||
+    !Number.isFinite(newSpot.publicLng) ||
+    newSpot.publicLat <= 0 ||
+    newSpot.publicLng <= 0
+  ) {
+    return [];
+  }
+
   const targetOppositeType =
     newSpot.spotType === 'ORANGE_SIGHT' ? 'RED_SOS' : 'ORANGE_SIGHT';
 
@@ -189,8 +226,14 @@ export function findDoubleMatchesWithin3Km(
     if (
       candidate.id === newSpot.id ||
       candidate.spotType !== targetOppositeType ||
+      candidate.status === 'RESOLVED' ||
       candidate.status === 'FADED' ||
-      candidate.status === 'SHADOWBANNED'
+      candidate.status === 'SHADOWBANNED' ||
+      candidate.hasExactLocation === false ||
+      !Number.isFinite(candidate.publicLat) ||
+      !Number.isFinite(candidate.publicLng) ||
+      candidate.publicLat <= 0 ||
+      candidate.publicLng <= 0
     ) {
       continue;
     }

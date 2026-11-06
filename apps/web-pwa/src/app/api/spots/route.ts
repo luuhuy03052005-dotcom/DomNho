@@ -68,20 +68,49 @@ export async function GET(request: NextRequest) {
     ? listMemorySnapsFromServerStore()
     : [];
 
-  const seenSpotIds = new Set<string>();
-  const communitySpots: DomSpot[] = [];
-  for (const sp of [...serverSpots, ...dbSpots]) {
-    if (!sp || seenSpotIds.has(sp.id) || deletedSet.has(sp.id)) continue;
-    seenSpotIds.add(sp.id);
-    communitySpots.push(sp);
+  const spotMap = new Map<string, DomSpot>();
+  for (const sp of [...serverSpots, ...dbSpots, ...INITIAL_DOM_SPOTS]) {
+    if (!sp || !sp.id || deletedSet.has(sp.id)) continue;
+    const prev = spotMap.get(sp.id);
+    if (!prev) {
+      spotMap.set(sp.id, sp);
+      continue;
+    }
+    const seenSightingIds = new Set<string>();
+    const mergedSightings = [
+      ...(prev.sightings || []),
+      ...(sp.sightings || []),
+    ].filter((st) => {
+      if (!st?.id || seenSightingIds.has(st.id)) return false;
+      seenSightingIds.add(st.id);
+      return true;
+    });
+    const isResolved =
+      prev.status === 'RESOLVED' ||
+      sp.status === 'RESOLVED' ||
+      prev.spotType === 'GREEN_PEACE' ||
+      sp.spotType === 'GREEN_PEACE';
+
+    spotMap.set(sp.id, {
+      ...sp,
+      ...prev,
+      spotType: isResolved ? 'GREEN_PEACE' : prev.spotType,
+      status: isResolved ? 'RESOLVED' : prev.status,
+      lightPower: Math.max(prev.lightPower || 0, sp.lightPower || 0),
+      boostCount: Math.max(prev.boostCount || 0, sp.boostCount || 0),
+      isEmergencyBoosted: Boolean(
+        prev.isEmergencyBoosted || sp.isEmergencyBoosted
+      ),
+      isContactUnlockedForViewer: Boolean(
+        prev.isContactUnlockedForViewer || sp.isContactUnlockedForViewer
+      ),
+      rawPhoneSecret: prev.rawPhoneSecret || sp.rawPhoneSecret,
+      zaloLink: prev.zaloLink || sp.zaloLink,
+      sightings: mergedSightings,
+    });
   }
 
-  const combinedSpots: DomSpot[] = [...communitySpots];
-  for (const spot of INITIAL_DOM_SPOTS) {
-    if (!spot || seenSpotIds.has(spot.id) || deletedSet.has(spot.id)) continue;
-    seenSpotIds.add(spot.id);
-    combinedSpots.push(spot);
-  }
+  const combinedSpots: DomSpot[] = Array.from(spotMap.values());
 
   const seenMemIds = new Set<string>();
   const memorySnaps: MemorySnap[] = [];
@@ -125,7 +154,7 @@ export async function GET(request: NextRequest) {
     ok: true,
     count: visibleSpots.length,
     spots: visibleSpots,
-    communityCount: communitySpots.length,
+    communityCount: visibleSpots.filter((s) => s.sourceType === 'USER_POST').length,
     deletedSpotIds,
     memorySnaps,
     vetStations: VET_EMERGENCY_STATIONS,

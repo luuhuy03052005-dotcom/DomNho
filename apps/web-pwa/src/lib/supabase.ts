@@ -8,6 +8,8 @@ import {
   SpotType,
   SpotVisibility,
   UserSession,
+  deterministicAccountIdFromPhone,
+  normalizePhoneDigits,
 } from './types';
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
@@ -270,7 +272,7 @@ export async function registerZeroVerificationUser(params: {
   const cleanName = (params.displayName || '').trim();
   const cleanPin = (params.pinCode || '').trim();
   const cleanPhone = (params.rawPhone || '').trim();
-  const normalizedPhone = cleanPhone.replace(/\D/g, '');
+  const normalizedPhone = normalizePhoneDigits(cleanPhone);
 
   if (normalizedPhone.length < 9 || normalizedPhone.length > 15) {
     throw new Error('Vui lòng nhập số điện thoại hợp lệ (từ 9 đến 11 chữ số).');
@@ -286,7 +288,8 @@ export async function registerZeroVerificationUser(params: {
   const registry = loadLocalAccountsRegistry();
   const localExisting = registry[normalizedPhone];
 
-  let profileId = localExisting?.id || generateUuidV4();
+  let profileId =
+    localExisting?.id || deterministicAccountIdFromPhone(normalizedPhone);
   let finalDisplayName = cleanName || localExisting?.displayName || '';
   let patrolModeActive = localExisting?.patrolModeActive ?? true;
   let isShadowbanned = false;

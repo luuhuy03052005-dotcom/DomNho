@@ -246,8 +246,13 @@ export default function LocationMapPickerModal({
     try {
       const res = await fetch(`/api/geocode?q=${encodeURIComponent(query)}`);
       const data = await res.json();
-      if (data.ok && Array.isArray(data.candidates)) {
-        setSearchResults(data.candidates);
+      const candidateList = Array.isArray(data?.results)
+        ? data.results
+        : Array.isArray(data?.candidates)
+        ? data.candidates
+        : [];
+      if (data.ok && candidateList.length > 0) {
+        setSearchResults(candidateList);
       }
     } catch {
       // ignore search error

@@ -21,8 +21,11 @@ import {
   DomSpot,
   ExploreCategory,
   OriginFilter,
+  PlatformFilter,
   RegionFilter,
+  UserSession,
   getSpotBadgeMeta,
+  isSpotOwnedByUser,
   isUserWebPost,
 } from '@/lib/types';
 import { calculateDistanceMeters } from '@/lib/security';
@@ -49,11 +52,14 @@ interface ExploreViewProps {
   onChangeRegionFilter: (reg: RegionFilter) => void;
   originFilter: OriginFilter;
   onChangeOriginFilter: (origin: OriginFilter) => void;
+  platformFilter?: PlatformFilter;
+  onChangePlatformFilter?: (p: PlatformFilter) => void;
   isSavedView?: boolean;
   onBackToExplore?: () => void;
   onTriggerUpdate?: () => void;
   isUpdating?: boolean;
   currentUserId?: string;
+  userSession?: UserSession | null;
   onEditSpot?: (spot: DomSpot) => void;
   onDeleteSpot?: (spotId: string) => void;
 }
@@ -95,11 +101,14 @@ export default function ExploreView({
   onChangeRegionFilter,
   originFilter,
   onChangeOriginFilter,
+  platformFilter = 'ALL',
+  onChangePlatformFilter,
   isSavedView = false,
   onBackToExplore,
   onTriggerUpdate,
   isUpdating = false,
   currentUserId,
+  userSession,
   onEditSpot,
   onDeleteSpot,
 }: ExploreViewProps) {
@@ -255,7 +264,7 @@ export default function ExploreView({
         if (diff !== 0) return diff;
       }
 
-      if (sortBy === 'NEAREST' && !aIsUser && !bIsUser) {
+      if (sortBy === 'NEAREST') {
         const aExact = isSpotPinAllowedOnMap(a);
         const bExact = isSpotPinAllowedOnMap(b);
         if (aExact && !bExact) return -1;
@@ -299,7 +308,8 @@ export default function ExploreView({
   const activeFiltersCount =
     (category !== 'ALL' ? 1 : 0) +
     (regionFilter !== 'ALL' ? 1 : 0) +
-    (originFilter !== 'ALL' ? 1 : 0);
+    (originFilter !== 'ALL' ? 1 : 0) +
+    (originFilter !== 'USER_POST' && platformFilter !== 'ALL' ? 1 : 0);
 
   return (
     <div className="w-full min-h-screen bg-[#FAF7F1] pb-10 md:pb-12 text-[#142820]">
@@ -668,6 +678,7 @@ export default function ExploreView({
                       setSearchQuery('');
                       onChangeRegionFilter('ALL');
                       onChangeOriginFilter('ALL');
+                      onChangePlatformFilter?.('ALL');
                     }
                   }}
                   className="min-h-[42px] px-4 py-2 rounded-[10px] bg-[#0E513B] text-white text-xs font-bold inline-flex items-center gap-1.5"
@@ -692,8 +703,9 @@ export default function ExploreView({
                     onSelectDetail={onSelectDetail}
                     onToggleSave={onToggleSaveSpot}
                     isSaved={savedSpotIds.has(spot.id)}
-                    isAuthor={Boolean(
-                      currentUserId && spot.authorId === currentUserId
+                    isAuthor={isSpotOwnedByUser(
+                      spot,
+                      userSession || currentUserId
                     )}
                     onEditSpot={onEditSpot}
                     onDeleteSpot={onDeleteSpot}

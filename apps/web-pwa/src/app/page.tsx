@@ -32,7 +32,9 @@ import {
   ThemeId,
   UserSession,
   VetStation,
+  detectPlatformFromUrl,
   detectRegionFromAddress,
+  isSpotOwnedByUser,
   isUserWebPost,
 } from '@/lib/types';
 import { DOM_THEMES } from '@/lib/themes';
@@ -45,6 +47,7 @@ import {
 import {
   checkAndIncrementBoostRateLimit,
   checkAndIncrementDeviceRateLimit,
+  decrementDeviceRateLimit,
   findDoubleMatchesWithin3Km,
 } from '@/lib/security';
 import {
@@ -220,6 +223,18 @@ export default function DomNhoHomePage() {
       }
     }
 
+    const savedMemories = window.localStorage.getItem(MEMORY_STORAGE_KEY);
+    if (savedMemories) {
+      try {
+        const parsed = JSON.parse(savedMemories) as MemorySnap[];
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setMemorySnaps(parsed);
+        }
+      } catch {
+        window.localStorage.removeItem(MEMORY_STORAGE_KEY);
+      }
+    }
+
     loadPermanentSession().then((session) => {
       if (session) {
         setUserSession(session);
@@ -282,7 +297,16 @@ export default function DomNhoHomePage() {
         }
 
         if (Array.isArray(data.memorySnaps) && data.memorySnaps.length > 0) {
-          setMemorySnaps(data.memorySnaps as MemorySnap[]);
+          setMemorySnaps((prev) => {
+            const seen = new Set<string>();
+            const merged: MemorySnap[] = [];
+            for (const m of [...(data.memorySnaps as MemorySnap[]), ...prev]) {
+              if (!m?.id || seen.has(m.id)) continue;
+              seen.add(m.id);
+              merged.push(m);
+            }
+            return merged;
+          });
         }
       } catch {
         // Giữ danh sách hiện có nếu ngoại tuyến
@@ -436,8 +460,33 @@ export default function DomNhoHomePage() {
 
         if (trusted.length > 0) {
           updateSpotsAndPersist((prev) => {
+            const prevMap = new Map(prev.map((s) => [s.id, s]));
             const userPosts = prev.filter((s) => s.sourceType === 'USER_POST');
-            return [...userPosts, ...trusted];
+            const mergedCrawled = trusted.map((sp) => {
+              const old = prevMap.get(sp.id);
+              if (!old) return sp;
+              return {
+                ...sp,
+                lightPower: Math.max(old.lightPower || 0, sp.lightPower || 0),
+                boostCount: Math.max(old.boostCount || 0, sp.boostCount || 0),
+                status:
+                  old.status === 'RESOLVED' ? 'RESOLVED' : sp.status,
+                spotType:
+                  old.spotType === 'GREEN_PEACE' ? 'GREEN_PEACE' : sp.spotType,
+                isEmergencyBoosted: Boolean(
+                  old.isEmergencyBoosted || sp.isEmergencyBoosted
+                ),
+                isContactUnlockedForViewer: Boolean(
+                  old.isContactUnlockedForViewer ||
+                    sp.isContactUnlockedForViewer
+                ),
+                sightings:
+                  Array.isArray(old.sightings) && old.sightings.length > 0
+                    ? old.sightings
+                    : sp.sightings,
+              };
+            });
+            return [...userPosts, ...mergedCrawled];
           });
           if (
             Array.isArray(data.savedGoogleMapsPlaces) &&
@@ -507,8 +556,33 @@ export default function DomNhoHomePage() {
         const trusted = filterTrustedSpots(data.spots);
         if (trusted.length > 0) {
           updateSpotsAndPersist((prev) => {
+            const prevMap = new Map(prev.map((s) => [s.id, s]));
             const userPosts = prev.filter((s) => s.sourceType === 'USER_POST');
-            return [...userPosts, ...trusted];
+            const mergedCrawled = trusted.map((sp) => {
+              const old = prevMap.get(sp.id);
+              if (!old) return sp;
+              return {
+                ...sp,
+                lightPower: Math.max(old.lightPower || 0, sp.lightPower || 0),
+                boostCount: Math.max(old.boostCount || 0, sp.boostCount || 0),
+                status:
+                  old.status === 'RESOLVED' ? 'RESOLVED' : sp.status,
+                spotType:
+                  old.spotType === 'GREEN_PEACE' ? 'GREEN_PEACE' : sp.spotType,
+                isEmergencyBoosted: Boolean(
+                  old.isEmergencyBoosted || sp.isEmergencyBoosted
+                ),
+                isContactUnlockedForViewer: Boolean(
+                  old.isContactUnlockedForViewer ||
+                    sp.isContactUnlockedForViewer
+                ),
+                sightings:
+                  Array.isArray(old.sightings) && old.sightings.length > 0
+                    ? old.sightings
+                    : sp.sightings,
+              };
+            });
+            return [...userPosts, ...mergedCrawled];
           });
         }
       })
@@ -631,7 +705,8 @@ export default function DomNhoHomePage() {
             return;
           }
 
-          const rateCheck = checkAndIncrementDeviceRateLimit();
+          const accountRateKey = session.rawPhone || session.id;
+          const rateCheck = checkAndIncrementDeviceRateLimit(accountRateKey);
           if (!rateCheck.allowed) {
             showToast(
               'Giới hạn tạo tin',
@@ -674,6 +749,7 @@ export default function DomNhoHomePage() {
 
             const data = await res.json().catch(() => null);
             if (!res.ok || !data?.ok || !data.spot) {
+              decrementDeviceRateLimit(accountRateKey);
               showToast(
                 'Không thể đăng tin',
                 data?.error ||
@@ -756,6 +832,7 @@ export default function DomNhoHomePage() {
               'success'
             );
           } catch {
+            decrementDeviceRateLimit(accountRateKey);
             showToast(
               'Lỗi kết nối máy chủ',
               'Không thể lưu bài viết lên hệ thống lúc này. Vui lòng thử lại.',
@@ -928,6 +1005,7 @@ export default function DomNhoHomePage() {
             return;
           }
 
+          decrementDeviceRateLimit(session.rawPhone || session.id);
           updateSpotsAndPersist((prev) =>
             prev.filter((s) => s.id !== spotId)
           );
@@ -1053,17 +1131,19 @@ export default function DomNhoHomePage() {
 
   const handleResolveSpotToPeace = useCallback(
     async (spotId: string) => {
+      let resolvedSpotToBroadcast: DomSpot | null = null;
       updateSpotsAndPersist((prev) =>
-        prev.map((s) =>
-          s.id === spotId
-            ? {
-                ...s,
-                spotType: 'GREEN_PEACE',
-                status: 'RESOLVED',
-                lightPower: 200,
-              }
-            : s
-        )
+        prev.map((s) => {
+          if (s.id !== spotId) return s;
+          const updated: DomSpot = {
+            ...s,
+            spotType: 'GREEN_PEACE',
+            status: 'RESOLVED',
+            lightPower: 200,
+          };
+          resolvedSpotToBroadcast = updated;
+          return updated;
+        })
       );
       setSelectedSpot((curr) =>
         curr && curr.id === spotId
@@ -1085,6 +1165,10 @@ export default function DomNhoHomePage() {
             }
           : curr
       );
+
+      if (resolvedSpotToBroadcast) {
+        broadcastCommunitySpotRealtime(resolvedSpotToBroadcast);
+      }
 
       await fetch('/api/spots', {
         method: 'PATCH',
@@ -1276,7 +1360,7 @@ export default function DomNhoHomePage() {
       if (s.lightPower <= 0 || s.status === 'FADED') return false;
       if (
         s.status === 'SHADOWBANNED' &&
-        (!userSession || s.authorId !== userSession.id)
+        !isSpotOwnedByUser(s, userSession)
       ) {
         return false;
       }
@@ -1285,6 +1369,16 @@ export default function DomNhoHomePage() {
       }
       if (originFilter === 'EXTERNAL' && isUserWebPost(s)) {
         return false;
+      }
+      if (originFilter !== 'USER_POST' && platformFilter !== 'ALL') {
+        if (isUserWebPost(s)) return false;
+        const detectedPlatform = detectPlatformFromUrl(
+          s.sourceUrl,
+          s.sourcePlatform || 'SOCIAL_MEDIA'
+        );
+        if (detectedPlatform !== platformFilter && s.sourcePlatform !== platformFilter) {
+          return false;
+        }
       }
       if (regionFilter !== 'ALL') {
         const spotRegion = detectRegionFromAddress(
@@ -1297,7 +1391,7 @@ export default function DomNhoHomePage() {
       }
       return true;
     });
-  }, [spots, originFilter, regionFilter, userSession]);
+  }, [spots, originFilter, platformFilter, regionFilter, userSession]);
 
   const handleTabChange = useCallback(
     (nextTab: MainTab) => {
@@ -1340,7 +1434,7 @@ export default function DomNhoHomePage() {
       <main className="flex-1 w-full">
         {mainTab === 'map' ? (
           <FullMapView
-            spots={spots}
+            spots={visibleSpots}
             selectedSpot={selectedSpot}
             onSelectSpot={setSelectedSpot}
             onOpenSpotDetail={(spot) => {
@@ -1377,11 +1471,14 @@ export default function DomNhoHomePage() {
             onChangeRegionFilter={setRegionFilter}
             originFilter={originFilter}
             onChangeOriginFilter={setOriginFilter}
+            platformFilter={platformFilter}
+            onChangePlatformFilter={setPlatformFilter}
             isSavedView={mainTab === 'saved'}
             onBackToExplore={() => handleTabChange('explore')}
             onTriggerUpdate={() => handleTriggerLiveCrawl('ALL')}
             isUpdating={isUpdatingFeed}
             currentUserId={userSession?.id}
+            userSession={userSession}
             onEditSpot={handleOpenEditSpot}
             onDeleteSpot={handleDeleteSpot}
           />
@@ -1517,21 +1614,27 @@ export default function DomNhoHomePage() {
             const data = await res.json().catch(() => null);
             if (res.ok && data?.ok && data.sighting) {
               const savedSighting = data.sighting as SightingItem;
+              let spotWithNewSighting: DomSpot | null = null;
               updateSpotsAndPersist((prev) =>
-                prev.map((s) =>
-                  s.id === spotId
-                    ? {
-                        ...s,
-                        sightings: [
-                          savedSighting,
-                          ...(s.sightings || []).filter(
-                            (st) => st.id !== sighting.id && st.id !== savedSighting.id
-                          ),
-                        ],
-                      }
-                    : s
-                )
+                prev.map((s) => {
+                  if (s.id !== spotId) return s;
+                  const updated: DomSpot = {
+                    ...s,
+                    sightings: [
+                      savedSighting,
+                      ...(s.sightings || []).filter(
+                        (st) =>
+                          st.id !== sighting.id && st.id !== savedSighting.id
+                      ),
+                    ],
+                  };
+                  spotWithNewSighting = updated;
+                  return updated;
+                })
               );
+              if (spotWithNewSighting) {
+                broadcastCommunitySpotRealtime(spotWithNewSighting);
+              }
             }
           } catch {
             // Giữ cập nhật tức thời nếu mạng gián đoạn
@@ -1619,13 +1722,22 @@ export default function DomNhoHomePage() {
         onResolveSpotToPeace={handleResolveSpotToPeace}
         onAddWeeklyMemorySnap={handleAddWeeklyMemorySnap}
         onActivateEmergencyBoost={async (spotId) => {
+          let boostedSpot: DomSpot | null = null;
           updateSpotsAndPersist((prev) =>
-            prev.map((s) =>
-              s.id === spotId
-                ? { ...s, lightPower: 300, isEmergencyBoosted: true }
-                : s
-            )
+            prev.map((s) => {
+              if (s.id !== spotId) return s;
+              const updated: DomSpot = {
+                ...s,
+                lightPower: 300,
+                isEmergencyBoosted: true,
+              };
+              boostedSpot = updated;
+              return updated;
+            })
           );
+          if (boostedSpot) {
+            broadcastCommunitySpotRealtime(boostedSpot);
+          }
           await fetch('/api/spots', {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },

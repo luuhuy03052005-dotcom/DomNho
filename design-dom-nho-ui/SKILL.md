@@ -1,85 +1,66 @@
 ---
 name: design-dom-nho-ui
-description: Thiết kế, viết prompt, triển khai và rà soát giao diện Đốm Nhỏ cho cứu trợ động vật, tìm thú lạc và nhận nuôi theo mẫu kem–xanh rừng–cam đất. Dùng khi người dùng yêu cầu giao diện Đốm Nhỏ giống ảnh tham chiếu, tạo mockup desktop/mobile, thiết kế màn hình tiếp nối hoặc sửa responsive để nội dung, bản đồ và nút không che nhau.
+description: Thiết kế và triển khai UI/UX Đốm Nhỏ theo mẫu desktop ba cột, mobile dễ thao tác và bản đồ hai hàng điều khiển gọn. Dùng khi xây hoặc sửa Khám phá, Bản đồ, Chi tiết, ảnh, Đăng tin, Tài khoản, sai hành động nghiệp vụ, lỗi responsive iPhone Safari hoặc giật lag. Bao gồm quy tắc tin cộng đồng/tổng hợp, kiểm tra tương tác và đo hiệu năng trước–sau.
 ---
 
-# Đốm Nhỏ — giao diện có cảm xúc, thao tác rõ ràng
+# Đốm Nhỏ — UI/UX và hiệu năng
 
-## 1. Xác định đầu ra
+## Chọn đúng đầu ra
 
-- Đọc yêu cầu mới nhất và chọn đúng đầu ra: prompt, ảnh mockup, màn hình thiết kế hoặc code.
-- Chỉ tạo prompt nếu được yêu cầu viết prompt; chỉ sinh ảnh nếu được yêu cầu vẽ; chỉ thay code khi được yêu cầu triển khai.
-- Giữ công nghệ, API, xác thực, dữ liệu và chức năng có sẵn khi sửa dự án; kiểm tra nguồn trước khi thay cấu trúc.
-- Không tự biến yêu cầu giao diện thành xây backend, triển khai website hoặc đăng nội dung.
-- Dùng tiếng Việt đúng dấu. Giữ tên dự án “Đốm Nhỏ”; dùng wordmark “đốm nhỏ” như ảnh.
+- Thực hiện đầu ra người dùng yêu cầu gồm prompt, mockup, đặc tả hoặc sửa source.
+- Đọc hướng dẫn dự án và nguồn hiện tại trước khi thay code. Tái dùng stack, provider bản đồ, route, state, API và component khi phù hợp.
+- Khi chỉ tạo skill hoặc ảnh, mô tả tiêu chí nghiệm thu. Chỉ công bố kết quả chạy ứng dụng khi có bằng chứng đã chạy.
+- Dùng tiếng Việt đúng dấu và tên Đốm Nhỏ. Giữ quyền truy cập, trạng thái nghiệp vụ và khả năng dùng bàn phím.
 
-## 2. Đọc nguồn thiết kế
+## Nguồn thiết kế và thứ tự ưu tiên
 
-1. Mở [ảnh mẫu](assets/dom-nho-desktop-mobile.png) bằng công cụ xem ảnh.
-2. Đọc [đặc tả thiết kế](references/design-spec.md) trước khi dựng bố cục.
-3. Đọc [bộ prompt](references/prompts.md) khi cần giao prompt cho AI tạo ảnh, công cụ thiết kế hoặc AI lập trình.
-4. Đọc [responsive và nghiệm thu](references/responsive-qa.md) trước khi triển khai hoặc đánh giá đầu ra.
+Mở các ảnh khi thiết kế hoặc triển khai.
 
-Lấy ảnh làm căn cứ cho bố cục, sắc thái và thứ bậc. Coi mã màu, kích thước, breakpoint trong tài liệu là thông số triển khai được đề xuất cho mẫu này, không phải số đo chính xác trích từ ảnh. Ưu tiên khả năng đọc và thao tác nếu ảnh mâu thuẫn với màn hình thực tế. Không hứa tái tạo pixel tuyệt đối từ ảnh sinh bằng AI.
+1. [Bản đồ mobile gọn](assets/mobile-map-compact.png) là chuẩn cao nhất cho Bản đồ mobile.
+2. [Khám phá desktop](assets/desktop-explore.png) quy định bố cục ba cột.
+3. [Khám phá và Chi tiết mobile](assets/mobile-explore-detail.png) quy định thẻ tin và chi tiết.
 
-## 3. Giữ nhận diện
+Trong ảnh thứ ba, màn Bản đồ ở giữa đã được thay bằng ảnh số một. Dùng năm mục điều hướng mobile gồm Khám phá, Bản đồ, Câu chuyện, Đã lưu, Tài khoản. Thông số pixel và breakpoint trong tài liệu là lựa chọn triển khai, không phải số đo chính xác từ bitmap.
 
-- Dùng nền kem ấm, chữ xanh rất đậm, hành động chính xanh rừng, cam đất cho cứu trợ, sage cho nhận nuôi.
-- Dùng sans-serif hỗ trợ dấu tiếng Việt; ưu tiên font sẵn có phù hợp hoặc Be Vietnam Pro nếu có thể cung cấp hợp lệ.
-- Giữ hình ảnh chó mèo thật, minh họa nét mảnh nhỏ và thông điệp ngắn.
-- Dùng bề mặt phẳng, viền nhẹ, góc bo vừa; dành bóng nhẹ cho phần cần tách lớp.
-- Tránh gradient, kính mờ, hero chiếm màn hình, các khối số liệu vô nghĩa, mọi nút đều dạng viên thuốc và popup chồng lên ảnh.
-- Dùng logo có sẵn nếu được cung cấp. Không tự coi logo trong ảnh mockup là bộ logo gốc hay cắt ảnh giao diện để thay logo chuẩn.
+Đọc tài liệu theo công việc.
 
-## 4. Dựng desktop
+- [Đặc tả UI](references/design-spec.md) cho token, desktop/mobile và các màn tiếp nối.
+- [Quy tắc nghiệp vụ](references/business-rules.md) trước khi nối hành động.
+- [Hiệu năng](references/performance.md) khi triển khai hoặc xử lý lag.
+- [Nghiệm thu](references/responsive-qa.md) trước khi bàn giao.
+- [Prompt dùng lại](references/prompts.md) khi người dùng cần giao việc cho AI khác.
 
-- Giữ header gồm logo, điều hướng “Khám phá / Bản đồ / Câu chuyện”, chọn khu vực, “Đăng tin”, tài khoản.
-- Dùng hai cột nội dung: feed khoảng 2 phần, cột ngữ cảnh khoảng 1 phần.
-- Đặt lời dẫn, tìm kiếm, bộ lọc, 4 danh mục và danh sách tin trong cột feed.
-- Đặt bản đồ xem nhanh cùng nút “Mở bản đồ” và câu chuyện tìm được nhà trong cột ngữ cảnh.
-- Dùng 2 thẻ tin mỗi hàng khi đủ chỗ. Giữ thẻ cùng cấu trúc và CTA thẳng hàng bằng layout nội dung, không bằng cắt chữ.
-- Giữ dải thông điệp chia sẻ ở cuối phần nội dung. Không cố định nó đè lên feed.
+## Các yêu cầu cốt lõi
 
-## 5. Chuyển sang điện thoại
+- Dùng bề mặt trắng trên nền xám ấm rất nhạt, nút xanh rừng, trạng thái có nhãn/icon. Dùng token nhất quán.
+- Desktop Khám phá có bộ lọc trái, feed giữa và bản đồ/ngữ cảnh phải. Mobile dùng một cột và thẻ ngang gọn.
+- Bản đồ mobile chỉ có hai hàng điều khiển ở trên. Gộp chọn khu vực vào hàng tiêu đề. Giữ định vị cạnh zoom và đưa thú y vào Bộ lọc.
+- Dành hàng riêng cho tóm tắt ghim và thanh điều hướng. Mở rộng vùng map khi đóng tóm tắt.
+- Cho thẻ cao theo nội dung. Kiểm tra flex shrink, grid row và vùng cuộn để tránh thẻ biến thành dải mỏng.
+- Trên Chi tiết, dùng header quay lại và hàng hành động riêng. Trình xem ảnh là lớp trên cùng, quản lý focus và khóa cuộn theo vòng đời.
+- Trên mobile, xếp mô tả dài và nút của Tài khoản thành một cột. Cho nội dung cuối cuộn tới được.
+- Phân biệt loại tin, nguồn tin và trạng thái xử lý. Lấy quyền hành động từ chính sách hiện có của dự án.
+- Giữ source attribution, chỉ mở vị trí khi tọa độ hợp lệ, chỉ hiện liên hệ khi được phép. Dùng dữ liệu thật ở bản chạy.
+- Đo thao tác và tìm nguyên nhân chậm trước khi tối ưu. Dùng production build để đánh giá.
+- Dọn map listeners, animation loops, camera streams, object URLs và timer đúng vòng đời.
+- Đọc kết quả API trước khi thông báo. Giữ dữ liệu cũ khi tải mới thất bại và báo lỗi dễ hiểu.
 
-- Thu gọn header còn logo và “Đăng tin”.
-- Dùng thứ tự: lời dẫn → khu vực → tìm kiếm và lọc → danh mục 2×2 → tiêu đề feed và sắp xếp → thẻ tin một cột.
-- Giữ thanh dưới 4 mục: “Khám phá / Bản đồ / Đã lưu / Tài khoản”.
-- Dành không gian thực cho thanh dưới và safe area. Cho nội dung cuộn tự nhiên khi màn hình thấp.
-- Đưa bản đồ vào màn hình riêng. Không thu nhỏ giao diện desktop để nhét vào điện thoại.
-- Không bắt buộc toàn bộ thẻ đầu phải nằm trong viewport. Bắt buộc có thể cuộn tới toàn bộ nội dung và CTA.
-- Đặt nút chính và nút lưu dưới thông tin, không nổi trên ảnh.
-- Giữ vùng chạm tối thiểu 44×44 CSS px, ưu tiên 48px; giữ khoảng cách giữa các hành động.
-- Xử lý bàn phím, phóng to chữ, nhãn dài và chuyển ngang theo tài liệu nghiệm thu.
+## Quy trình thực hiện
 
-## 6. Giữ nghĩa của thẻ và bản đồ
+1. Đọc source và lập bản đồ các màn, dữ liệu, quyền và hành động.
+2. Chọn ảnh chuẩn theo màn. Ghi rõ các điểm chưa có thiết kế hoặc nghiệp vụ chưa được xác nhận.
+3. Tái hiện lỗi có sẵn và đo baseline trước khi sửa nếu có app chạy được.
+4. Dựng hoặc sửa bố cục mobile tại 390px và 320px, sau đó mở rộng desktop.
+5. Nối các hành động theo references/business-rules.md và chính sách nguồn hiện tại.
+6. Kiểm tra các lỗi hồi quy trong references/responsive-qa.md, xử lý nguyên nhân.
+7. Đo lại cùng cấu hình và dữ liệu theo references/performance.md.
+8. Sửa các lỗi còn lại trong phạm vi, chạy kiểm tra sẵn có và lưu đầu ra đúng môi trường.
+9. Bàn giao phần đã làm, ảnh nếu có, kết quả kiểm tra và những trường hợp chưa thể xác nhận.
 
-- Hiển thị ảnh → loại tin và khoảng cách → tiêu đề → vị trí/thời gian → nhu cầu → hành động và lưu.
-- Phân biệt cứu trợ, thú lạc, nhận nuôi bằng icon và nhãn, không chỉ màu.
-- Hiển thị nguồn/tác giả khi dữ liệu có; phân biệt bài tự đăng và bài tổng hợp. Giữ liên kết nguồn khi có.
-- Không tự gắn “đã xác minh”, suy đoán tuổi/tiêm phòng, tạo khoảng cách hay phần trăm hoàn thành.
-- Đánh dấu dữ liệu mẫu là minh họa trong tài liệu hoặc chế độ demo; không chèn cảnh báo kỹ thuật vào luồng sản phẩm.
-- Dùng tọa độ và provider bản đồ thật trong sản phẩm. Chỉ dùng bản đồ minh họa khi vẽ concept.
-- Xin định vị sau thao tác phù hợp, cung cấp chọn khu vực khi bị từ chối; không bịa vị trí.
+## Điều kiện hoàn thành
 
-## 7. Quy trình thực hiện
-
-1. Xác nhận phạm vi bằng yêu cầu hiện có; chỉ hỏi nếu thiếu đầu vào thật sự chặn công việc.
-2. Lập bố cục mobile trước tại 390px, sau đó 360px và 320px.
-3. Mở rộng sang tablet và desktop; kiểm tra header và thẻ ở độ rộng trung gian.
-4. Dùng chung token và cấu trúc dữ liệu cho mọi kích thước.
-5. Bổ sung trạng thái cần thiết: tải, rỗng, lỗi, ảnh lỗi, từ chối định vị, lưu thành công.
-6. Với mockup, vẽ đúng bố cục và nêu đây là concept; không tuyên bố đã kiểm thử tương tác.
-7. Với code, chạy và kiểm tra luồng thao tác thật; không để nút giả hoặc liên kết rỗng được trình bày như đã hoàn thiện.
-8. Đánh giá theo các tiêu chí trong references/responsive-qa.md, sửa lỗi trước khi giao.
-9. Báo ngắn gọn phần hoàn thành, phạm vi đã kiểm tra và giới hạn còn lại.
-
-## 8. Điểm dừng chất lượng
-
-Chỉ coi đầu ra đạt khi:
-- Nhận ra cùng một sản phẩm ở desktop và mobile.
-- Nội dung không tràn ngang; nút và văn bản không đè nhau.
-- CTA cuối vẫn truy cập được khi có thanh dưới, safe area và màn hình thấp.
-- Bản đồ, bộ lọc và chi tiết không làm mất đường quay lại feed.
-- Không dùng ảnh chụp toàn giao diện như giao diện đã triển khai.
-- Không bịa trạng thái xác minh, dữ liệu cứu trợ hoặc kết quả kiểm thử.
+- Đúng ảnh ưu tiên, đặc biệt bản đồ gọn và năm tab mobile.
+- Có thể cuộn tới CTA, đóng từng lớp và trở lại đúng state.
+- Tin tổng hợp dẫn về nguồn, tin cộng đồng dùng đúng hành động và quyền.
+- Kiểm tra được màn thấp, phóng chữ, ảnh lỗi, định vị bị từ chối và cập nhật thất bại.
+- Báo hiệu năng theo số đo, cấu hình và luồng thực đã kiểm tra. Phân biệt mockup, phép đo phòng thử và quan sát trên máy thật.

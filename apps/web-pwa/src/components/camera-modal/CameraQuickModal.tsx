@@ -220,6 +220,7 @@ export default function CameraQuickModal({
     lat: number;
     lng: number;
   } | null>(null);
+  const [hasUserMovedPin, setHasUserMovedPin] = useState<boolean>(false);
   const [hasExactLocation, setHasExactLocation] = useState<boolean>(true);
   const [isMapPickerOpen, setIsMapPickerOpen] = useState<boolean>(false);
 
@@ -252,6 +253,7 @@ export default function CameraQuickModal({
           ? { lat: editingSpot.publicLat, lng: editingSpot.publicLng }
           : null
       );
+      setHasUserMovedPin(false);
       setHasExactLocation(editingSpot.hasExactLocation ?? true);
       setAiStatusText('');
       setLastAiAnalysis(null);
@@ -270,6 +272,7 @@ export default function CameraQuickModal({
       setLastAiAnalysis(null);
       setCustomAddress('');
       setPinnedCoords(null);
+      setHasUserMovedPin(false);
       setHasExactLocation(true);
     }
   }, [isOpen, editingSpot]);
@@ -537,11 +540,15 @@ export default function CameraQuickModal({
       traits: selectedTraits,
       images,
       compressedSizeKB: compressedKB || 64,
-      allowFoster: spotType === 'YELLOW_ADOPT',
+      allowFoster:
+        spotType === 'YELLOW_ADOPT' ||
+        selectedTraits.includes('Cần tìm nhà tạm (Foster)'),
       hasExactLocation,
       customAddress: effectiveAddress,
-      pinnedLat: pinnedCoords?.lat,
-      pinnedLng: pinnedCoords?.lng,
+      pinnedLat:
+        editingSpot && !hasUserMovedPin ? undefined : pinnedCoords?.lat,
+      pinnedLng:
+        editingSpot && !hasUserMovedPin ? undefined : pinnedCoords?.lng,
     };
 
     if (editingSpot && onUpdateSpot) {
@@ -1175,6 +1182,7 @@ export default function CameraQuickModal({
           onConfirmLocation={(result) => {
             setCustomAddress(result.formattedAddress);
             setPinnedCoords({ lat: result.lat, lng: result.lng });
+            setHasUserMovedPin(true);
             setHasExactLocation(true);
           }}
         />
