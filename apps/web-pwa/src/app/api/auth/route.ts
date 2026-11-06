@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import {
-  authenticateOrRegisterInServerStore,
-  computeServerPinHash,
-} from '@/lib/server-community-store';
-import { supabase } from '@/lib/supabase';
-import { isValidVietnamesePhone, normalizePhoneDigits } from '@/lib/types';
+  authenticateOrRegisterInMongo,
+  updateAccountPreferencesInMongo,
+} from '@/lib/mongodb';
+import { authenticateOrRegisterInServerStore } from '@/lib/server-community-store';
+import { isValidVietnamesePhone } from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
 
@@ -38,66 +38,57 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const normalizedPhone = normalizePhoneDigits(rawPhone);
-    const pinHash = computeServerPinHash(normalizedPhone, pinCode);
-    const accountDeviceToken = `dom_phone_${normalizedPhone}`;
+    const displayName = body.displayName ? String(body.displayName).trim() : '';
 
-    let remoteId: string | undefined = body.id ? String(body.id) : undefined;
-    let remoteDisplayName: string | undefined = body.displayName
-      ? String(body.displayName)
-      : undefined;
-    let verifiedRemoteExisting = false;
+    let record;
+    try {
+      record = await authenticateOrRegisterInMongo({
+        id: body.id ? String(body.id) : undefined,
+        displayName,
+        rawPhone,
+        pinCode,
+        mode,
+        allowSyncExisting,
+      });
 
-    if (supabase) {
+      // Đồng bộ bản sao về bộ nhớ đệm Server Store
       try {
-        const { data: existingRemote, error: fetchError } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('device_secret_token', accountDeviceToken)
-          .maybeSingle();
-
-        if (!fetchError && existingRemote) {
-          if (mode === 'register' && !allowSyncExisting) {
-            return NextResponse.json(
-              {
-                ok: false,
-                error:
-                  'Số điện thoại này đã được đăng ký tài khoản. Vui lòng chuyển sang tab "Đăng nhập" và nhập mã PIN của bạn.',
-              },
-              { status: 400 }
-            );
-          }
-
-          if (existingRemote.pin_hash !== pinHash) {
-            return NextResponse.json(
-              {
-                ok: false,
-                error:
-                  'Số điện thoại này đã có tài khoản nhưng mã PIN không chính xác.',
-              },
-              { status: 400 }
-            );
-          }
-
-          remoteId = String(existingRemote.id);
-          remoteDisplayName =
-            String(existingRemote.display_name || '').trim() ||
-            remoteDisplayName;
-          verifiedRemoteExisting = true;
-        }
+        authenticateOrRegisterInServerStore({
+          id: record.id,
+          displayName: record.displayName,
+          rawPhone: record.rawPhone,
+          pinCode,
+          mode: 'register',
+          allowSyncExisting: true,
+        });
       } catch {
-        // Fallback to server store check if Supabase network is unavailable
+        // Bỏ qua nếu bộ nhớ đệm tạm thời không ghi được
       }
-    }
+    } catch (mongoErr: any) {
+      const errMsg = String(mongoErr?.message || '');
+      if (
+        errMsg.includes('đã được đăng ký') ||
+        errMsg.includes('chưa được đăng ký') ||
+        errMsg.includes('mã PIN không chính xác') ||
+        errMsg.includes('Tên gọi') ||
+        errMsg.includes('Số điện thoại')
+      ) {
+        return NextResponse.json(
+          { ok: false, error: errMsg },
+          { status: 400 }
+        );
+      }
 
-    const record = authenticateOrRegisterInServerStore({
-      id: remoteId,
-      displayName: remoteDisplayName,
-      rawPhone,
-      pinCode,
-      mode: verifiedRemoteExisting ? 'register' : mode,
-      allowSyncExisting: allowSyncExisting || verifiedRemoteExisting,
-    });
+      // Fallback sang Server Store nếu mạng kết nối tới MongoDB tạm thời gián đoạn
+      record = authenticateOrRegisterInServerStore({
+        id: body.id ? String(body.id) : undefined,
+        displayName,
+        rawPhone,
+        pinCode,
+        mode,
+        allowSyncExisting,
+      });
+    }
 
     return NextResponse.json({
       ok: true,
@@ -127,3 +118,28 @@ export async function POST(request: NextRequest) {
   }
 }
 
+export async function PATCH(request: NextRequest) {
+  try {
+    const body = await request.json();
+    const ok = await updateAccountPreferencesInMongo({
+      userId: body.userId ? String(body.userId) : undefined,
+      rawPhone: body.rawPhone ? String(body.rawPhone) : undefined,
+      patrolModeActive:
+        typeof body.patrolModeActive === 'boolean'
+          ? body.patrolModeActive
+          : undefined,
+      partnerName:
+        typeof body.partnerName === 'string' ? body.partnerName : undefined,
+      coupleRoomCode:
+        typeof body.coupleRoomCode === 'string'
+          ? body.coupleRoomCode
+          : undefined,
+    });
+    return NextResponse.json({ ok });
+  } catch (err: any) {
+    return NextResponse.json(
+      { ok: false, error: err?.message || 'Không thể cập nhật tài khoản.' },
+      { status: 400 }
+    );
+  }
+}

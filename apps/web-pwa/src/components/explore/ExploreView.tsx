@@ -3,14 +3,20 @@
 import React, { useMemo, useRef, useState } from 'react';
 import {
   Camera,
+  Check,
   ChevronDown,
+  ChevronRight,
+  Crosshair,
   Home,
+  Info,
   LayoutGrid,
   LifeBuoy,
   Loader2,
   MapPin,
+  Phone,
   RotateCcw,
   Search,
+  Share2,
   SlidersHorizontal,
   X,
 } from 'lucide-react';
@@ -42,6 +48,7 @@ interface ExploreViewProps {
   userCoords: { lat: number; lng: number; label: string };
   locationLabel: string;
   onOpenLocationPicker: () => void;
+  onRequestRealGps?: () => void;
   onOpenFullMap: () => void;
   onOpenStory: () => void;
   onOpenFilterModal: () => void;
@@ -91,6 +98,7 @@ export default function ExploreView({
   userCoords,
   locationLabel,
   onOpenLocationPicker,
+  onRequestRealGps,
   onOpenFullMap,
   onOpenStory,
   onOpenFilterModal,
@@ -115,6 +123,7 @@ export default function ExploreView({
   const [category, setCategory] = useState<ExploreCategory>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<SortOption>('NEAREST');
+  const [copiedShareLink, setCopiedShareLink] = useState(false);
 
   const visualInputRef = useRef<HTMLInputElement | null>(null);
   const [visualSearchImage, setVisualSearchImage] = useState<string | null>(
@@ -151,11 +160,18 @@ export default function ExploreView({
       if (data.ok && data.analysis) {
         const analysisData: VisualAnalysisResult = data.analysis;
         setVisualAnalysis(analysisData);
-        const ranked =
-          Array.isArray(data.matches) && data.matches.length > 0
-            ? (data.matches as VisualMatchItem[])
-            : rankSpotsByVisualSimilarity(analysisData, spots, userCoords);
-        setVisualMatches(ranked);
+        if (analysisData.isPet === false) {
+          setVisualError(
+            'Ảnh tải lên không phải thú cưng (chó/mèo). Vui lòng chọn ảnh thực tế của bé.'
+          );
+          setVisualMatches([]);
+        } else {
+          const ranked =
+            Array.isArray(data.matches) && data.matches.length > 0
+              ? (data.matches as VisualMatchItem[])
+              : rankSpotsByVisualSimilarity(analysisData, spots, userCoords);
+          setVisualMatches(ranked);
+        }
       } else {
         setVisualError(
           'Không thể phân tích ảnh lúc này. Vui lòng thử lại với bức ảnh rõ nét hơn.'
@@ -177,6 +193,15 @@ export default function ExploreView({
     setVisualMatches([]);
     setVisualError(null);
     setVisualAnalyzing(false);
+  };
+
+  const resetAllFilters = () => {
+    setCategory('ALL');
+    setSearchQuery('');
+    onChangeRegionFilter('ALL');
+    onChangeOriginFilter('ALL');
+    onChangePlatformFilter?.('ALL');
+    clearVisualSearch();
   };
 
   const visualMatchMap = useMemo(() => {
@@ -311,98 +336,154 @@ export default function ExploreView({
     (originFilter !== 'ALL' ? 1 : 0) +
     (originFilter !== 'USER_POST' && platformFilter !== 'ALL' ? 1 : 0);
 
+  const toggleOriginCheckbox = (target: 'USER_POST' | 'EXTERNAL') => {
+    if (originFilter === target) {
+      onChangeOriginFilter('ALL');
+    } else {
+      onChangeOriginFilter(target);
+    }
+  };
+
+  const handleQuickReportSighting = () => {
+    const target =
+      filteredSpots.find(
+        (s) =>
+          getSpotBadgeMeta(s).categoryKind === 'LOST' ||
+          getSpotBadgeMeta(s).categoryKind === 'RESCUE'
+      ) || filteredSpots[0];
+    if (target) {
+      onSelectDetail(target);
+    } else {
+      onOpenFullMap();
+    }
+  };
+
+  const handleQuickContactPoster = () => {
+    const communitySpot =
+      filteredSpots.find((s) => isUserWebPost(s)) || filteredSpots[0];
+    if (communitySpot) {
+      onSelectDetail(communitySpot);
+    } else {
+      onChangeOriginFilter('USER_POST');
+    }
+  };
+
+  const handleSharePage = async () => {
+    if (typeof window === 'undefined') return;
+    const shareUrl = window.location.href;
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: 'Đốm Nhỏ — Cứu trợ, tìm thú lạc và nhận nuôi',
+          text: 'Cùng chung tay hỗ trợ các bé thú cưng đang cần giúp đỡ quanh bạn trên Đốm Nhỏ.',
+          url: shareUrl,
+        });
+        return;
+      } catch {
+        // Fallback to clipboard copy
+      }
+    }
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      setCopiedShareLink(true);
+      window.setTimeout(() => setCopiedShareLink(false), 2500);
+    } catch {
+      // Ignore
+    }
+  };
+
   return (
-    <div className="w-full min-h-screen bg-[#FAF7F1] pb-10 md:pb-12 text-[#142820]">
-      <div className="max-w-[1320px] mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-7 items-start">
-          <div className="lg:col-span-8 min-w-0 flex flex-col gap-3.5 sm:gap-4">
-            <div className="flex items-end justify-between gap-4">
-              <div className="space-y-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  <span className="text-[11px] sm:text-xs font-extrabold uppercase tracking-widest text-[#AF421F]">
-                    {isSavedView ? 'MỤC ĐÃ LƯU' : 'QUANH BẠN'}
-                  </span>
-                  <span className="w-7 h-[1.5px] bg-[#D8724D]/60 rounded-full" />
-                </div>
+    <div className="w-full min-h-screen bg-[#F5F6F2] pb-12 text-[#15251F]">
+      <input
+        ref={visualInputRef}
+        type="file"
+        accept="image/*"
+        onChange={handleVisualFileChange}
+        className="hidden"
+      />
 
-                <h1 className="text-2xl sm:text-3xl lg:text-[32px] font-extrabold text-[#142820] leading-tight">
-                  {isSavedView
-                    ? 'Bài viết bạn đã lưu'
-                    : 'Mỗi bé, một cơ hội.'}
-                </h1>
+      <div className="max-w-[1320px] mx-auto px-3.5 sm:px-6 lg:px-8 py-4 sm:py-6 space-y-4 sm:space-y-5">
+        {/* Desktop Toolbar Row (matches desktop-explore.png) */}
+        <div className="hidden lg:flex items-center justify-between gap-6">
+          <div className="min-w-0">
+            <h1 className="text-[28px] xl:text-[32px] font-extrabold text-[#15251F] leading-tight">
+              {isSavedView ? 'Bài viết đã lưu' : 'Tin quanh bạn'}
+            </h1>
+            <p className="text-sm text-[#52605A] mt-0.5">
+              {isSavedView
+                ? 'Những trường hợp bạn đã đánh dấu để theo dõi và hỗ trợ.'
+                : 'Cứu trợ, tìm thú lạc và nhận nuôi'}
+            </p>
+          </div>
 
-                <p className="text-xs sm:text-sm text-[#52605A]">
-                  {isSavedView
-                    ? 'Những trường hợp cứu trợ, tìm thú lạc và nhận nuôi bạn đang theo dõi.'
-                    : 'Cứu trợ, tìm thú lạc và nhận nuôi quanh bạn.'}
-                </p>
-              </div>
-
-              <svg
-                viewBox="0 0 180 76"
-                fill="none"
-                xmlns="http://www.w3.org/2000/svg"
-                className="hidden sm:block w-36 h-16 shrink-0 pointer-events-none select-none"
-                aria-hidden="true"
-              >
-                <path
-                  d="M8 66C24 62 36 56 48 64"
-                  stroke="#D8724D"
-                  strokeWidth="1.6"
-                  strokeDasharray="3 4"
-                  strokeLinecap="round"
-                />
-                <circle cx="28" cy="54" r="2.2" fill="#AF421F" />
-                <circle cx="33" cy="51" r="2.2" fill="#AF421F" />
-                <circle cx="37" cy="54" r="2.2" fill="#AF421F" />
-                <path
-                  d="M30 59C29.5 56.5 31.5 55 33.5 55C35.5 55 37.5 56.5 37 59C36.5 60.5 35 61.5 33.5 61.5C32 61.5 30.5 60.5 30 59Z"
-                  fill="#AF421F"
-                />
-                <path
-                  d="M64 64C64 46 78 32 96 32C110 32 120 42 122 56L124 64H64Z"
-                  stroke="#AF421F"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-                <path
-                  d="M78 36C72 38 68 45 70 52C72 56 78 56 82 50"
-                  stroke="#AF421F"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                />
-                <circle cx="92" cy="46" r="1.8" fill="#AF421F" />
-                <path
-                  d="M122 64C122 50 132 40 144 40C156 40 164 50 164 64H122Z"
-                  stroke="#AF421F"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-                <path
-                  d="M132 42L135 32L141 39M153 42L150 32L144 39"
-                  stroke="#AF421F"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-                <path
-                  d="M52 65H172"
-                  stroke="#AF421F"
-                  strokeWidth="1.8"
-                  strokeLinecap="round"
-                />
-              </svg>
+          <div className="flex items-center gap-2.5 flex-1 max-w-[680px] justify-end">
+            <div className="relative flex-1 min-w-0">
+              <Search className="w-4 h-4 text-[#52605A] absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Tìm tên, đặc điểm, khu vực..."
+                className="w-full h-[44px] pl-10 pr-8 rounded-[10px] bg-white border border-[#DDE2DC] text-sm text-[#15251F] placeholder-[#52605A] focus:border-[#123F35] outline-none transition-colors"
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-[#F5F6F2] text-xs flex items-center justify-center text-[#15251F]"
+                  aria-label="Xóa tìm kiếm"
+                >
+                  ✕
+                </button>
+              )}
             </div>
 
             <button
               type="button"
-              onClick={onOpenLocationPicker}
-              className="sm:hidden flex items-center justify-between w-full min-h-[44px] px-3.5 rounded-[10px] bg-white border border-[#DDDCD4] text-xs font-bold text-[#142820]"
+              onClick={() => visualInputRef.current?.click()}
+              disabled={visualAnalyzing}
+              className={`min-h-[44px] px-3.5 rounded-[10px] border text-xs font-bold flex items-center gap-1.5 shrink-0 transition-colors ${
+                visualSearchImage
+                  ? 'bg-[#E4EDDD] border-[#123F35] text-[#123F35]'
+                  : 'bg-white border-[#DDE2DC] hover:border-[#123F35] text-[#15251F]'
+              }`}
+              title="Tải ảnh thú cưng lên để AI đối chiếu bài viết tương đồng"
             >
-              <span className="flex items-center gap-2 truncate">
-                <MapPin className="w-4 h-4 text-[#0E513B] shrink-0" />
+              {visualAnalyzing ? (
+                <Loader2 className="w-4 h-4 animate-spin text-[#123F35] shrink-0" />
+              ) : (
+                <Camera className="w-4 h-4 text-[#123F35] shrink-0" />
+              )}
+              <span>{visualAnalyzing ? 'Đang quét...' : 'Tìm bằng ảnh'}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={onOpenFilterModal}
+              className="min-h-[44px] px-4 rounded-[10px] bg-white hover:bg-[#E4EDDD]/50 border border-[#DDE2DC] hover:border-[#123F35] text-[#15251F] text-sm font-bold flex items-center gap-2 shrink-0 transition-colors"
+            >
+              <SlidersHorizontal className="w-4 h-4 text-[#15251F] shrink-0" />
+              <span>Bộ lọc</span>
+              {activeFiltersCount > 0 && (
+                <span className="px-1.5 py-0.5 rounded-full bg-[#123F35] text-white text-[11px] font-bold leading-none">
+                  {activeFiltersCount}
+                </span>
+              )}
+            </button>
+          </div>
+        </div>
+
+        {/* Mobile Controls Stack (matches 01 · KHÁM PHÁ in mobile-explore-detail.png) */}
+        <div className="lg:hidden space-y-2.5">
+          {/* Row 1: Location Selector + GPS Button */}
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={onOpenLocationPicker}
+              className="flex-1 min-w-0 min-h-[44px] px-3.5 rounded-[10px] bg-white border border-[#DDE2DC] text-xs sm:text-sm font-bold text-[#15251F] flex items-center justify-between gap-2"
+            >
+              <span className="flex items-center gap-2 min-w-0">
+                <MapPin className="w-4 h-4 text-[#123F35] shrink-0" />
                 <span className="truncate">
                   {locationLabel || 'Thủ Đức, TP.HCM'}
                 </span>
@@ -410,162 +491,207 @@ export default function ExploreView({
               <ChevronDown className="w-4 h-4 text-[#52605A] shrink-0" />
             </button>
 
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-              <div className="relative flex-1 min-w-0">
-                <Search className="w-4 h-4 text-[#52605A] absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Tìm theo tên, đặc điểm, khu vực..."
-                  className="w-full h-11 pl-10 pr-8 rounded-[10px] bg-white border border-[#DDDCD4] text-xs sm:text-sm text-[#142820] placeholder-[#52605A]/75 focus:border-[#0E513B] outline-none transition-colors"
-                />
-                {searchQuery && (
-                  <button
-                    type="button"
-                    onClick={() => setSearchQuery('')}
-                    className="absolute right-2.5 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-[#F1EFE8] text-xs flex items-center justify-center text-[#142820]"
-                    aria-label="Xóa tìm kiếm"
-                  >
-                    ✕
-                  </button>
-                )}
-              </div>
+            <button
+              type="button"
+              onClick={() => {
+                if (onRequestRealGps) onRequestRealGps();
+                else onOpenLocationPicker();
+              }}
+              aria-label="Định vị GPS hiện tại của tôi"
+              title="Định vị GPS hiện tại của tôi"
+              className="min-w-[44px] min-h-[44px] rounded-[10px] bg-white border border-[#DDE2DC] hover:border-[#123F35] text-[#15251F] flex items-center justify-center shrink-0"
+            >
+              <Crosshair className="w-4 h-4 text-[#123F35]" />
+            </button>
+          </div>
 
-              <div className="flex items-center gap-2 shrink-0 flex-wrap sm:flex-nowrap">
-                <input
-                  ref={visualInputRef}
-                  type="file"
-                  accept="image/*"
-                  onChange={handleVisualFileChange}
-                  className="hidden"
-                />
-
+          {/* Row 2: Search Input + Camera AI Search + Filter Modal Button */}
+          <div className="flex items-center gap-2">
+            <div className="relative flex-1 min-w-0">
+              <Search className="w-4 h-4 text-[#52605A] absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Tìm tên, đặc điểm, khu vực..."
+                className="w-full min-h-[44px] pl-10 pr-8 rounded-[10px] bg-white border border-[#DDE2DC] text-sm text-[#15251F] placeholder-[#52605A] focus:border-[#123F35] outline-none"
+              />
+              {searchQuery && (
                 <button
                   type="button"
-                  onClick={() => visualInputRef.current?.click()}
-                  disabled={visualAnalyzing}
-                  className={`flex-1 sm:flex-none min-h-[44px] px-3.5 rounded-[10px] border text-xs sm:text-sm font-bold flex items-center justify-center gap-1.5 transition-colors ${
-                    visualSearchImage
-                      ? 'bg-[#E8EFE6] border-[#0E513B] text-[#0E513B]'
-                      : 'bg-white border-[#DDDCD4] hover:border-[#0E513B] text-[#142820]'
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-[#F5F6F2] text-xs flex items-center justify-center text-[#15251F]"
+                  aria-label="Xóa tìm kiếm"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+
+            <button
+              type="button"
+              onClick={() => visualInputRef.current?.click()}
+              disabled={visualAnalyzing}
+              aria-label="Tìm kiếm bằng hình ảnh thú cưng"
+              title="Tìm bằng ảnh"
+              className={`min-w-[44px] min-h-[44px] px-2.5 rounded-[10px] border flex items-center justify-center gap-1 shrink-0 transition-colors ${
+                visualSearchImage
+                  ? 'bg-[#E4EDDD] border-[#123F35] text-[#123F35]'
+                  : 'bg-white border-[#DDE2DC] text-[#15251F]'
+              }`}
+            >
+              {visualAnalyzing ? (
+                <Loader2 className="w-4 h-4 animate-spin text-[#123F35]" />
+              ) : (
+                <Camera className="w-4 h-4 text-[#123F35]" />
+              )}
+            </button>
+
+            <button
+              type="button"
+              onClick={onOpenFilterModal}
+              aria-label="Mở bộ lọc"
+              title="Bộ lọc"
+              className="relative min-w-[44px] min-h-[44px] px-2.5 rounded-[10px] bg-white border border-[#DDE2DC] text-[#15251F] flex items-center justify-center shrink-0"
+            >
+              <SlidersHorizontal className="w-4 h-4" />
+              {activeFiltersCount > 0 && (
+                <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-[#123F35] text-white text-[10px] font-bold flex items-center justify-center">
+                  {activeFiltersCount}
+                </span>
+              )}
+            </button>
+          </div>
+
+          {/* Row 3: Mobile Category Segmented Row */}
+          <div className="p-1 rounded-[10px] bg-white border border-[#DDE2DC] flex items-center gap-1 overflow-x-auto no-scrollbar">
+            {(
+              [
+                { id: 'ALL', label: 'Tất cả' },
+                { id: 'RESCUE', label: 'Cứu trợ' },
+                { id: 'LOST', label: 'Thú lạc' },
+                { id: 'ADOPT', label: 'Nhận nuôi' },
+              ] as { id: ExploreCategory; label: string }[]
+            ).map((item) => {
+              const active = category === item.id;
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => setCategory(item.id)}
+                  aria-pressed={active}
+                  className={`flex-1 min-h-[38px] px-2.5 py-1.5 rounded-[8px] text-xs font-bold whitespace-nowrap transition-colors ${
+                    active
+                      ? 'bg-[#E4EDDD] text-[#123F35]'
+                      : 'text-[#15251F] hover:bg-[#F5F6F2]'
                   }`}
-                  title="Tải ảnh lên để lọc các bài viết có hình ảnh thú cưng trùng khớp"
                 >
-                  {visualAnalyzing ? (
-                    <Loader2 className="w-4 h-4 animate-spin text-[#0E513B] shrink-0" />
-                  ) : (
-                    <Camera className="w-4 h-4 text-[#0E513B] shrink-0" />
-                  )}
-                  <span className="truncate">
-                    {visualAnalyzing ? 'Đang đối chiếu...' : 'Tìm bằng ảnh'}
-                  </span>
+                  {item.label}
                 </button>
+              );
+            })}
+          </div>
 
-                {onTriggerUpdate && (
-                  <button
-                    type="button"
-                    onClick={onTriggerUpdate}
-                    disabled={isUpdating}
-                    className="flex-1 sm:flex-none min-h-[44px] px-3.5 rounded-[10px] bg-white border border-[#DDDCD4] hover:border-[#0E513B] text-[#142820] text-xs sm:text-sm font-bold flex items-center justify-center gap-1.5 transition-colors disabled:opacity-65"
-                  >
-                    <RotateCcw
-                      className={`w-3.5 h-3.5 text-[#0E513B] shrink-0 ${
-                        isUpdating ? 'animate-spin' : ''
-                      }`}
-                    />
-                    <span className="truncate">
-                      {isUpdating ? 'Đang cập nhật...' : 'Cập nhật'}
-                    </span>
-                  </button>
-                )}
+          {/* Row 4: Mobile Heading + Sort Dropdown */}
+          <div className="flex items-center justify-between gap-2 pt-1">
+            <h1 className="text-xl font-extrabold text-[#15251F]">
+              {isSavedView ? 'Bài viết đã lưu' : 'Tin quanh bạn'}
+            </h1>
 
-                <button
-                  type="button"
-                  onClick={onOpenFilterModal}
-                  className="min-h-[44px] px-3.5 rounded-[10px] bg-[#0E513B] hover:bg-[#0A412F] text-white text-xs sm:text-sm font-bold flex items-center justify-center gap-1.5 transition-colors shrink-0"
-                >
-                  <SlidersHorizontal className="w-4 h-4 shrink-0" />
-                  <span>Bộ lọc</span>
-                  {activeFiltersCount > 0 && (
-                    <span className="w-4 h-4 rounded-full bg-white text-[#0E513B] text-[10px] font-extrabold flex items-center justify-center">
-                      {activeFiltersCount}
-                    </span>
+            <div className="relative shrink-0">
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as SortOption)}
+                className="min-h-[38px] pl-3 pr-7 rounded-[8px] bg-transparent text-xs font-bold text-[#15251F] appearance-none cursor-pointer outline-none"
+                aria-label="Sắp xếp kết quả"
+              >
+                <option value="NEAREST">Gần nhất</option>
+                <option value="NEWEST">Mới nhất</option>
+                <option value="URGENT">Ưu tiên SOS</option>
+              </select>
+              <ChevronDown className="w-3.5 h-3.5 text-[#52605A] pointer-events-none absolute right-1.5 top-1/2 -translate-y-1/2" />
+            </div>
+          </div>
+        </div>
+
+        {/* Visual Search Active Banner */}
+        {visualSearchImage && (
+          <div className="p-3.5 rounded-[12px] bg-white border border-[#123F35] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-3 min-w-0">
+              <img
+                src={visualSearchImage}
+                alt="Ảnh đang dùng để tìm kiếm"
+                className="w-14 h-14 rounded-[8px] object-cover border border-[#DDE2DC] shrink-0"
+              />
+              <div className="min-w-0 space-y-1">
+                <p className="text-xs sm:text-sm font-bold text-[#15251F]">
+                  {visualAnalyzing
+                    ? 'Đang phân tích hình ảnh và lọc bài viết trùng khớp...'
+                    : visualError
+                    ? visualError
+                    : `Kết quả phân tích ảnh: ${
+                        visualAnalysis?.breed || 'Thú cưng'
+                      } (${visualAnalysis?.coatColor || 'Rõ đặc điểm'}) — ${
+                        visualMatches.length
+                      } bài viết trùng khớp`}
+                </p>
+                {visualAnalysis &&
+                  Array.isArray(visualAnalysis.traits) &&
+                  visualAnalysis.traits.length > 0 && (
+                    <div className="flex flex-wrap gap-1">
+                      {visualAnalysis.traits.map((t) => (
+                        <span
+                          key={t}
+                          className="px-2 py-0.5 rounded bg-[#E4EDDD] text-[#123F35] text-[11px] font-semibold"
+                        >
+                          {t}
+                        </span>
+                      ))}
+                    </div>
                   )}
-                </button>
               </div>
             </div>
 
-            {visualSearchImage && (
-              <div className="p-3.5 rounded-xl bg-white border border-[#0E513B] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div className="flex items-center gap-3 min-w-0">
-                  <img
-                    src={visualSearchImage}
-                    alt="Ảnh đang dùng để tìm kiếm"
-                    className="w-14 h-14 rounded-lg object-cover border border-[#DDDCD4] shrink-0"
-                  />
-                  <div className="min-w-0 space-y-1">
-                    <p className="text-xs sm:text-sm font-bold text-[#142820]">
-                      {visualAnalyzing
-                        ? 'Đang phân tích hình ảnh và lọc bài viết trùng khớp...'
-                        : visualError
-                        ? visualError
-                        : `Kết quả phân tích ảnh: ${
-                            visualAnalysis?.breed || 'Thú cưng'
-                          } (${visualAnalysis?.coatColor || 'Rõ đặc điểm'}) — ${
-                            visualMatches.length
-                          } bài viết trùng khớp`}
-                    </p>
-                    {visualAnalysis &&
-                      Array.isArray(visualAnalysis.traits) &&
-                      visualAnalysis.traits.length > 0 && (
-                        <div className="flex flex-wrap gap-1">
-                          {visualAnalysis.traits.map((t) => (
-                            <span
-                              key={t}
-                              className="px-2 py-0.5 rounded bg-[#E8EFE6] text-[#0E513B] text-[11px] font-semibold"
-                            >
-                              {t}
-                            </span>
-                          ))}
-                        </div>
-                      )}
-                  </div>
-                </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={() => visualInputRef.current?.click()}
+                className="min-h-[38px] px-3 rounded-[10px] border border-[#DDE2DC] bg-[#F5F6F2] hover:bg-[#E4EDDD]/50 text-xs font-semibold text-[#15251F]"
+              >
+                Đổi ảnh khác
+              </button>
+              <button
+                type="button"
+                onClick={clearVisualSearch}
+                className="min-h-[38px] px-3 rounded-[10px] bg-[#FFF0E8] text-[#A83D20] text-xs font-bold flex items-center gap-1"
+              >
+                <X className="w-3.5 h-3.5" />
+                <span>Bỏ lọc ảnh</span>
+              </button>
+            </div>
+          </div>
+        )}
 
-                <div className="flex items-center gap-2 shrink-0">
-                  <button
-                    type="button"
-                    onClick={() => visualInputRef.current?.click()}
-                    className="min-h-[38px] px-3 rounded-[10px] border border-[#DDDCD4] bg-[#FAF7F1] hover:bg-[#F1EFE8] text-xs font-semibold text-[#142820]"
-                  >
-                    Đổi ảnh khác
-                  </button>
-                  <button
-                    type="button"
-                    onClick={clearVisualSearch}
-                    className="min-h-[38px] px-3 rounded-[10px] bg-[#FFF0E5] text-[#AF421F] text-xs font-bold flex items-center gap-1"
-                  >
-                    <X className="w-3.5 h-3.5" />
-                    <span>Bỏ lọc ảnh</span>
-                  </button>
-                </div>
-              </div>
-            )}
-
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pt-0.5">
-              <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2">
+        {/* Main 3-Column Desktop Grid / 1-Column Mobile Layout */}
+        <div className="grid grid-cols-1 lg:grid-cols-[235px_minmax(0,1fr)_320px] xl:grid-cols-[250px_minmax(0,1fr)_340px] gap-5 items-start">
+          {/* Column 1: Left Filter Sidebar (Desktop) */}
+          <aside className="hidden lg:flex flex-col bg-white rounded-[12px] border border-[#DDE2DC] p-4 space-y-5 sticky top-20 shadow-[0_2px_10px_rgba(21,37,31,0.03)]">
+            <div className="space-y-2">
+              <h2 className="text-sm font-extrabold text-[#15251F] px-1">
+                Loại tin
+              </h2>
+              <div className="space-y-1">
                 <button
                   type="button"
                   onClick={() => setCategory('ALL')}
                   aria-pressed={category === 'ALL'}
-                  className={`min-h-[42px] px-3.5 rounded-[10px] text-xs sm:text-sm font-bold border flex items-center justify-center gap-2 transition-colors ${
+                  className={`w-full min-h-[42px] px-3 rounded-[10px] text-sm font-bold flex items-center gap-2.5 transition-colors ${
                     category === 'ALL'
-                      ? 'bg-[#0E513B] text-white border-[#0E513B]'
-                      : 'bg-white border-[#DDDCD4] text-[#142820] hover:bg-[#F1EFE8]'
+                      ? 'bg-[#E4EDDD] text-[#123F35]'
+                      : 'text-[#15251F] hover:bg-[#F5F6F2]'
                   }`}
                 >
-                  <LayoutGrid className="w-4 h-4 shrink-0" />
+                  <LayoutGrid className="w-4 h-4 text-[#123F35] shrink-0" />
                   <span>Tất cả</span>
                 </button>
 
@@ -573,17 +699,13 @@ export default function ExploreView({
                   type="button"
                   onClick={() => setCategory('RESCUE')}
                   aria-pressed={category === 'RESCUE'}
-                  className={`min-h-[42px] px-3.5 rounded-[10px] text-xs sm:text-sm font-bold border flex items-center justify-center gap-2 transition-colors ${
+                  className={`w-full min-h-[42px] px-3 rounded-[10px] text-sm font-bold flex items-center gap-2.5 transition-colors ${
                     category === 'RESCUE'
-                      ? 'bg-[#0E513B] text-white border-[#0E513B]'
-                      : 'bg-white border-[#DDDCD4] text-[#142820] hover:bg-[#F1EFE8]'
+                      ? 'bg-[#E4EDDD] text-[#123F35]'
+                      : 'text-[#15251F] hover:bg-[#F5F6F2]'
                   }`}
                 >
-                  <LifeBuoy
-                    className={`w-4 h-4 shrink-0 ${
-                      category === 'RESCUE' ? 'text-white' : 'text-[#AF421F]'
-                    }`}
-                  />
+                  <LifeBuoy className="w-4 h-4 text-[#A83D20] shrink-0" />
                   <span>Cứu trợ</span>
                 </button>
 
@@ -591,17 +713,13 @@ export default function ExploreView({
                   type="button"
                   onClick={() => setCategory('LOST')}
                   aria-pressed={category === 'LOST'}
-                  className={`min-h-[42px] px-3.5 rounded-[10px] text-xs sm:text-sm font-bold border flex items-center justify-center gap-2 transition-colors ${
+                  className={`w-full min-h-[42px] px-3 rounded-[10px] text-sm font-bold flex items-center gap-2.5 transition-colors ${
                     category === 'LOST'
-                      ? 'bg-[#0E513B] text-white border-[#0E513B]'
-                      : 'bg-white border-[#DDDCD4] text-[#142820] hover:bg-[#F1EFE8]'
+                      ? 'bg-[#E4EDDD] text-[#123F35]'
+                      : 'text-[#15251F] hover:bg-[#F5F6F2]'
                   }`}
                 >
-                  <PawCategoryIcon
-                    className={`w-4 h-4 shrink-0 ${
-                      category === 'LOST' ? 'text-white' : 'text-[#80570D]'
-                    }`}
-                  />
+                  <PawCategoryIcon className="w-4 h-4 text-[#D4942A] shrink-0" />
                   <span>Thú lạc</span>
                 </button>
 
@@ -609,62 +727,154 @@ export default function ExploreView({
                   type="button"
                   onClick={() => setCategory('ADOPT')}
                   aria-pressed={category === 'ADOPT'}
-                  className={`min-h-[42px] px-3.5 rounded-[10px] text-xs sm:text-sm font-bold border flex items-center justify-center gap-2 transition-colors ${
+                  className={`w-full min-h-[42px] px-3 rounded-[10px] text-sm font-bold flex items-center gap-2.5 transition-colors ${
                     category === 'ADOPT'
-                      ? 'bg-[#0E513B] text-white border-[#0E513B]'
-                      : 'bg-white border-[#DDDCD4] text-[#142820] hover:bg-[#F1EFE8]'
+                      ? 'bg-[#E4EDDD] text-[#123F35]'
+                      : 'text-[#15251F] hover:bg-[#F5F6F2]'
                   }`}
                 >
-                  <Home
-                    className={`w-4 h-4 shrink-0 ${
-                      category === 'ADOPT' ? 'text-white' : 'text-[#0E513B]'
-                    }`}
-                  />
+                  <Home className="w-4 h-4 text-[#275B3A] shrink-0" />
                   <span>Nhận nuôi</span>
                 </button>
               </div>
+            </div>
 
-              <div className="flex items-center justify-between sm:justify-end gap-2.5 shrink-0">
-                <div className="flex items-baseline gap-1.5">
-                  <h2 className="text-sm sm:text-base font-extrabold text-[#142820]">
-                    {isSavedView ? 'Đã lưu' : 'Tin quanh bạn'}
-                  </h2>
-                  <span className="text-xs font-semibold text-[#52605A]">
-                    ({filteredSpots.length} tin)
+            <div className="pt-4 border-t border-[#DDE2DC] space-y-2.5">
+              <h2 className="text-sm font-extrabold text-[#15251F] px-1">
+                Nguồn tin
+              </h2>
+              <div className="space-y-1.5">
+                <button
+                  type="button"
+                  onClick={() => toggleOriginCheckbox('USER_POST')}
+                  aria-pressed={originFilter === 'USER_POST'}
+                  className="w-full min-h-[38px] px-2 rounded-[8px] hover:bg-[#F5F6F2] flex items-center gap-2.5 text-sm font-medium text-[#15251F] text-left"
+                >
+                  <span
+                    className={`w-4 h-4 rounded-[4px] border flex items-center justify-center shrink-0 transition-colors ${
+                      originFilter === 'USER_POST'
+                        ? 'bg-[#123F35] border-[#123F35] text-white'
+                        : 'bg-white border-[#52605A]/50'
+                    }`}
+                  >
+                    {originFilter === 'USER_POST' && (
+                      <Check className="w-3 h-3 stroke-[3]" />
+                    )}
                   </span>
-                </div>
+                  <span>Tin cộng đồng</span>
+                </button>
 
-                <div className="relative shrink-0">
+                <button
+                  type="button"
+                  onClick={() => toggleOriginCheckbox('EXTERNAL')}
+                  aria-pressed={originFilter === 'EXTERNAL'}
+                  className="w-full min-h-[38px] px-2 rounded-[8px] hover:bg-[#F5F6F2] flex items-center gap-2.5 text-sm font-medium text-[#15251F] text-left"
+                >
+                  <span
+                    className={`w-4 h-4 rounded-[4px] border flex items-center justify-center shrink-0 transition-colors ${
+                      originFilter === 'EXTERNAL'
+                        ? 'bg-[#123F35] border-[#123F35] text-white'
+                        : 'bg-white border-[#52605A]/50'
+                    }`}
+                  >
+                    {originFilter === 'EXTERNAL' && (
+                      <Check className="w-3 h-3 stroke-[3]" />
+                    )}
+                  </span>
+                  <span>Tin tổng hợp</span>
+                </button>
+              </div>
+            </div>
+
+            <div className="pt-4 border-t border-[#DDE2DC] space-y-2.5">
+              <h2 className="text-sm font-extrabold text-[#15251F] px-1">
+                Khu vực
+              </h2>
+              <button
+                type="button"
+                onClick={onOpenLocationPicker}
+                className="w-full min-h-[42px] px-3 rounded-[10px] bg-white hover:bg-[#F5F6F2] border border-[#DDE2DC] text-xs font-semibold text-[#15251F] flex items-center justify-between gap-2 transition-colors"
+              >
+                <span className="flex items-center gap-1.5 min-w-0">
+                  <MapPin className="w-3.5 h-3.5 text-[#123F35] shrink-0" />
+                  <span className="truncate">
+                    {locationLabel || 'Thủ Đức, TP.HCM'}
+                  </span>
+                </span>
+                <ChevronDown className="w-3.5 h-3.5 text-[#52605A] shrink-0" />
+              </button>
+            </div>
+
+            <button
+              type="button"
+              onClick={resetAllFilters}
+              className="w-full min-h-[42px] px-3 rounded-[10px] bg-white hover:bg-[#F5F6F2] border border-[#DDE2DC] text-xs font-bold text-[#15251F] flex items-center justify-center gap-2 transition-colors"
+            >
+              <RotateCcw className="w-3.5 h-3.5 text-[#52605A]" />
+              <span>Xóa bộ lọc</span>
+            </button>
+          </aside>
+
+          {/* Column 2: Center Feed */}
+          <div className="min-w-0 flex flex-col gap-3.5">
+            {/* Desktop Sort & Status Bar */}
+            <div className="hidden lg:flex items-center justify-between px-4 py-2.5 rounded-[12px] bg-white border border-[#DDE2DC]">
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium text-[#52605A]">
+                  Sắp xếp:
+                </span>
+                <div className="relative">
                   <select
                     value={sortBy}
                     onChange={(e) => setSortBy(e.target.value as SortOption)}
-                    className="h-[42px] pl-3 pr-8 rounded-[10px] bg-white border border-[#DDDCD4] text-xs font-bold text-[#142820] appearance-none cursor-pointer outline-none hover:border-[#0E513B]"
-                    aria-label="Sắp xếp kết quả"
+                    className="min-h-[34px] pr-6 bg-transparent text-sm font-extrabold text-[#15251F] appearance-none cursor-pointer outline-none"
+                    aria-label="Sắp xếp bài viết"
                   >
                     <option value="NEAREST">Gần nhất</option>
                     <option value="NEWEST">Mới nhất</option>
                     <option value="URGENT">Ưu tiên SOS</option>
                   </select>
-                  <ChevronDown className="w-3.5 h-3.5 text-[#52605A] pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2" />
+                  <ChevronDown className="w-4 h-4 text-[#15251F] pointer-events-none absolute right-0 top-1/2 -translate-y-1/2" />
                 </div>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <span className="text-xs font-semibold text-[#52605A]">
+                  Hiển thị {filteredSpots.length} bài viết
+                </span>
+                {onTriggerUpdate && (
+                  <button
+                    type="button"
+                    onClick={onTriggerUpdate}
+                    disabled={isUpdating}
+                    className="min-h-[34px] px-3 rounded-[8px] bg-[#F5F6F2] hover:bg-[#E4EDDD] text-xs font-bold text-[#123F35] inline-flex items-center gap-1.5 transition-colors disabled:opacity-60"
+                  >
+                    <RotateCcw
+                      className={`w-3.5 h-3.5 ${
+                        isUpdating ? 'animate-spin' : ''
+                      }`}
+                    />
+                    <span>{isUpdating ? 'Đang làm mới...' : 'Làm mới'}</span>
+                  </button>
+                )}
               </div>
             </div>
 
             {filteredSpots.length === 0 ? (
-              <div className="p-8 sm:p-10 text-center rounded-xl bg-white border border-[#DDDCD4] space-y-3">
-                <p className="text-sm sm:text-base font-bold text-[#142820]">
+              <div className="p-8 sm:p-10 text-center rounded-[12px] bg-white border border-[#DDE2DC] space-y-3">
+                <p className="text-base font-bold text-[#15251F]">
                   {visualSearchImage
-                    ? 'Không tìm thấy bài viết nào có hình ảnh trùng khớp cao'
+                    ? 'Không tìm thấy bài viết nào có hình ảnh trùng khớp'
                     : isSavedView
                     ? 'Bạn chưa lưu bài viết nào'
                     : 'Không tìm thấy bài viết nào phù hợp'}
                 </p>
-                <p className="text-xs text-[#52605A]">
+                <p className="text-xs sm:text-sm text-[#52605A]">
                   {visualSearchImage
-                    ? 'Hệ thống chỉ lọc ra những bài viết có cùng loài và đặc điểm ngoại hình tương đồng với ảnh bạn tải lên.'
+                    ? 'Hệ thống chỉ lọc những bài viết cùng loài và có đặc điểm ngoại hình tương đồng với ảnh bạn tải lên.'
                     : isSavedView
-                    ? 'Bấm biểu tượng trái tim ở dưới mỗi bài viết để lưu lại.'
-                    : 'Thử tìm với từ khóa khác hoặc đặt lại bộ lọc.'}
+                    ? 'Bấm nút Lưu tin trên mỗi bài viết để lưu lại theo dõi.'
+                    : 'Thử tìm với từ khóa khác hoặc bấm Xóa bộ lọc để xem toàn bộ bài viết.'}
                 </p>
                 <button
                   type="button"
@@ -674,14 +884,10 @@ export default function ExploreView({
                     } else if (isSavedView && onBackToExplore) {
                       onBackToExplore();
                     } else {
-                      setCategory('ALL');
-                      setSearchQuery('');
-                      onChangeRegionFilter('ALL');
-                      onChangeOriginFilter('ALL');
-                      onChangePlatformFilter?.('ALL');
+                      resetAllFilters();
                     }
                   }}
-                  className="min-h-[42px] px-4 py-2 rounded-[10px] bg-[#0E513B] text-white text-xs font-bold inline-flex items-center gap-1.5"
+                  className="min-h-[42px] px-4 py-2 rounded-[10px] bg-[#123F35] text-white text-xs sm:text-sm font-bold inline-flex items-center gap-1.5"
                 >
                   <RotateCcw className="w-3.5 h-3.5" />
                   <span>
@@ -689,12 +895,12 @@ export default function ExploreView({
                       ? 'Bỏ lọc ảnh & Xem tất cả'
                       : isSavedView
                       ? 'Quay lại khám phá'
-                      : 'Xem tất cả'}
+                      : 'Xóa bộ lọc'}
                   </span>
                 </button>
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 lg:gap-5 items-stretch min-w-0">
+              <div className="flex flex-col gap-3.5 min-w-0">
                 {filteredSpots.map((spot) => (
                   <PetCard
                     key={spot.id}
@@ -719,24 +925,69 @@ export default function ExploreView({
               </div>
             )}
 
-            <div className="lg:hidden flex flex-col gap-4 pt-2">
-              <ContextMapCard
-                spots={spots}
-                onOpenFullMap={onOpenFullMap}
-                onOpenLocationPicker={onOpenLocationPicker}
-                userCoords={userCoords}
-              />
-              <SuccessStoryCard onOpenStory={onOpenStory} />
-            </div>
+            <p className="lg:hidden flex items-center gap-1.5 text-xs text-[#52605A] pt-1 px-1">
+              <Info className="w-3.5 h-3.5 shrink-0" />
+              <span>Hiển thị theo khu vực bạn chọn ({locationLabel}).</span>
+            </p>
           </div>
 
-          <aside className="hidden lg:flex lg:col-span-4 flex-col gap-5 sticky top-20">
+          {/* Column 3: Right Context Sidebar */}
+          <aside className="flex flex-col gap-4 lg:sticky lg:top-20">
             <ContextMapCard
               spots={spots}
               onOpenFullMap={onOpenFullMap}
               onOpenLocationPicker={onOpenLocationPicker}
               userCoords={userCoords}
             />
+
+            {/* Action Guide Card (matches desktop-explore.png "Bạn có thể giúp bằng cách nào?") */}
+            <div className="bg-white rounded-[12px] border border-[#DDE2DC] p-4 space-y-2.5 shadow-[0_2px_10px_rgba(21,37,31,0.04)]">
+              <h3 className="text-base font-extrabold text-[#15251F]">
+                Bạn có thể giúp bằng cách nào?
+              </h3>
+
+              <div className="divide-y divide-[#DDE2DC]">
+                <button
+                  type="button"
+                  onClick={handleQuickReportSighting}
+                  className="w-full min-h-[44px] py-2.5 flex items-center justify-between gap-3 text-left text-sm font-semibold text-[#15251F] hover:text-[#123F35] transition-colors group"
+                >
+                  <span className="flex items-center gap-2.5">
+                    <MapPin className="w-4 h-4 text-[#123F35] shrink-0" />
+                    <span>Báo nơi nhìn thấy</span>
+                  </span>
+                  <ChevronRight className="w-4 h-4 text-[#52605A] group-hover:translate-x-0.5 transition-transform shrink-0" />
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleQuickContactPoster}
+                  className="w-full min-h-[44px] py-2.5 flex items-center justify-between gap-3 text-left text-sm font-semibold text-[#15251F] hover:text-[#123F35] transition-colors group"
+                >
+                  <span className="flex items-center gap-2.5">
+                    <Phone className="w-4 h-4 text-[#123F35] shrink-0" />
+                    <span>Liên hệ người đăng</span>
+                  </span>
+                  <ChevronRight className="w-4 h-4 text-[#52605A] group-hover:translate-x-0.5 transition-transform shrink-0" />
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleSharePage}
+                  className="w-full min-h-[44px] py-2.5 flex items-center justify-between gap-3 text-left text-sm font-semibold text-[#15251F] hover:text-[#123F35] transition-colors group"
+                >
+                  <span className="flex items-center gap-2.5">
+                    <Share2 className="w-4 h-4 text-[#123F35] shrink-0" />
+                    <span>
+                      {copiedShareLink
+                        ? 'Đã sao chép liên kết chia sẻ!'
+                        : 'Chia sẻ bài viết'}
+                    </span>
+                  </span>
+                  <ChevronRight className="w-4 h-4 text-[#52605A] group-hover:translate-x-0.5 transition-transform shrink-0" />
+                </button>
+              </div>
+            </div>
 
             <SuccessStoryCard onOpenStory={onOpenStory} />
           </aside>

@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Bookmark, Compass, MapPin, User } from 'lucide-react';
+import { BookOpen, Bookmark, Home, MapPin, User } from 'lucide-react';
 import { MainTab } from '@/lib/types';
 
 interface MobileBottomNavProps {
@@ -15,25 +15,35 @@ export default function MobileBottomNav({
   onChangeTab,
   savedCount = 0,
 }: MobileBottomNavProps) {
-  const navItems = [
+  const navItems: {
+    id: MainTab;
+    label: string;
+    icon: React.ComponentType<{ className?: string }>;
+    badge?: number;
+  }[] = [
     {
-      id: 'explore' as MainTab,
+      id: 'explore',
       label: 'Khám phá',
-      icon: Compass,
+      icon: Home,
     },
     {
-      id: 'map' as MainTab,
+      id: 'map',
       label: 'Bản đồ',
       icon: MapPin,
     },
     {
-      id: 'saved' as MainTab,
+      id: 'stories',
+      label: 'Câu chuyện',
+      icon: BookOpen,
+    },
+    {
+      id: 'saved',
       label: 'Đã lưu',
       icon: Bookmark,
       badge: savedCount > 0 ? savedCount : undefined,
     },
     {
-      id: 'profile' as MainTab,
+      id: 'profile',
       label: 'Tài khoản',
       icon: User,
     },
@@ -41,10 +51,10 @@ export default function MobileBottomNav({
 
   return (
     <nav
-      className="md:hidden fixed bottom-0 inset-x-0 z-30 bg-[#FAF7F1] border-t border-[#DDDCD4] pb-[env(safe-area-inset-bottom,0px)]"
-      aria-label="Thanh điều hướng dưới"
+      className="md:hidden fixed bottom-0 inset-x-0 z-30 bg-[#FFFFFF] border-t border-[#DDE2DC] pb-[env(safe-area-inset-bottom,0px)]"
+      aria-label="Thanh điều hướng chính"
     >
-      <div className="grid grid-cols-4 min-h-[56px] items-stretch">
+      <div className="grid grid-cols-5 min-h-[60px] px-1 py-1 gap-0.5 items-stretch">
         {navItems.map((item) => {
           const Icon = item.icon;
           const isActive = activeTab === item.id;
@@ -53,31 +63,28 @@ export default function MobileBottomNav({
               key={item.id}
               type="button"
               onClick={() => onChangeTab(item.id)}
-              className={`min-h-[48px] min-w-[44px] py-1.5 flex flex-col items-center justify-center transition-colors relative ${
+              className={`min-h-[48px] min-w-[44px] px-1 py-1 rounded-[10px] flex flex-col items-center justify-center transition-colors relative ${
                 isActive
-                  ? 'text-[#0E513B] font-bold'
-                  : 'text-[#52605A] hover:text-[#142820]'
+                  ? 'bg-[#E4EDDD] text-[#123F35] font-bold'
+                  : 'text-[#52605A] hover:text-[#15251F]'
               }`}
               aria-current={isActive ? 'page' : undefined}
             >
-              <div className="relative">
+              <div className="relative flex items-center justify-center">
                 <Icon
-                  className={`w-5 h-5 ${
-                    isActive ? 'stroke-[2.4]' : 'stroke-[1.8]'
+                  className={`w-5 h-5 shrink-0 ${
+                    isActive ? 'stroke-[2.3]' : 'stroke-[1.8]'
                   }`}
                 />
                 {typeof item.badge === 'number' && item.badge > 0 && (
-                  <span className="absolute -top-1 -right-2.5 px-1 rounded-full text-[9px] font-bold bg-[#AF421F] text-white min-w-[14px] text-center">
+                  <span className="absolute -top-1 -right-2.5 px-1 rounded-full text-[9px] font-bold bg-[#A83D20] text-white min-w-[14px] text-center leading-tight">
                     {item.badge}
                   </span>
                 )}
               </div>
-              <span className="text-[11px] mt-0.5 tracking-tight truncate max-w-full px-1">
+              <span className="text-[11px] leading-tight mt-1 text-center break-words">
                 {item.label}
               </span>
-              {isActive && (
-                <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-8 h-0.5 rounded-full bg-[#0E513B]" />
-              )}
             </button>
           );
         })}

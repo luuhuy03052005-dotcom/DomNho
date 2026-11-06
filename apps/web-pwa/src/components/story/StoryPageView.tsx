@@ -5,6 +5,7 @@ import {
   ArrowRight,
   Compass,
   FileCheck2,
+  Mail,
   Map as MapIcon,
   MapPin,
   Sparkles,
@@ -563,6 +564,32 @@ export default function StoryPageView({
               </p>
             </div>
           </div>
+        </section>
+
+        <section className="p-5 sm:p-6 rounded-2xl bg-white border border-[#E2E5DC] flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="space-y-1">
+            <h2 className="text-base sm:text-lg font-extrabold text-[#15251F] flex items-center gap-2">
+              <Mail className="w-5 h-5 text-[#123F35] shrink-0" />
+              <span>Liên hệ &amp; Đóng góp ý kiến</span>
+            </h2>
+            <p className="text-sm text-[#53635B] leading-relaxed">
+              Mọi ý kiến đóng góp, phản hồi gửi về email:{' '}
+              <a
+                href="mailto:luuhuy05032005h@gmail.com?subject=G%C3%B3p%20%C3%BD%20%26%20Ph%E1%BA%A3n%20h%E1%BB%93i%20cho%20%C4%90%E1%BB%91m%20Nh%E1%BB%8F"
+                className="font-extrabold text-[#123F35] hover:underline break-all"
+              >
+                luuhuy05032005h@gmail.com
+              </a>
+            </p>
+          </div>
+
+          <a
+            href="mailto:luuhuy05032005h@gmail.com?subject=G%C3%B3p%20%C3%BD%20%26%20Ph%E1%BA%A3n%20h%E1%BB%93i%20cho%20%C4%90%E1%BB%91m%20Nh%E1%BB%8F"
+            className="min-h-[42px] px-4 rounded-[10px] bg-[#123F35] hover:bg-[#0D3129] text-white text-xs sm:text-sm font-bold inline-flex items-center justify-center gap-2 shrink-0 transition-colors"
+          >
+            <Mail className="w-4 h-4 shrink-0" />
+            <span>Gửi email phản hồi</span>
+          </a>
         </section>
 
         <section className="pt-6 sm:pt-8 border-t border-[#DDDCD4] flex flex-col sm:flex-row sm:items-center justify-between gap-4">

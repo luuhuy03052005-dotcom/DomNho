@@ -4,6 +4,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowLeft,
   ArrowRight,
+  Bookmark,
   ChevronDown,
   Crosshair,
   Home,
@@ -12,6 +13,7 @@ import {
   MapPin,
   Plus,
   Search,
+  SlidersHorizontal,
   Stethoscope,
   X,
 } from 'lucide-react';
@@ -40,6 +42,8 @@ interface FullMapViewProps {
   onBackToExplore: () => void;
   onOpenCreatePost: () => void;
   vetStations: VetStation[];
+  onOpenFilterModal?: () => void;
+  onOpenGoogleMapsVault?: () => void;
 }
 
 function PawFilterIcon({ className = 'w-4 h-4' }: { className?: string }) {
@@ -73,9 +77,13 @@ export default function FullMapView({
   onBackToExplore,
   onOpenCreatePost,
   vetStations,
+  onOpenFilterModal,
+  onOpenGoogleMapsVault,
 }: FullMapViewProps) {
   const [category, setCategory] = useState<ExploreCategory>('ALL');
   const [showVets, setShowVets] = useState<boolean>(false);
+  const [isMobileMapFilterOpen, setIsMobileMapFilterOpen] =
+    useState<boolean>(false);
   const [areaQuery, setAreaQuery] = useState<string>('');
   const [focusTrigger, setFocusTrigger] = useState<{
     lat: number;
@@ -148,144 +156,222 @@ export default function FullMapView({
       .trim();
   };
 
+  const shortUserLocationLabel = useMemo(() => {
+    const raw = (userCoords.label || 'Thủ Đức').trim();
+    if (/thủ đức/i.test(raw)) return 'Thủ Đức';
+    return raw
+      .replace(/^phường\s+/i, '')
+      .replace(/,\s*TP\.?\s*HCM$/i, '')
+      .split(',')[0]
+      .trim();
+  }, [userCoords.label]);
+
   return (
-    <div className="fixed inset-x-0 top-0 bottom-[calc(56px+env(safe-area-inset-bottom,0px))] z-20 md:static md:z-auto w-full md:h-[calc(100dvh-65px)] bg-[#FAF7F1] text-[#142820] flex flex-col md:flex-row overflow-hidden">
-      <div className="md:hidden shrink-0 bg-[#FAF7F1]/95 backdrop-blur-md border-b border-[#DDDCD4] px-2.5 pt-[max(6px,env(safe-area-inset-top,0px))] pb-1.5 space-y-1.5 z-20">
-        <div className="flex items-center gap-1.5">
-          <button
-            type="button"
-            onClick={onBackToExplore}
-            className="w-9 h-9 rounded-[9px] bg-white border border-[#DDDCD4] text-[#142820] hover:bg-[#F1EFE8] flex items-center justify-center shrink-0 transition-colors"
-            aria-label="Quay lại"
-          >
-            <ArrowLeft className="w-4 h-4" />
-          </button>
+    <div className="fixed inset-x-0 top-0 bottom-[calc(58px+env(safe-area-inset-bottom,0px))] z-20 md:static md:z-auto w-full md:h-[calc(100dvh-64px)] bg-[#F5F6F2] text-[#15251F] flex flex-col md:flex-row overflow-hidden">
+      {/* MOBILE MAP TOP AREA: Priority 1 (assets/mobile-map-compact.png) */}
+      <div className="md:hidden shrink-0 bg-[#F5F6F2] border-b border-[#E2E5DC] px-3 pt-[max(8px,env(safe-area-inset-top,0px))] pb-2 space-y-2 z-20 relative">
+        {/* Row 1: Back + Bản đồ (Thủ Đức v) + Đăng tin */}
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 min-w-0">
+            <button
+              type="button"
+              onClick={onBackToExplore}
+              className="w-9 h-9 rounded-[10px] bg-white border border-[#E2E5DC] text-[#15251F] hover:bg-[#ECEFE7] flex items-center justify-center shrink-0 transition-colors"
+              aria-label="Quay lại"
+            >
+              <ArrowLeft className="w-4 h-4" />
+            </button>
 
-          <button
-            type="button"
-            onClick={onOpenLocationPicker}
-            className="flex-1 min-w-0 h-9 px-2.5 rounded-[9px] bg-white border border-[#DDDCD4] text-xs font-semibold text-[#142820] flex items-center justify-between gap-1.5"
-          >
-            <span className="flex items-center gap-1 min-w-0">
-              <MapPin className="w-3.5 h-3.5 text-[#0E513B] shrink-0" />
-              <span className="truncate">
-                {userCoords.label || 'Thủ Đức, TP.HCM'}
+            <button
+              type="button"
+              onClick={onOpenLocationPicker}
+              className="text-left min-w-0 px-1 py-0.5 rounded-lg hover:bg-[#ECEFE7]/70 transition-colors"
+            >
+              <span className="block text-[15px] font-extrabold text-[#15251F] leading-tight">
+                Bản đồ
               </span>
-            </span>
-            <ChevronDown className="w-3.5 h-3.5 text-[#52605A] shrink-0" />
-          </button>
-
-          <button
-            type="button"
-            onClick={handleLocateMe}
-            className="w-9 h-9 rounded-[9px] bg-white border border-[#DDDCD4] text-[#142820] hover:border-[#0E513B] flex items-center justify-center shrink-0"
-            title="Vị trí của tôi"
-            aria-label="Vị trí của tôi"
-          >
-            <Crosshair className="w-4 h-4 text-[#0E513B]" />
-          </button>
+              <span className="inline-flex items-center gap-0.5 text-[12px] font-semibold text-[#53635B] leading-tight max-w-[160px]">
+                <span className="truncate">{shortUserLocationLabel}</span>
+                <ChevronDown className="w-3.5 h-3.5 shrink-0 text-[#53635B]" />
+              </span>
+            </button>
+          </div>
 
           <button
             type="button"
             onClick={onOpenCreatePost}
-            className="h-9 px-2.5 rounded-[9px] bg-[#0E513B] hover:bg-[#0A412F] text-white text-xs font-bold flex items-center gap-1 shadow-sm transition-colors shrink-0"
+            className="h-9 px-3.5 rounded-[10px] bg-[#123F35] hover:bg-[#0D3129] text-white text-xs font-bold flex items-center gap-1.5 shadow-sm transition-colors shrink-0"
           >
             <Plus className="w-3.5 h-3.5" />
             <span>Đăng tin</span>
           </button>
         </div>
 
-        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
-          <button
-            type="button"
-            onClick={() => setCategory('ALL')}
-            aria-pressed={category === 'ALL'}
-            className={`h-8 px-2.5 rounded-full text-[11px] font-bold border flex items-center gap-1 whitespace-nowrap shrink-0 transition-colors ${
-              category === 'ALL'
-                ? 'bg-[#0E513B] text-white border-[#0E513B]'
-                : 'bg-white text-[#142820] border-[#DDDCD4]'
-            }`}
-          >
-            <LayoutGrid className="w-3 h-3 shrink-0" />
-            <span>Tất cả</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setCategory('RESCUE')}
-            aria-pressed={category === 'RESCUE'}
-            className={`h-8 px-2.5 rounded-full text-[11px] font-bold border flex items-center gap-1 whitespace-nowrap shrink-0 transition-colors ${
-              category === 'RESCUE'
-                ? 'bg-[#FFF0E5] text-[#AF421F] border-[#AF421F]'
-                : 'bg-white text-[#142820] border-[#DDDCD4]'
-            }`}
-          >
-            <LifeBuoy className="w-3 h-3 text-[#C84B24] shrink-0" />
-            <span>Cứu trợ</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setCategory('LOST')}
-            aria-pressed={category === 'LOST'}
-            className={`h-8 px-2.5 rounded-full text-[11px] font-bold border flex items-center gap-1 whitespace-nowrap shrink-0 transition-colors ${
-              category === 'LOST'
-                ? 'bg-[#FFF3D8] text-[#80570D] border-[#80570D]'
-                : 'bg-white text-[#142820] border-[#DDDCD4]'
-            }`}
-          >
-            <PawFilterIcon className="w-3 h-3 text-[#D4942A] shrink-0" />
-            <span>Thú lạc</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setCategory('ADOPT')}
-            aria-pressed={category === 'ADOPT'}
-            className={`h-8 px-2.5 rounded-full text-[11px] font-bold border flex items-center gap-1 whitespace-nowrap shrink-0 transition-colors ${
-              category === 'ADOPT'
-                ? 'bg-[#E8EFE6] text-[#0E513B] border-[#0E513B]'
-                : 'bg-white text-[#142820] border-[#DDDCD4]'
-            }`}
-          >
-            <Home className="w-3 h-3 text-[#0E513B] shrink-0" />
-            <span>Nhận nuôi</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setShowVets((v) => !v)}
-            aria-pressed={showVets}
-            className={`h-8 px-2.5 rounded-full text-[11px] font-bold border flex items-center gap-1 whitespace-nowrap shrink-0 transition-colors ${
-              showVets
-                ? 'bg-[#0E513B] text-white border-[#0E513B]'
-                : 'bg-white text-[#142820] border-[#DDDCD4]'
-            }`}
-          >
-            <Stethoscope
-              className={`w-3 h-3 shrink-0 ${
-                showVets ? 'text-white' : 'text-[#0E513B]'
+        {/* Row 2: Tất cả | Cứu trợ | Thú lạc | Nhận nuôi + [Bộ lọc] */}
+        <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar flex-1 min-w-0">
+            <button
+              type="button"
+              onClick={() => setCategory('ALL')}
+              aria-pressed={category === 'ALL'}
+              className={`h-8 px-2.5 rounded-full text-xs font-bold border flex items-center gap-1 whitespace-nowrap shrink-0 transition-colors ${
+                category === 'ALL'
+                  ? 'bg-[#123F35] text-white border-[#123F35]'
+                  : 'bg-white text-[#15251F] border-[#E2E5DC]'
               }`}
-            />
-            <span>Thú y 24/7</span>
+            >
+              <span>Tất cả</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setCategory('RESCUE')}
+              aria-pressed={category === 'RESCUE'}
+              className={`h-8 px-2.5 rounded-full text-xs font-bold border flex items-center gap-1 whitespace-nowrap shrink-0 transition-colors ${
+                category === 'RESCUE'
+                  ? 'bg-[#FDECE7] text-[#C84E2B] border-[#C84E2B]'
+                  : 'bg-white text-[#15251F] border-[#E2E5DC]'
+              }`}
+            >
+              <LifeBuoy className="w-3.5 h-3.5 text-[#C84E2B] shrink-0" />
+              <span>Cứu trợ</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setCategory('LOST')}
+              aria-pressed={category === 'LOST'}
+              className={`h-8 px-2.5 rounded-full text-xs font-bold border flex items-center gap-1 whitespace-nowrap shrink-0 transition-colors ${
+                category === 'LOST'
+                  ? 'bg-[#F2D272] text-[#15251F] border-[#D9881E]'
+                  : 'bg-white text-[#15251F] border-[#E2E5DC]'
+              }`}
+            >
+              <PawFilterIcon className="w-3.5 h-3.5 text-[#9A5D0A] shrink-0" />
+              <span>Thú lạc</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setCategory('ADOPT')}
+              aria-pressed={category === 'ADOPT'}
+              className={`h-8 px-2.5 rounded-full text-xs font-bold border flex items-center gap-1 whitespace-nowrap shrink-0 transition-colors ${
+                category === 'ADOPT'
+                  ? 'bg-[#E4EDDD] text-[#123F35] border-[#123F35]'
+                  : 'bg-white text-[#15251F] border-[#E2E5DC]'
+              }`}
+            >
+              <Home className="w-3.5 h-3.5 text-[#123F35] shrink-0" />
+              <span>Nhận nuôi</span>
+            </button>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setIsMobileMapFilterOpen((v) => !v)}
+            aria-expanded={isMobileMapFilterOpen}
+            aria-label="Mở bộ lọc bản đồ"
+            className={`relative w-8 h-8 rounded-[10px] border flex items-center justify-center shrink-0 transition-colors ${
+              isMobileMapFilterOpen || showVets
+                ? 'bg-[#E4EDDD] border-[#123F35] text-[#123F35]'
+                : 'bg-white border-[#E2E5DC] text-[#15251F]'
+            }`}
+          >
+            <SlidersHorizontal className="w-4 h-4" />
+            {showVets && (
+              <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-[#123F35] border border-white" />
+            )}
           </button>
         </div>
+
+        {/* Mobile Map Filter Popover (contains Thú y 24/7 + Nguồn/Khu vực + Sổ tay vị trí) */}
+        {isMobileMapFilterOpen && (
+          <div className="pt-1.5 border-t border-[#E2E5DC] grid grid-cols-2 gap-1.5">
+            <button
+              type="button"
+              onClick={() => setShowVets((v) => !v)}
+              aria-pressed={showVets}
+              className={`min-h-[38px] px-2.5 rounded-[10px] text-xs font-bold border flex items-center justify-center gap-1.5 transition-colors ${
+                showVets
+                  ? 'bg-[#123F35] text-white border-[#123F35]'
+                  : 'bg-white text-[#15251F] border-[#E2E5DC]'
+              }`}
+            >
+              <Stethoscope
+                className={`w-3.5 h-3.5 shrink-0 ${
+                  showVets ? 'text-white' : 'text-[#123F35]'
+                }`}
+              />
+              <span>Thú y 24/7 {showVets ? '(Bật)' : ''}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleLocateMe}
+              className="min-h-[38px] px-2.5 rounded-[10px] bg-white border border-[#E2E5DC] text-xs font-bold text-[#15251F] flex items-center justify-center gap-1.5"
+            >
+              <Crosshair className="w-3.5 h-3.5 text-[#123F35] shrink-0" />
+              <span>Vị trí của tôi</span>
+            </button>
+
+            {onOpenFilterModal && (
+              <button
+                type="button"
+                onClick={() => {
+                  setIsMobileMapFilterOpen(false);
+                  onOpenFilterModal();
+                }}
+                className="min-h-[38px] px-2.5 rounded-[10px] bg-white border border-[#E2E5DC] text-xs font-bold text-[#15251F] flex items-center justify-center gap-1.5"
+              >
+                <SlidersHorizontal className="w-3.5 h-3.5 text-[#123F35] shrink-0" />
+                <span>Lọc nguồn &amp; vùng</span>
+              </button>
+            )}
+
+            {onOpenGoogleMapsVault && (
+              <button
+                type="button"
+                onClick={() => {
+                  setIsMobileMapFilterOpen(false);
+                  onOpenGoogleMapsVault();
+                }}
+                className="min-h-[38px] px-2.5 rounded-[10px] bg-white border border-[#E2E5DC] text-xs font-bold text-[#15251F] flex items-center justify-center gap-1.5"
+              >
+                <Bookmark className="w-3.5 h-3.5 text-[#123F35] shrink-0" />
+                <span>Sổ tay vị trí</span>
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
-      <aside className="hidden md:flex w-[360px] lg:w-[390px] shrink-0 h-full bg-[#FAF7F1] border-r border-[#DDDCD4] flex-col overflow-y-auto">
-        <div className="p-4 lg:px-6 lg:py-5 space-y-3.5 border-b border-[#DDDCD4]">
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="w-6 h-6 rounded-md bg-[#FFF3D8] text-[#D4942A] flex items-center justify-center shrink-0">
-                <MapPin className="w-4 h-4" />
-              </span>
-              <h1 className="text-xl font-extrabold text-[#142820]">
-                Quanh bạn
-              </h1>
+      <aside className="hidden md:flex w-[360px] lg:w-[390px] shrink-0 h-full bg-[#F5F6F2] border-r border-[#E2E5DC] flex-col overflow-y-auto">
+        <div className="p-4 lg:px-6 lg:py-5 space-y-3.5 border-b border-[#E2E5DC]">
+          <div className="flex items-start justify-between gap-2">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="w-6 h-6 rounded-md bg-[#FFF3D8] text-[#D4942A] flex items-center justify-center shrink-0">
+                  <MapPin className="w-4 h-4" />
+                </span>
+                <h1 className="text-xl font-extrabold text-[#15251F]">
+                  Quanh bạn
+                </h1>
+              </div>
+              <p className="text-xs text-[#53635B] mt-1">
+                Tin cứu hộ, thú lạc và nhận nuôi
+              </p>
             </div>
-            <p className="text-xs text-[#52605A] mt-1">
-              Tin cứu hộ, thú lạc và nhận nuôi
-            </p>
+
+            {onOpenGoogleMapsVault && (
+              <button
+                type="button"
+                onClick={onOpenGoogleMapsVault}
+                className="h-8 px-2.5 rounded-[10px] bg-white border border-[#E2E5DC] hover:border-[#123F35] text-xs font-bold text-[#123F35] inline-flex items-center gap-1 shrink-0 transition-colors"
+              >
+                <Bookmark className="w-3.5 h-3.5" />
+                <span>Sổ tay vị trí</span>
+              </button>
+            )}
           </div>
 
           <div className="relative flex items-center gap-1.5">
@@ -560,14 +646,13 @@ export default function FullMapView({
         </div>
 
         {selectedSpot && (
-          <div className="md:hidden shrink-0 max-h-[34dvh] overflow-y-auto bg-[#FAF7F1] border-t border-[#DDDCD4] p-2.5 z-20">
+          <div className="md:hidden shrink-0 max-h-[34dvh] overflow-y-auto bg-[#F5F6F2] border-t border-[#E2E5DC] p-3 z-20">
             {(() => {
-              const badgeMeta = getSpotBadgeMeta(selectedSpot);
               const areaDisplay = getCompactAreaLabel(selectedSpot);
               const sourceText = getSpotSourceText(selectedSpot);
 
               return (
-                <div className="rounded-[12px] bg-white border border-[#DDDCD4] p-2.5 flex items-start gap-3 shadow-sm">
+                <div className="rounded-[16px] bg-white border border-[#E2E5DC] p-3 flex items-start gap-3 shadow-sm">
                   <img
                     src={selectedSpot.images?.[0] || FALLBACK_PET_IMAGE}
                     alt={selectedSpot.title}
@@ -578,52 +663,39 @@ export default function FullMapView({
                         target.src = FALLBACK_PET_IMAGE;
                       }
                     }}
-                    className="w-16 h-16 sm:w-20 sm:h-20 rounded-[10px] object-cover shrink-0 bg-[#F1EFE8] border border-[#DDDCD4]"
+                    className="w-[76px] h-[76px] rounded-[12px] object-cover shrink-0 bg-[#ECEFE7] border border-[#E2E5DC]"
                   />
 
-                  <div className="min-w-0 flex-1 space-y-1">
-                    <div className="flex items-center justify-between gap-1">
-                      <span
-                        className="inline-block px-2 py-0.5 rounded text-[10px] font-extrabold uppercase tracking-wider"
-                        style={{
-                          backgroundColor: badgeMeta.bgHex,
-                          color: badgeMeta.textHex,
-                        }}
-                      >
-                        {badgeMeta.uppercaseLabel}
-                      </span>
+                  <div className="min-w-0 flex-1 space-y-1.5">
+                    <div className="flex items-start justify-between gap-2">
+                      <h3 className="text-[15px] font-extrabold text-[#15251F] leading-snug line-clamp-1">
+                        {selectedSpot.title}
+                      </h3>
 
                       <button
                         type="button"
                         onClick={() => onSelectSpot(null)}
-                        className="w-7 h-7 rounded-md text-[#52605A] hover:bg-[#F1EFE8] flex items-center justify-center shrink-0"
+                        className="w-7 h-7 -mt-0.5 -mr-1 rounded-md text-[#53635B] hover:bg-[#ECEFE7] flex items-center justify-center shrink-0"
                         aria-label="Đóng tóm tắt ghim"
                       >
                         <X className="w-4 h-4" />
                       </button>
                     </div>
 
-                    <h3 className="text-xs sm:text-sm font-bold text-[#142820] leading-snug line-clamp-2">
-                      {selectedSpot.title}
-                    </h3>
+                    <p className="text-xs text-[#53635B] flex items-center gap-1 min-w-0">
+                      <MapPin className="w-3.5 h-3.5 text-[#53635B] shrink-0" />
+                      <span className="truncate">
+                        {areaDisplay} · {sourceText}
+                      </span>
+                    </p>
 
-                    <div className="flex flex-wrap items-center justify-between gap-2 pt-0.5">
-                      <p className="text-[11px] text-[#52605A] flex items-center gap-1 min-w-0">
-                        <MapPin className="w-3 h-3 text-[#52605A] shrink-0" />
-                        <span className="truncate">
-                          {areaDisplay} · {sourceText}
-                        </span>
-                      </p>
-
-                      <button
-                        type="button"
-                        onClick={() => onOpenSpotDetail(selectedSpot)}
-                        className="min-h-[38px] px-3 rounded-[10px] bg-[#0E513B] hover:bg-[#0A412F] text-white text-xs font-bold inline-flex items-center gap-1 shrink-0 transition-colors"
-                      >
-                        <span>Xem chi tiết</span>
-                        <ArrowRight className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
+                    <button
+                      type="button"
+                      onClick={() => onOpenSpotDetail(selectedSpot)}
+                      className="w-full h-9 px-3 rounded-[10px] bg-[#123F35] hover:bg-[#0D3129] text-white text-xs font-bold inline-flex items-center justify-center gap-1.5 transition-colors"
+                    >
+                      <span>Xem chi tiết</span>
+                    </button>
                   </div>
                 </div>
               );

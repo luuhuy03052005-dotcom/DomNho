@@ -307,42 +307,62 @@ export default function SpotDetailModal({
       >
         <div
           onClick={(e) => e.stopPropagation()}
-          className="w-full h-[100dvh] sm:h-auto sm:max-h-[90dvh] sm:max-w-2xl bg-[#FAF7F1] text-[#142820] sm:rounded-2xl sm:border sm:border-[#DDDCD4] shadow-2xl flex flex-col overflow-hidden"
+          className="w-full h-[100dvh] sm:h-auto sm:max-h-[90dvh] sm:max-w-2xl bg-[#F5F6F2] text-[#15251F] sm:rounded-2xl sm:border sm:border-[#E2E5DC] shadow-2xl flex flex-col overflow-hidden"
         >
-          <header className="shrink-0 bg-[#FAF7F1] border-b border-[#DDDCD4] px-3 sm:px-5 py-2.5 pt-[max(10px,env(safe-area-inset-top,0px))] flex items-center justify-between gap-2">
+          <header className="shrink-0 bg-[#F5F6F2] border-b border-[#E2E5DC] px-3 sm:px-5 py-2.5 pt-[max(10px,env(safe-area-inset-top,0px))] flex items-center justify-between gap-2">
             <button
               type="button"
               onClick={onClose}
-              className="min-w-[44px] min-h-[44px] -ml-1 px-2.5 rounded-[10px] text-[#142820] hover:bg-[#F1EFE8] flex items-center gap-1.5 text-xs sm:text-sm font-bold transition-colors"
+              className="min-w-[40px] min-h-[40px] rounded-[10px] bg-white border border-[#E2E5DC] text-[#15251F] hover:bg-[#ECEFE7] flex items-center justify-center transition-colors"
               aria-label="Quay lại"
             >
-              <ArrowLeft className="w-5 h-5 shrink-0" />
-              <span className="hidden sm:inline">Quay lại</span>
+              <ArrowLeft className="w-4 h-4 shrink-0" />
             </button>
 
-            <h2 className="text-base sm:text-lg font-extrabold text-[#142820] truncate">
+            <h2 className="text-base sm:text-lg font-extrabold text-[#15251F] truncate">
               Chi tiết tin
             </h2>
 
-            <button
-              type="button"
-              onClick={onClose}
-              className="min-w-[44px] min-h-[44px] -mr-1 rounded-[10px] text-[#52605A] hover:text-[#142820] hover:bg-[#F1EFE8] flex items-center justify-center transition-colors"
-              aria-label="Đóng chi tiết tin"
-            >
-              <X className="w-5 h-5" />
-            </button>
+            <div className="flex items-center gap-1.5">
+              {onToggleSave && (
+                <button
+                  type="button"
+                  onClick={() => onToggleSave(spot)}
+                  aria-pressed={isSaved}
+                  aria-label={isSaved ? 'Bỏ lưu bài viết' : 'Lưu bài viết'}
+                  className={`min-w-[40px] min-h-[40px] rounded-[10px] border flex items-center justify-center transition-colors ${
+                    isSaved
+                      ? 'bg-[#E4EDDD] border-[#123F35] text-[#123F35]'
+                      : 'bg-white border-[#E2E5DC] text-[#15251F] hover:border-[#123F35]'
+                  }`}
+                >
+                  <Bookmark
+                    className={`w-4 h-4 ${isSaved ? 'fill-[#123F35]' : ''}`}
+                  />
+                </button>
+              )}
+
+              <button
+                type="button"
+                onClick={onClose}
+                className="hidden sm:flex min-w-[40px] min-h-[40px] rounded-[10px] bg-white border border-[#E2E5DC] text-[#53635B] hover:text-[#15251F] hover:bg-[#ECEFE7] items-center justify-center transition-colors"
+                aria-label="Đóng chi tiết tin"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
           </header>
 
           <div
             ref={bodyScrollRef}
             className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-4 sm:px-6 py-4 space-y-4"
           >
-            <div className="space-y-2.5">
+            {/* Main Image + Dedicated Counter/View Bar Below Image (No Overlay) */}
+            <div className="space-y-2">
               <div
                 onClick={() => setIsLightboxOpen(true)}
-                className="relative w-full aspect-[16/9] min-h-[190px] rounded-2xl overflow-hidden bg-[#F1EFE8] border border-[#DDDCD4] cursor-zoom-in"
-                title="Bấm vào ảnh để mở trình xem ảnh rõ"
+                className="relative w-full aspect-[4/3] sm:aspect-[16/9] min-h-[190px] rounded-[16px] overflow-hidden bg-[#ECEFE7] border border-[#E2E5DC] cursor-zoom-in"
+                title="Bấm vào ảnh để mở trình xem ảnh"
               >
                 <img
                   src={currentHeroSrc}
@@ -355,7 +375,7 @@ export default function SpotDetailModal({
                 />
               </div>
 
-              <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center justify-between gap-2 px-0.5">
                 {safeImages.length > 1 ? (
                   <div className="flex items-center gap-1.5">
                     <button
@@ -365,13 +385,13 @@ export default function SpotDetailModal({
                           (i) => (i - 1 + safeImages.length) % safeImages.length
                         )
                       }
-                      className="min-w-[40px] min-h-[40px] rounded-[10px] bg-white border border-[#DDDCD4] hover:border-[#0E513B] text-[#142820] flex items-center justify-center transition-colors"
+                      className="w-8 h-8 rounded-[8px] bg-white border border-[#E2E5DC] hover:border-[#123F35] text-[#15251F] flex items-center justify-center transition-colors"
                       aria-label="Ảnh trước"
                     >
                       <ChevronLeft className="w-4 h-4" />
                     </button>
 
-                    <span className="px-3 py-1.5 rounded-[10px] bg-white border border-[#DDDCD4] text-xs font-bold text-[#142820]">
+                    <span className="px-2.5 py-1 text-xs font-bold text-[#53635B]">
                       {imageIndex + 1} / {safeImages.length}
                     </span>
 
@@ -380,25 +400,25 @@ export default function SpotDetailModal({
                       onClick={() =>
                         setImageIndex((i) => (i + 1) % safeImages.length)
                       }
-                      className="min-w-[40px] min-h-[40px] rounded-[10px] bg-white border border-[#DDDCD4] hover:border-[#0E513B] text-[#142820] flex items-center justify-center transition-colors"
+                      className="w-8 h-8 rounded-[8px] bg-white border border-[#E2E5DC] hover:border-[#123F35] text-[#15251F] flex items-center justify-center transition-colors"
                       aria-label="Ảnh tiếp theo"
                     >
                       <ChevronRight className="w-4 h-4" />
                     </button>
                   </div>
                 ) : (
-                  <span className="text-xs font-medium text-[#52605A]">
-                    1 / 1 ảnh đính kèm
+                  <span className="text-xs font-semibold text-[#53635B]">
+                    1 / 1
                   </span>
                 )}
 
                 <button
                   type="button"
                   onClick={() => setIsLightboxOpen(true)}
-                  className="min-h-[40px] px-3.5 rounded-[10px] bg-white border border-[#DDDCD4] hover:border-[#0E513B] text-xs font-bold text-[#142820] inline-flex items-center gap-1.5 transition-colors"
+                  className="h-9 px-3 rounded-[10px] bg-white border border-[#E2E5DC] hover:border-[#123F35] text-xs font-bold text-[#15251F] inline-flex items-center gap-1.5 transition-colors"
                 >
-                  <ZoomIn className="w-4 h-4 text-[#0E513B]" />
-                  <span>Xem ảnh rõ</span>
+                  <ZoomIn className="w-3.5 h-3.5 text-[#123F35]" />
+                  <span>Xem ảnh</span>
                 </button>
               </div>
 
@@ -411,8 +431,8 @@ export default function SpotDetailModal({
                       onClick={() => setImageIndex(idx)}
                       className={`relative w-14 h-14 rounded-[10px] overflow-hidden shrink-0 border-2 transition-all ${
                         idx === imageIndex
-                          ? 'border-[#0E513B] shadow-sm'
-                          : 'border-[#DDDCD4] opacity-70 hover:opacity-100'
+                          ? 'border-[#123F35] shadow-sm'
+                          : 'border-[#E2E5DC] opacity-70 hover:opacity-100'
                       }`}
                       aria-label={`Xem ảnh ${idx + 1}`}
                       aria-pressed={idx === imageIndex}
@@ -437,10 +457,11 @@ export default function SpotDetailModal({
               )}
             </div>
 
-            <div className="space-y-2.5">
+            {/* Category Badge + Title + Subline */}
+            <div className="space-y-2">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <span
-                  className="inline-block px-2.5 py-1 rounded-md text-xs font-extrabold uppercase tracking-wider"
+                  className="inline-block px-2.5 py-0.5 rounded-full text-[11px] font-extrabold uppercase tracking-wider"
                   style={{
                     backgroundColor: badgeMeta.bgHex,
                     color: badgeMeta.textHex,
@@ -451,8 +472,8 @@ export default function SpotDetailModal({
 
                 <div className="flex items-center gap-2 flex-wrap">
                   {hasExactCoords && (
-                    <span className="px-2.5 py-1 rounded-md bg-white border border-[#DDDCD4] text-xs font-bold text-[#142820] inline-flex items-center gap-1">
-                      <MapPin className="w-3.5 h-3.5 text-[#0E513B] shrink-0" />
+                    <span className="px-2.5 py-0.5 rounded-full bg-white border border-[#E2E5DC] text-xs font-bold text-[#15251F] inline-flex items-center gap-1">
+                      <MapPin className="w-3 h-3 text-[#123F35] shrink-0" />
                       <span>{formatDistanceVi(distanceMeters)}</span>
                     </span>
                   )}
@@ -460,63 +481,57 @@ export default function SpotDetailModal({
                   <button
                     type="button"
                     onClick={() => onBoostLight(spot.id)}
-                    className="px-2.5 py-1 rounded-md bg-[#FFF0E5] border border-[#AF421F]/25 text-xs font-bold text-[#AF421F] inline-flex items-center gap-1 transition-colors hover:bg-[#FFE4D1]"
+                    className="px-2.5 py-0.5 rounded-full bg-[#FDECE7] border border-[#C84E2B]/25 text-xs font-bold text-[#C84E2B] inline-flex items-center gap-1 transition-colors hover:bg-[#FADCD3]"
                     title="Thắp thêm sự quan tâm cho bài viết"
                   >
-                    <Flame className="w-3.5 h-3.5 fill-current" />
+                    <Flame className="w-3 h-3 fill-current" />
                     <span>Quan tâm ({spot.boostCount})</span>
                   </button>
                 </div>
               </div>
 
-              <h1 className="text-xl sm:text-2xl font-extrabold text-[#142820] leading-snug">
+              <h1 className="text-xl sm:text-2xl font-extrabold text-[#15251F] leading-snug">
                 {spot.title}
               </h1>
 
-              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs sm:text-sm text-[#52605A]">
-                <span className="inline-flex items-center gap-1 font-medium text-[#142820]">
-                  <MapPin className="w-4 h-4 text-[#0E513B] shrink-0" />
-                  <span>{spot.formattedAddress || spot.areaLabel}</span>
+              <p className="text-xs sm:text-sm text-[#53635B] flex flex-wrap items-center gap-1.5">
+                <MapPin className="w-3.5 h-3.5 text-[#53635B] shrink-0" />
+                <span>{spot.formattedAddress || spot.areaLabel}</span>
+                <span>·</span>
+                <span className="font-semibold text-[#15251F]">
+                  {friendlySource}
                 </span>
-                <span className="text-[#DDDCD4]">|</span>
-                <span>
-                  Nguồn:{' '}
-                  <strong className="font-semibold text-[#142820]">
-                    {friendlySource}
-                  </strong>
-                </span>
-                {publishedDateFormatted && (
-                  <>
-                    <span className="text-[#DDDCD4]">|</span>
-                    <span>Ngày đăng: {publishedDateFormatted}</span>
-                  </>
-                )}
-              </div>
+              </p>
             </div>
 
-            <div className="p-4 rounded-xl bg-white border border-[#DDDCD4] space-y-3">
-              <p className="text-sm sm:text-base text-[#142820] leading-relaxed whitespace-pre-line">
+            {/* Section 1: Đặc điểm nhận diện */}
+            <div className="p-4 rounded-[14px] bg-white border border-[#E2E5DC] space-y-2.5">
+              <h3 className="text-sm font-extrabold text-[#15251F]">
+                Đặc điểm nhận diện
+              </h3>
+
+              <p className="text-sm text-[#53635B] leading-relaxed whitespace-pre-line">
                 {spot.story}
               </p>
 
               {(spot.breed ||
                 spot.coatColor ||
                 (Array.isArray(spot.traits) && spot.traits.length > 0)) && (
-                <div className="flex flex-wrap gap-1.5 pt-1 border-t border-[#F1EFE8]">
+                <div className="flex flex-wrap gap-1.5 pt-2 border-t border-[#ECEFE7]">
                   {spot.breed && spot.breed !== 'Chưa rõ giống' && (
-                    <span className="px-2.5 py-1 rounded-md bg-[#F1EFE8] text-xs font-semibold text-[#142820]">
+                    <span className="px-2.5 py-1 rounded-md bg-[#ECEFE7] text-xs font-semibold text-[#15251F]">
                       Giống: {spot.breed}
                     </span>
                   )}
                   {spot.coatColor && spot.coatColor !== 'Chưa rõ màu lông' && (
-                    <span className="px-2.5 py-1 rounded-md bg-[#F1EFE8] text-xs font-semibold text-[#142820]">
+                    <span className="px-2.5 py-1 rounded-md bg-[#ECEFE7] text-xs font-semibold text-[#15251F]">
                       Màu lông: {spot.coatColor}
                     </span>
                   )}
                   {spot.traits?.map((trait) => (
                     <span
                       key={trait}
-                      className="px-2.5 py-1 rounded-md bg-[#E8EFE6] text-xs font-semibold text-[#0E513B]"
+                      className="px-2.5 py-1 rounded-md bg-[#E4EDDD] text-xs font-semibold text-[#123F35]"
                     >
                       {trait}
                     </span>
@@ -525,54 +540,69 @@ export default function SpotDetailModal({
               )}
             </div>
 
-            {hasExactCoords ? (
-              <div className="space-y-2">
+            {/* Section 2: Lần cuối nhìn thấy / Vị trí ghi nhận */}
+            <div className="p-4 rounded-[14px] bg-white border border-[#E2E5DC] space-y-1.5">
+              <h3 className="text-sm font-extrabold text-[#15251F]">
+                Lần cuối nhìn thấy
+              </h3>
+              <p className="text-sm text-[#53635B]">
+                {spot.formattedAddress || spot.areaLabel}
+                {publishedDateFormatted
+                  ? ` · Ghi nhận ngày ${publishedDateFormatted}`
+                  : ''}
+              </p>
+              {!hasExactCoords && (
+                <p className="text-xs text-[#73827A] pt-1">
+                  Bài viết chưa có tọa độ số nhà cụ thể nên hiển thị trong danh sách tin khu vực để tránh ghim sai vị trí.
+                </p>
+              )}
+            </div>
+
+            {/* Primary Action Buttons matching 03 · CHI TIẾT */}
+            <div className="space-y-2">
+              <button
+                type="button"
+                onClick={() => openSubPanelAndScroll('REPORT_SIGHTING')}
+                className="w-full min-h-[44px] px-4 rounded-[12px] bg-[#ECEFE7] hover:bg-[#E4EDDD] border border-[#E2E5DC] text-sm font-bold text-[#15251F] flex items-center justify-center gap-2 transition-colors"
+              >
+                <Camera className="w-4 h-4 text-[#C84E2B] shrink-0" />
+                <span>Tôi đã nhìn thấy bé</span>
+              </button>
+
+              {hasExactCoords && (
                 <button
                   type="button"
                   onClick={() => onFocusSpotOnMap(spot)}
-                  className="w-full min-h-[48px] px-4 rounded-[10px] bg-white border border-[#DDDCD4] hover:border-[#0E513B] text-sm font-bold text-[#142820] flex items-center justify-between gap-2 transition-colors"
+                  className="w-full min-h-[44px] px-4 rounded-[12px] bg-white hover:bg-[#ECEFE7] border border-[#E2E5DC] text-sm font-bold text-[#15251F] flex items-center justify-center gap-2 transition-colors"
                 >
-                  <span className="inline-flex items-center gap-2">
-                    <Compass className="w-4 h-4 text-[#0E513B] shrink-0" />
-                    <span>Xem trên bản đồ</span>
-                  </span>
-                  <ArrowRight className="w-4 h-4 text-[#0E513B] shrink-0" />
+                  <MapPin className="w-4 h-4 text-[#123F35] shrink-0" />
+                  <span>Xem vị trí trên bản đồ</span>
                 </button>
+              )}
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {hasExactCoords && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-0.5">
                   <a
                     href={googleMapsDirectionFromUserUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="min-h-[44px] px-3.5 rounded-[10px] bg-white border border-[#DDDCD4] hover:border-[#0E513B] text-xs font-bold text-[#142820] flex items-center justify-center gap-1.5 transition-colors"
+                    className="min-h-[40px] px-3.5 rounded-[10px] bg-white border border-[#E2E5DC] hover:border-[#123F35] text-xs font-bold text-[#15251F] flex items-center justify-center gap-1.5 transition-colors"
                   >
-                    <Navigation className="w-3.5 h-3.5 text-[#0E513B]" />
+                    <Navigation className="w-3.5 h-3.5 text-[#123F35]" />
                     <span>Chỉ đường Google Maps</span>
                   </a>
 
                   <button
                     type="button"
                     onClick={() => onSaveSpotToGoogleMapsVault(spot)}
-                    className="min-h-[44px] px-3.5 rounded-[10px] bg-white border border-[#DDDCD4] hover:border-[#0E513B] text-xs font-bold text-[#142820] flex items-center justify-center gap-1.5 transition-colors"
+                    className="min-h-[40px] px-3.5 rounded-[10px] bg-white border border-[#E2E5DC] hover:border-[#123F35] text-xs font-bold text-[#15251F] flex items-center justify-center gap-1.5 transition-colors"
                   >
-                    <Bookmark className="w-3.5 h-3.5 text-[#0E513B]" />
+                    <Bookmark className="w-3.5 h-3.5 text-[#123F35]" />
                     <span>Lưu vào Sổ tay vị trí</span>
                   </button>
                 </div>
-              </div>
-            ) : (
-              <div className="p-3.5 rounded-xl bg-white border border-[#DDDCD4] flex items-start gap-2.5 text-xs text-[#52605A]">
-                <MapPin className="w-4 h-4 text-[#AF421F] shrink-0 mt-0.5" />
-                <div>
-                  <p className="font-bold text-[#142820]">
-                    Khu vực ghi nhận: {spot.formattedAddress || spot.areaLabel}
-                  </p>
-                  <p className="mt-0.5">
-                    Bài viết chưa có tọa độ số nhà cụ thể nên chỉ hiển thị trong danh sách tin khu vực để tránh ghim sai vị trí.
-                  </p>
-                </div>
-              </div>
-            )}
+              )}
+            </div>
 
             {isUserPost && (
               <div className="p-3.5 rounded-xl bg-white border border-[#DDDCD4] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -669,283 +699,261 @@ export default function SpotDetailModal({
               </div>
             )}
 
-            {isUserPost && (
-              <div ref={subPanelAnchorRef} className="space-y-3">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                  <button
-                    type="button"
-                    onClick={() => openSubPanelAndScroll('REPORT_SIGHTING')}
-                    className="min-h-[44px] px-4 rounded-[10px] bg-white border border-[#DDDCD4] hover:border-[#AF421F] text-xs font-bold text-[#AF421F] flex items-center justify-center gap-2 transition-colors"
-                  >
-                    <Camera className="w-4 h-4" />
-                    <span>Báo phát hiện mới</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => openSubPanelAndScroll('UNLOCK_CONTACT')}
-                    className="min-h-[44px] px-4 rounded-[10px] bg-white border border-[#DDDCD4] hover:border-[#0E513B] text-xs font-bold text-[#0E513B] flex items-center justify-center gap-2 transition-colors"
-                  >
-                    <MessageCircle className="w-4 h-4" />
-                    <span>Gửi lời nhắn &amp; Mở SĐT</span>
-                  </button>
-                </div>
-
-                {activeSubPanel === 'REPORT_SIGHTING' && (
-                  <form
-                    onSubmit={handleSubmitSighting}
-                    className="p-4 rounded-xl bg-white border border-[#DDDCD4] space-y-3"
-                  >
-                    <p className="text-xs font-bold text-[#AF421F]">
-                      Báo tin vừa nhìn thấy bé ngoài đường
-                    </p>
-                    {!userSession && (
-                      <input
-                        type="text"
-                        value={sightingReporterName}
-                        onChange={(e) =>
-                          setSightingReporterName(e.target.value)
-                        }
-                        placeholder="Tên của bạn (để người đăng biết ai hỗ trợ)..."
-                        className="w-full h-11 px-3 rounded-[10px] bg-[#FAF7F1] border border-[#DDDCD4] text-xs text-[#142820] outline-none focus:border-[#0E513B]"
-                        required
-                      />
-                    )}
+            <div ref={subPanelAnchorRef} className="space-y-3">
+              {activeSubPanel === 'REPORT_SIGHTING' && (
+                <form
+                  onSubmit={handleSubmitSighting}
+                  className="p-4 rounded-[14px] bg-white border border-[#E2E5DC] space-y-3"
+                >
+                  <p className="text-xs font-bold text-[#C84E2B]">
+                    Báo tin vừa nhìn thấy bé ngoài đường
+                  </p>
+                  {!userSession && (
                     <input
                       type="text"
-                      value={sightingArea}
-                      onChange={(e) => setSightingArea(e.target.value)}
-                      placeholder="Vị trí nhìn thấy (VD: Hẻm 12 Thảo Điền)..."
-                      className="w-full h-11 px-3 rounded-[10px] bg-[#FAF7F1] border border-[#DDDCD4] text-xs text-[#142820] outline-none focus:border-[#0E513B]"
-                    />
-                    <textarea
-                      value={sightingNote}
-                      onChange={(e) => setSightingNote(e.target.value)}
-                      rows={2}
-                      placeholder="Mô tả tình trạng của bé khi bạn nhìn thấy..."
-                      className="w-full p-3 rounded-[10px] bg-[#FAF7F1] border border-[#DDDCD4] text-xs text-[#142820] outline-none focus:border-[#0E513B]"
+                      value={sightingReporterName}
+                      onChange={(e) =>
+                        setSightingReporterName(e.target.value)
+                      }
+                      placeholder="Tên của bạn (để người đăng biết ai hỗ trợ)..."
+                      className="w-full h-11 px-3 rounded-[10px] bg-[#F5F6F2] border border-[#E2E5DC] text-xs text-[#15251F] outline-none focus:border-[#123F35]"
                       required
                     />
-                    {sightingError && (
-                      <p className="text-xs font-bold text-[#AF421F]">
-                        {sightingError}
-                      </p>
-                    )}
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <input
-                        ref={sightingFileRef}
-                        type="file"
-                        accept="image/*"
-                        onChange={handleSightingFileChange}
-                        className="hidden"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => sightingFileRef.current?.click()}
-                        className="min-h-[40px] px-3 rounded-[10px] bg-[#F1EFE8] text-xs font-semibold text-[#142820] inline-flex items-center gap-1.5"
-                      >
-                        <Camera className="w-3.5 h-3.5" />
-                        <span>
-                          {uploadingSighting
-                            ? 'Đang nén ảnh...'
-                            : sightingImage
-                            ? 'Đã đính kèm 1 ảnh'
-                            : 'Đính kèm ảnh'}
-                        </span>
-                      </button>
-
-                      <div className="flex items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() => setActiveSubPanel('NONE')}
-                          className="min-h-[40px] px-3 rounded-[10px] text-xs font-semibold text-[#52605A]"
-                        >
-                          Hủy
-                        </button>
-                        <button
-                          type="submit"
-                          className="min-h-[40px] px-4 rounded-[10px] bg-[#AF421F] text-white text-xs font-bold"
-                        >
-                          Gửi manh mối
-                        </button>
-                      </div>
-                    </div>
-                  </form>
-                )}
-
-                {activeSubPanel === 'UNLOCK_CONTACT' && (
-                  <form
-                    onSubmit={handleSubmitUnlockContact}
-                    className="p-4 rounded-xl bg-white border border-[#DDDCD4] space-y-3"
-                  >
-                    <p className="text-xs font-bold text-[#0E513B]">
-                      Liên hệ người đăng để hỗ trợ hoặc nhận nuôi
+                  )}
+                  <input
+                    type="text"
+                    value={sightingArea}
+                    onChange={(e) => setSightingArea(e.target.value)}
+                    placeholder="Vị trí nhìn thấy (VD: Hẻm 12 Thảo Điền)..."
+                    className="w-full h-11 px-3 rounded-[10px] bg-[#F5F6F2] border border-[#E2E5DC] text-xs text-[#15251F] outline-none focus:border-[#123F35]"
+                  />
+                  <textarea
+                    value={sightingNote}
+                    onChange={(e) => setSightingNote(e.target.value)}
+                    rows={2}
+                    placeholder="Mô tả tình trạng của bé khi bạn nhìn thấy..."
+                    className="w-full p-3 rounded-[10px] bg-[#F5F6F2] border border-[#E2E5DC] text-xs text-[#15251F] outline-none focus:border-[#123F35]"
+                    required
+                  />
+                  {sightingError && (
+                    <p className="text-xs font-bold text-[#C84E2B]">
+                      {sightingError}
                     </p>
-                    <div className="grid grid-cols-3 gap-1.5">
-                      {[
-                        { id: 'ADOPT_REQUEST', label: 'Xin nhận nuôi' },
-                        { id: 'FOSTER_OFFER', label: 'Nhận nuôi tạm' },
-                        { id: 'SIGHTING_REPORT', label: 'Báo manh mối' },
-                      ].map((opt) => (
-                        <button
-                          key={opt.id}
-                          type="button"
-                          onClick={() =>
-                            setContactRequestType(opt.id as typeof contactRequestType)
-                          }
-                          className={`min-h-[38px] px-2 rounded-[10px] text-[11px] font-bold transition-colors ${
-                            contactRequestType === opt.id
-                              ? 'bg-[#0E513B] text-white'
-                              : 'bg-[#F1EFE8] text-[#142820]'
-                          }`}
-                        >
-                          {opt.label}
-                        </button>
-                      ))}
-                    </div>
-                    <textarea
-                      value={contactMessage}
-                      onChange={(e) => setContactMessage(e.target.value)}
-                      rows={2}
-                      placeholder="Lời nhắn gửi tới người đăng tin..."
-                      className="w-full p-3 rounded-[10px] bg-[#FAF7F1] border border-[#DDDCD4] text-xs text-[#142820] outline-none focus:border-[#0E513B]"
-                      required
+                  )}
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <input
+                      ref={sightingFileRef}
+                      type="file"
+                      accept="image/*"
+                      onChange={handleSightingFileChange}
+                      className="hidden"
                     />
-                    <div className="flex justify-end gap-2">
+                    <button
+                      type="button"
+                      onClick={() => sightingFileRef.current?.click()}
+                      className="min-h-[40px] px-3 rounded-[10px] bg-[#ECEFE7] text-xs font-semibold text-[#15251F] inline-flex items-center gap-1.5"
+                    >
+                      <Camera className="w-3.5 h-3.5" />
+                      <span>
+                        {uploadingSighting
+                          ? 'Đang nén ảnh...'
+                          : sightingImage
+                          ? 'Đã đính kèm 1 ảnh'
+                          : 'Đính kèm ảnh'}
+                      </span>
+                    </button>
+
+                    <div className="flex items-center gap-2">
                       <button
                         type="button"
                         onClick={() => setActiveSubPanel('NONE')}
-                        className="min-h-[40px] px-3 rounded-[10px] text-xs font-semibold text-[#52605A]"
+                        className="min-h-[40px] px-3 rounded-[10px] text-xs font-semibold text-[#53635B]"
                       >
-                        Đóng
+                        Hủy
                       </button>
                       <button
                         type="submit"
-                        className="min-h-[40px] px-4 rounded-[10px] bg-[#0E513B] text-white text-xs font-bold"
+                        className="min-h-[40px] px-4 rounded-[10px] bg-[#C84E2B] text-white text-xs font-bold"
                       >
-                        Gửi &amp; Xem SĐT
+                        Gửi manh mối
                       </button>
                     </div>
-                  </form>
-                )}
-
-                {activeSubPanel === 'QR_POSTER' && (
-                  <div className="p-4 rounded-xl bg-white border border-[#DDDCD4] space-y-3 text-center">
-                    {generatingPoster ? (
-                      <p className="text-xs py-6 text-[#52605A]">
-                        Đang tạo Poster QR...
-                      </p>
-                    ) : (
-                      posterDataUrl && (
-                        <div className="space-y-3">
-                          <img
-                            src={posterDataUrl}
-                            alt="Poster QR Tìm Thú Lạc"
-                            className="w-56 mx-auto rounded-xl border border-[#DDDCD4]"
-                          />
-                          <div className="flex items-center justify-center gap-2">
-                            <a
-                              href={posterDataUrl}
-                              download={`Poster-Tim-Thu-Lac-${spot.id}.png`}
-                              className="min-h-[40px] px-4 rounded-[10px] text-xs font-bold text-white bg-[#AF421F] inline-flex items-center gap-1.5"
-                            >
-                              <Download className="w-3.5 h-3.5" />
-                              <span>Tải Poster QR (.PNG)</span>
-                            </a>
-                            <button
-                              type="button"
-                              onClick={() => setActiveSubPanel('NONE')}
-                              className="min-h-[40px] px-3 rounded-[10px] text-xs font-semibold text-[#52605A]"
-                            >
-                              Thu gọn
-                            </button>
-                          </div>
-                        </div>
-                      )
-                    )}
                   </div>
-                )}
+                </form>
+              )}
 
-                {isAuthor && (
-                  <div className="p-3.5 rounded-xl bg-white border border-[#0E513B]/40 space-y-2.5">
-                    <div className="flex items-center justify-between gap-2">
-                      <p className="text-xs font-extrabold uppercase tracking-wider text-[#0E513B]">
-                        Quản lý bài đăng của bạn
-                      </p>
-                      <span className="text-[11px] font-semibold text-[#52605A]">
-                        Chủ bài viết
-                      </span>
-                    </div>
+              {activeSubPanel === 'UNLOCK_CONTACT' && (
+                <form
+                  onSubmit={handleSubmitUnlockContact}
+                  className="p-4 rounded-[14px] bg-white border border-[#E2E5DC] space-y-3"
+                >
+                  <p className="text-xs font-bold text-[#123F35]">
+                    Liên hệ người đăng để hỗ trợ hoặc nhận nuôi
+                  </p>
+                  <div className="grid grid-cols-3 gap-1.5">
+                    {[
+                      { id: 'ADOPT_REQUEST', label: 'Xin nhận nuôi' },
+                      { id: 'FOSTER_OFFER', label: 'Nhận nuôi tạm' },
+                      { id: 'SIGHTING_REPORT', label: 'Báo manh mối' },
+                    ].map((opt) => (
+                      <button
+                        key={opt.id}
+                        type="button"
+                        onClick={() =>
+                          setContactRequestType(opt.id as typeof contactRequestType)
+                        }
+                        className={`min-h-[38px] px-2 rounded-[10px] text-[11px] font-bold transition-colors ${
+                          contactRequestType === opt.id
+                            ? 'bg-[#123F35] text-white'
+                            : 'bg-[#ECEFE7] text-[#15251F]'
+                        }`}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                  <textarea
+                    value={contactMessage}
+                    onChange={(e) => setContactMessage(e.target.value)}
+                    rows={2}
+                    placeholder="Lời nhắn gửi tới người đăng tin..."
+                    className="w-full p-3 rounded-[10px] bg-[#F5F6F2] border border-[#E2E5DC] text-xs text-[#15251F] outline-none focus:border-[#123F35]"
+                    required
+                  />
+                  <div className="flex justify-end gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setActiveSubPanel('NONE')}
+                      className="min-h-[40px] px-3 rounded-[10px] text-xs font-semibold text-[#53635B]"
+                    >
+                      Đóng
+                    </button>
+                    <button
+                      type="submit"
+                      className="min-h-[40px] px-4 rounded-[10px] bg-[#123F35] text-white text-xs font-bold"
+                    >
+                      Gửi &amp; Xem SĐT
+                    </button>
+                  </div>
+                </form>
+              )}
 
-                    <div className="flex flex-wrap items-center gap-2">
-                      {onEditSpot && (
-                        <button
-                          type="button"
-                          onClick={() => onEditSpot(spot)}
-                          className="flex-1 min-w-[140px] min-h-[42px] px-3.5 rounded-[10px] text-xs font-bold bg-[#0E513B] hover:bg-[#0A412F] text-white inline-flex items-center justify-center gap-1.5 transition-colors"
-                        >
-                          <Pencil className="w-3.5 h-3.5" />
-                          <span>Chỉnh sửa bài viết</span>
-                        </button>
-                      )}
-
-                      {spot.spotType !== 'GREEN_PEACE' && (
-                        <button
-                          type="button"
-                          onClick={() => onResolveSpotToPeace(spot.id)}
-                          className="flex-1 min-w-[160px] min-h-[42px] px-3.5 rounded-[10px] text-xs font-bold bg-[#E8EFE6] hover:bg-[#D7E4D4] text-[#0E513B] inline-flex items-center justify-center gap-1.5 transition-colors"
-                        >
-                          <CheckCircle2 className="w-4 h-4" />
-                          <span>Đánh dấu: Đã đoàn tụ</span>
-                        </button>
-                      )}
-
-                      {onDeleteSpot &&
-                        (confirmDelete ? (
-                          <div className="flex items-center gap-1.5 w-full sm:w-auto">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setConfirmDelete(false);
-                                onDeleteSpot(spot.id);
-                              }}
-                              className="flex-1 sm:flex-none min-h-[42px] px-3.5 rounded-[10px] text-xs font-bold bg-[#AF421F] hover:bg-[#933516] text-white inline-flex items-center justify-center gap-1.5 transition-colors"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                              <span>Xác nhận xóa bài</span>
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => setConfirmDelete(false)}
-                              className="min-h-[42px] px-3 rounded-[10px] text-xs font-semibold text-[#52605A] bg-[#FAF7F1] border border-[#DDDCD4]"
-                            >
-                              Hủy
-                            </button>
-                          </div>
-                        ) : (
+              {activeSubPanel === 'QR_POSTER' && (
+                <div className="p-4 rounded-[14px] bg-white border border-[#E2E5DC] space-y-3 text-center">
+                  {generatingPoster ? (
+                    <p className="text-xs py-6 text-[#53635B]">
+                      Đang tạo Poster QR...
+                    </p>
+                  ) : (
+                    posterDataUrl && (
+                      <div className="space-y-3">
+                        <img
+                          src={posterDataUrl}
+                          alt="Poster QR Tìm Thú Lạc"
+                          className="w-56 mx-auto rounded-xl border border-[#E2E5DC]"
+                        />
+                        <div className="flex items-center justify-center gap-2">
+                          <a
+                            href={posterDataUrl}
+                            download={`Poster-Tim-Thu-Lac-${spot.id}.png`}
+                            className="min-h-[40px] px-4 rounded-[10px] text-xs font-bold text-white bg-[#C84E2B] inline-flex items-center gap-1.5"
+                          >
+                            <Download className="w-3.5 h-3.5" />
+                            <span>Tải Poster QR (.PNG)</span>
+                          </a>
                           <button
                             type="button"
-                            onClick={() => setConfirmDelete(true)}
-                            className="min-h-[42px] px-3.5 rounded-[10px] text-xs font-bold text-[#AF421F] bg-[#FFF0E5] hover:bg-[#AF421F] hover:text-white border border-[#AF421F]/30 inline-flex items-center justify-center gap-1.5 transition-colors"
+                            onClick={() => setActiveSubPanel('NONE')}
+                            className="min-h-[40px] px-3 rounded-[10px] text-xs font-semibold text-[#53635B]"
+                          >
+                            Thu gọn
+                          </button>
+                        </div>
+                      </div>
+                    )
+                  )}
+                </div>
+              )}
+
+              {isAuthor && (
+                <div className="p-3.5 rounded-[14px] bg-white border border-[#123F35]/40 space-y-2.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-xs font-extrabold uppercase tracking-wider text-[#123F35]">
+                      Quản lý bài đăng của bạn
+                    </p>
+                    <span className="text-[11px] font-semibold text-[#53635B]">
+                      Chủ bài viết
+                    </span>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2">
+                    {onEditSpot && (
+                      <button
+                        type="button"
+                        onClick={() => onEditSpot(spot)}
+                        className="flex-1 min-w-[140px] min-h-[42px] px-3.5 rounded-[10px] text-xs font-bold bg-[#123F35] hover:bg-[#0D3129] text-white inline-flex items-center justify-center gap-1.5 transition-colors"
+                      >
+                        <Pencil className="w-3.5 h-3.5" />
+                        <span>Chỉnh sửa bài viết</span>
+                      </button>
+                    )}
+
+                    {spot.spotType !== 'GREEN_PEACE' && (
+                      <button
+                        type="button"
+                        onClick={() => onResolveSpotToPeace(spot.id)}
+                        className="flex-1 min-w-[160px] min-h-[42px] px-3.5 rounded-[10px] text-xs font-bold bg-[#E4EDDD] hover:bg-[#D5E3CC] text-[#123F35] inline-flex items-center justify-center gap-1.5 transition-colors"
+                      >
+                        <CheckCircle2 className="w-4 h-4" />
+                        <span>Đánh dấu: Đã đoàn tụ</span>
+                      </button>
+                    )}
+
+                    {onDeleteSpot &&
+                      (confirmDelete ? (
+                        <div className="flex items-center gap-1.5 w-full sm:w-auto">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setConfirmDelete(false);
+                              onDeleteSpot(spot.id);
+                            }}
+                            className="flex-1 sm:flex-none min-h-[42px] px-3.5 rounded-[10px] text-xs font-bold bg-[#C84E2B] hover:bg-[#A63D1F] text-white inline-flex items-center justify-center gap-1.5 transition-colors"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
-                            <span>Xóa bài đăng</span>
+                            <span>Xác nhận xóa bài</span>
                           </button>
-                        ))}
-                    </div>
+                          <button
+                            type="button"
+                            onClick={() => setConfirmDelete(false)}
+                            className="min-h-[42px] px-3 rounded-[10px] text-xs font-semibold text-[#53635B] bg-[#F5F6F2] border border-[#E2E5DC]"
+                          >
+                            Hủy
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => setConfirmDelete(true)}
+                          className="min-h-[42px] px-3.5 rounded-[10px] text-xs font-bold text-[#C84E2B] bg-[#FDECE7] hover:bg-[#C84E2B] hover:text-white border border-[#C84E2B]/30 inline-flex items-center justify-center gap-1.5 transition-colors"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          <span>Xóa bài đăng</span>
+                        </button>
+                      ))}
                   </div>
-                )}
-              </div>
-            )}
+                </div>
+              )}
+            </div>
           </div>
 
-          <footer className="shrink-0 bg-[#FAF7F1] border-t border-[#DDDCD4] px-4 sm:px-6 py-3 pb-[max(12px,env(safe-area-inset-bottom,0px))] flex items-center gap-2.5">
+          <footer className="shrink-0 bg-[#F5F6F2] border-t border-[#E2E5DC] px-4 sm:px-6 py-3 pb-[max(12px,env(safe-area-inset-bottom,0px))] flex items-center gap-2.5">
             {!isUserPost && spot.sourceUrl ? (
               <a
                 href={spot.sourceUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex-1 min-h-[48px] px-4 rounded-[10px] bg-[#0E513B] hover:bg-[#0A412F] text-white text-sm font-bold flex items-center justify-center gap-2 transition-colors shadow-sm"
+                className="flex-1 min-h-[48px] px-4 rounded-[12px] bg-[#123F35] hover:bg-[#0D3129] text-white text-sm font-bold flex items-center justify-center gap-2 transition-colors shadow-sm"
               >
                 <span>Đọc bài gốc ({platformBadge.shortLabel})</span>
                 <ExternalLink className="w-4 h-4 shrink-0" />
@@ -953,7 +961,7 @@ export default function SpotDetailModal({
             ) : isContactUnlocked && spot.rawPhoneSecret ? (
               <a
                 href={`tel:${spot.rawPhoneSecret}`}
-                className="flex-1 min-h-[48px] px-4 rounded-[10px] bg-[#0E513B] hover:bg-[#0A412F] text-white text-sm font-bold flex items-center justify-center gap-2 transition-colors shadow-sm"
+                className="flex-1 min-h-[48px] px-4 rounded-[12px] bg-[#123F35] hover:bg-[#0D3129] text-white text-sm font-bold flex items-center justify-center gap-2 transition-colors shadow-sm"
               >
                 <Phone className="w-4 h-4 shrink-0" />
                 <span>Gọi ngay: {spot.rawPhoneSecret}</span>
@@ -962,29 +970,12 @@ export default function SpotDetailModal({
               <button
                 type="button"
                 onClick={() => openSubPanelAndScroll('UNLOCK_CONTACT')}
-                className="flex-1 min-h-[48px] px-4 rounded-[10px] bg-[#0E513B] hover:bg-[#0A412F] text-white text-sm font-bold flex items-center justify-center gap-2 transition-colors shadow-sm"
+                className="flex-1 min-h-[48px] px-4 rounded-[12px] bg-[#123F35] hover:bg-[#0D3129] text-white text-sm font-bold flex items-center justify-center gap-2 transition-colors shadow-sm"
               >
                 <MessageCircle className="w-4 h-4 shrink-0" />
-                <span>Liên hệ người đăng</span>
-              </button>
-            )}
-
-            {onToggleSave && (
-              <button
-                type="button"
-                onClick={() => onToggleSave(spot)}
-                aria-pressed={isSaved}
-                aria-label={isSaved ? 'Bỏ lưu bài viết' : 'Lưu bài viết'}
-                title={isSaved ? 'Bỏ lưu bài viết' : 'Lưu bài viết'}
-                className={`min-w-[48px] min-h-[48px] rounded-[10px] border flex items-center justify-center shrink-0 transition-colors ${
-                  isSaved
-                    ? 'bg-[#FFF0E5] border-[#AF421F] text-[#AF421F]'
-                    : 'bg-white border-[#DDDCD4] text-[#142820] hover:border-[#0E513B]'
-                }`}
-              >
-                <Heart
-                  className={`w-5 h-5 ${isSaved ? 'fill-[#AF421F]' : ''}`}
-                />
+                <span>
+                  {userSession ? 'Liên hệ người đăng' : 'Đăng nhập để liên hệ'}
+                </span>
               </button>
             )}
           </footer>

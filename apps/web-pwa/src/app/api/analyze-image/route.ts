@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import https from 'node:https';
 import { INITIAL_DOM_SPOTS } from '@/lib/seed-data';
+import {
+  fetchCommunitySpotsFromMongo,
+  listDeletedSpotIdsFromMongo,
+} from '@/lib/mongodb';
 import { listDeletedSpotIdsFromServerStore } from '@/lib/server-community-store';
 import { DomSpot, isSpotDeletedOrHidden } from '@/lib/types';
 import {
@@ -53,11 +57,18 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { imageDataUrl, candidateSpots, userCoords } = body;
 
-    const deletedSet = new Set(listDeletedSpotIdsFromServerStore());
+    const [mongoDeleted, mongoSpots] = await Promise.all([
+      listDeletedSpotIdsFromMongo().catch(() => [] as string[]),
+      fetchCommunitySpotsFromMongo().catch(() => [] as DomSpot[]),
+    ]);
+    const deletedSet = new Set<string>([
+      ...mongoDeleted,
+      ...listDeletedSpotIdsFromServerStore(),
+    ]);
     const rawPool: DomSpot[] =
       Array.isArray(candidateSpots) && candidateSpots.length > 0
-        ? candidateSpots
-        : INITIAL_DOM_SPOTS;
+        ? [...mongoSpots, ...candidateSpots]
+        : [...mongoSpots, ...INITIAL_DOM_SPOTS];
 
     const seenIds = new Set<string>();
     const pool: DomSpot[] = [];

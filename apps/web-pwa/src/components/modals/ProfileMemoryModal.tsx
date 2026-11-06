@@ -12,6 +12,7 @@ import {
   ImagePlus,
   LogIn,
   LogOut,
+  Mail,
   Pencil,
   Plus,
   Send,
@@ -982,6 +983,19 @@ export default function ProfileMemoryModal({
               </div>
             </div>
           )}
+
+          <div className="mt-5 pt-4 border-t border-[#ECEAE2] flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs text-[#52605A]">
+            <p className="flex items-center gap-1.5 flex-wrap">
+              <Mail className="w-3.5 h-3.5 text-[#0E513B] shrink-0" />
+              <span>Mọi ý kiến đóng góp, phản hồi gửi về email:</span>
+              <a
+                href="mailto:luuhuy05032005h@gmail.com?subject=G%C3%B3p%20%C3%BD%20%26%20Ph%E1%BA%A3n%20h%E1%BB%93i%20cho%20%C4%90%E1%BB%91m%20Nh%E1%BB%8F"
+                className="font-bold text-[#0E513B] hover:underline break-all"
+              >
+                luuhuy05032005h@gmail.com
+              </a>
+            </p>
+          </div>
         </div>
       </div>
     </div>,

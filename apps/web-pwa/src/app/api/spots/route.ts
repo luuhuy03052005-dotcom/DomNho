@@ -8,6 +8,20 @@ import {
   findDoubleMatchesWithin3Km,
 } from '@/lib/security';
 import {
+  activateEmergencyBoostInMongo,
+  addSpotSightingInMongo,
+  boostSpotLightInMongo,
+  createMemorySnapInMongo,
+  createSpotInMongo,
+  deleteSpotInMongo,
+  fetchCommunitySpotsFromMongo,
+  fetchMemorySnapsFromMongo,
+  listDeletedSpotIdsFromMongo,
+  resolveSpotToPeaceInMongo,
+  unlockSpotContactInMongo,
+  updateSpotInMongo,
+} from '@/lib/mongodb';
+import {
   activateEmergencyBoostInServerStore,
   addSightingInServerStore,
   boostSpotInServerStore,
@@ -23,19 +37,6 @@ import {
   updateSpotInServerStore,
 } from '@/lib/server-community-store';
 import {
-  activateEmergencyBoostInSupabase,
-  addSpotSightingInSupabase,
-  boostSpotLightInSupabase,
-  createMemorySnapInSupabase,
-  createSpotInSupabase,
-  deleteSpotInSupabase,
-  fetchCommunitySpotsFromSupabase,
-  fetchMemorySnapsFromSupabase,
-  resolveSpotToPeaceInSupabase,
-  unlockSpotContactInSupabase,
-  updateSpotInSupabase,
-} from '@/lib/supabase';
-import {
   DomSpot,
   MemorySnap,
   SpotMatchResult,
@@ -47,7 +48,7 @@ export const dynamic = 'force-dynamic';
 
 /**
  * GET /api/spots
- * Trả về danh sách bài đăng cộng đồng thời gian thực từ Supabase + Server Community Store kết hợp với bài viết đã xác thực.
+ * Trả về danh sách bài đăng cộng đồng thời gian thực từ MongoDB Atlas + Server Community Store kết hợp với bài viết đã xác thực.
  * Bảo mật: Không bao giờ trả về rawPhone cho người lạ khi chưa mở khóa liên hệ.
  */
 export async function GET(request: NextRequest) {
@@ -60,22 +61,25 @@ export async function GET(request: NextRequest) {
   const coupleCode = searchParams.get('coupleCode') || '';
   const includeMemories = searchParams.get('includeMemories') === '1';
 
-  const [dbSpots, dbMemories] = await Promise.all([
-    fetchCommunitySpotsFromSupabase(viewerId).catch(() => [] as DomSpot[]),
+  const [mongoSpots, mongoDeletedIds, mongoMemories] = await Promise.all([
+    fetchCommunitySpotsFromMongo(viewerId).catch(() => [] as DomSpot[]),
+    listDeletedSpotIdsFromMongo().catch(() => [] as string[]),
     includeMemories
-      ? fetchMemorySnapsFromSupabase().catch(() => [] as MemorySnap[])
+      ? fetchMemorySnapsFromMongo().catch(() => [] as MemorySnap[])
       : Promise.resolve([] as MemorySnap[]),
   ]);
 
   const serverSpots = listCommunitySpotsFromServerStore(viewerId);
-  const deletedSpotIds = listDeletedSpotIdsFromServerStore();
-  const deletedSet = new Set(deletedSpotIds);
+  const serverDeletedIds = listDeletedSpotIdsFromServerStore();
+  const deletedSet = new Set<string>([...mongoDeletedIds, ...serverDeletedIds]);
+  const deletedSpotIds = Array.from(deletedSet);
+
   const serverMemories = includeMemories
     ? listMemorySnapsFromServerStore()
     : [];
 
   const spotMap = new Map<string, DomSpot>();
-  for (const sp of [...serverSpots, ...dbSpots, ...INITIAL_DOM_SPOTS]) {
+  for (const sp of [...mongoSpots, ...serverSpots, ...INITIAL_DOM_SPOTS]) {
     if (isSpotDeletedOrHidden(sp, deletedSet)) continue;
     const prev = spotMap.get(sp.id);
     if (!prev) {
@@ -120,14 +124,14 @@ export async function GET(request: NextRequest) {
 
   const seenMemIds = new Set<string>();
   const memorySnaps: MemorySnap[] = [];
-  for (const m of [...dbMemories, ...serverMemories]) {
+  for (const m of [...mongoMemories, ...serverMemories]) {
     if (!m || seenMemIds.has(m.id)) continue;
     seenMemIds.add(m.id);
     memorySnaps.push(m);
   }
 
   const visibleSpots = combinedSpots.filter((spot) => {
-    if (spot.lightPower <= 0 || spot.status === 'FADED') return false;
+    if (isSpotDeletedOrHidden(spot, deletedSet)) return false;
     if (
       spot.status === 'SHADOWBANNED' &&
       (!viewerId || spot.authorId !== viewerId)
@@ -160,7 +164,8 @@ export async function GET(request: NextRequest) {
     ok: true,
     count: visibleSpots.length,
     spots: visibleSpots,
-    communityCount: visibleSpots.filter((s) => s.sourceType === 'USER_POST').length,
+    communityCount: visibleSpots.filter((s) => s.sourceType === 'USER_POST')
+      .length,
     deletedSpotIds,
     memorySnaps,
     vetStations: VET_EMERGENCY_STATIONS,
@@ -169,7 +174,7 @@ export async function GET(request: NextRequest) {
 
 /**
  * POST /api/spots
- * Tạo bài đăng mới lưu trực tiếp lên Supabase (public.dom_nho_posts) và Server Community Store
+ * Tạo bài đăng mới lưu trực tiếp lên MongoDB Atlas (collection `posts`) và Server Community Store
  * để mọi người dùng trên mọi thiết bị đều thấy ngay lập tức.
  */
 export async function POST(request: NextRequest) {
@@ -248,10 +253,9 @@ export async function POST(request: NextRequest) {
 
     let finalSpot: DomSpot;
     let remainingToday = 2;
-    let dbMatches: any[] = [];
 
     try {
-      const createdDb = await createSpotInSupabase({
+      const createdMongo = await createSpotInMongo({
         authorId,
         authorName,
         rawPhone,
@@ -274,44 +278,46 @@ export async function POST(request: NextRequest) {
         allowFoster,
       });
 
-      finalSpot = createdDb.spot;
-      remainingToday = createdDb.remainingToday;
-      dbMatches = createdDb.dbMatches;
+      finalSpot = createdMongo.spot;
+      remainingToday = createdMongo.remainingToday;
 
       // Đồng bộ bản sao vào Server Store để truy xuất tốc độ cao
-      createSpotInServerStore({
-        id: finalSpot.id,
-        authorId: finalSpot.authorId,
-        authorName,
-        rawPhone,
-        pinCode,
-        spotType,
-        visibility,
-        coupleRoomCode: body.coupleRoomCode || undefined,
-        title,
-        story,
-        species,
-        breed,
-        coatColor,
-        traits,
-        images,
-        exactLat,
-        exactLng,
-        publicLat: finalSpot.publicLat,
-        publicLng: finalSpot.publicLng,
-        hasExactLocation,
-        areaLabel,
-        formattedAddress,
-        allowFoster,
-        skipRateLimit: true,
-      });
+      try {
+        createSpotInServerStore({
+          id: finalSpot.id,
+          authorId: finalSpot.authorId,
+          authorName,
+          rawPhone,
+          pinCode,
+          spotType,
+          visibility,
+          coupleRoomCode: body.coupleRoomCode || undefined,
+          title,
+          story,
+          species,
+          breed,
+          coatColor,
+          traits,
+          images,
+          exactLat,
+          exactLng,
+          publicLat: finalSpot.publicLat,
+          publicLng: finalSpot.publicLng,
+          hasExactLocation,
+          areaLabel,
+          formattedAddress,
+          allowFoster,
+          skipRateLimit: true,
+        });
+      } catch {
+        // Ignore local cache write error
+      }
     } catch (dbErr: any) {
       const msg = String(dbErr?.message || '');
       if (msg.includes('3 bài/ngày')) {
         return NextResponse.json({ ok: false, error: msg }, { status: 429 });
       }
 
-      // Lưu vào Server Community Store (áp dụng đúng Rate-Limit 3 bài/ngày, Fuzzing ±150m-300m, Masking SĐT)
       const createdServer = createSpotInServerStore({
         authorId,
         authorName,
@@ -339,17 +345,21 @@ export async function POST(request: NextRequest) {
       remainingToday = createdServer.remainingToday;
     }
 
-    const deletedSet = new Set(listDeletedSpotIdsFromServerStore());
-    const [dbAll, serverAll] = await Promise.all([
-      fetchCommunitySpotsFromSupabase(finalSpot.authorId).catch(
+    const [mongoDeletedIds, mongoAll] = await Promise.all([
+      listDeletedSpotIdsFromMongo().catch(() => [] as string[]),
+      fetchCommunitySpotsFromMongo(finalSpot.authorId).catch(
         () => [] as DomSpot[]
       ),
-      Promise.resolve(listCommunitySpotsFromServerStore(finalSpot.authorId)),
     ]);
+    const deletedSet = new Set<string>([
+      ...mongoDeletedIds,
+      ...listDeletedSpotIdsFromServerStore(),
+    ]);
+    const serverAll = listCommunitySpotsFromServerStore(finalSpot.authorId);
 
     const seenCandidateIds = new Set<string>([finalSpot.id]);
     const candidatePool: DomSpot[] = [];
-    for (const sp of [...dbAll, ...serverAll, ...INITIAL_DOM_SPOTS]) {
+    for (const sp of [...mongoAll, ...serverAll, ...INITIAL_DOM_SPOTS]) {
       if (!sp || !sp.id || seenCandidateIds.has(sp.id)) continue;
       if (isSpotDeletedOrHidden(sp, deletedSet)) continue;
       seenCandidateIds.add(sp.id);
@@ -366,7 +376,7 @@ export async function POST(request: NextRequest) {
       spot: finalSpot,
       remainingToday,
       matches,
-      dbMatches,
+      dbMatches: [],
     });
   } catch (err: any) {
     return NextResponse.json(
@@ -383,14 +393,15 @@ export async function POST(request: NextRequest) {
 
 /**
  * PATCH /api/spots
- * Thực thi các nghiệp vụ cộng đồng trực tiếp trên Supabase & Server Store:
+ * Thực thi các nghiệp vụ cộng đồng trực tiếp trên MongoDB Atlas & Server Store:
+ * - UPDATE_SPOT: Chỉnh sửa bài đăng
+ * - DELETE_SPOT: Xóa bài đăng
  * - BOOST_LIGHT: Truyền lửa (+light_power, +boost_count)
- * - ADD_SIGHTING: Báo phát hiện mới (lưu vào spot_sightings)
- * - UNLOCK_CONTACT: Gửi lời nhắn & Mở khóa SĐT (lưu vào contact_unlock_requests & trả về SĐT thật)
+ * - ADD_SIGHTING: Báo phát hiện mới (lưu vào sightings)
+ * - UNLOCK_CONTACT: Gửi lời nhắn & Mở khóa SĐT (lưu vào contact_unlocks & trả về SĐT thật)
  * - RESOLVE_PEACE: Đóng ca / Đã đoàn tụ (chuyển sang GREEN_PEACE & RESOLVED)
  * - EMERGENCY_BOOST: Kích hoạt khẩn cấp (ưu tiên hiển thị 48h)
- * - ADD_MEMORY_SNAP: Lưu ảnh Nhật ký hàng tuần (lưu vào memory_snaps)
- * - SYNC_SPOT: Đồng bộ bài đăng cộng đồng nhận từ kênh Realtime WebSocket
+ * - ADD_MEMORY_SNAP: Lưu ảnh Nhật ký hàng tuần (lưu vào memories)
  */
 export async function PATCH(request: NextRequest) {
   try {
@@ -408,15 +419,23 @@ export async function PATCH(request: NextRequest) {
       const spotId = String(body.spotId || '').trim();
       if (spotId) {
         deleteSpotInServerStore({ spotId, skipOwnershipCheck: true });
+        await deleteSpotInMongo({
+          spotId,
+          skipOwnershipCheck: true,
+        }).catch(() => false);
       }
       return NextResponse.json({ ok: true, spotId });
     }
 
     if (action === 'UPDATE_SPOT') {
       const spotId = String(body.spotId || '').trim();
-      const authorId = String(body.authorId || '').trim();
+      const authorId = String(
+        body.authorId || body.requesterId || ''
+      ).trim();
       const authorName = String(body.authorName || '').trim();
-      const rawPhone = String(body.rawPhone || '').trim();
+      const rawPhone = String(
+        body.rawPhone || body.requesterPhone || ''
+      ).trim();
       const title = String(body.title || '').trim();
       const story = String(body.story || '').trim();
       const breed = String(body.breed || '').trim();
@@ -445,15 +464,6 @@ export async function PATCH(request: NextRequest) {
           { status: 400 }
         );
       }
-      if (images.length === 0) {
-        return NextResponse.json(
-          {
-            ok: false,
-            error: 'Bài đăng cần có ít nhất 1 bức ảnh thực tế của thú cưng.',
-          },
-          { status: 400 }
-        );
-      }
 
       const spotType = (body.spotType as SpotType) || 'RED_SOS';
       const species =
@@ -466,49 +476,52 @@ export async function PATCH(request: NextRequest) {
       const hasExactLocation = Boolean(body.hasExactLocation ?? true);
       const allowFoster = Boolean(body.allowFoster);
 
-      const srvUpdated = updateSpotInServerStore({
-        spotId,
-        authorId,
-        authorName,
-        rawPhone,
-        spotType,
-        title,
-        story,
-        species,
-        breed,
-        coatColor,
-        traits,
-        images,
-        exactLat: exactLat > 0 ? exactLat : undefined,
-        exactLng: exactLng > 0 ? exactLng : undefined,
-        hasExactLocation,
-        areaLabel,
-        formattedAddress,
-        allowFoster,
-      });
+      const [mongoUpdated, srvUpdated] = await Promise.all([
+        updateSpotInMongo({
+          spotId,
+          authorId,
+          authorName,
+          rawPhone,
+          spotType,
+          title,
+          story,
+          species,
+          breed,
+          coatColor,
+          traits,
+          images,
+          exactLat: exactLat > 0 ? exactLat : undefined,
+          exactLng: exactLng > 0 ? exactLng : undefined,
+          hasExactLocation,
+          areaLabel,
+          formattedAddress,
+          allowFoster,
+        }).catch(() => null),
+        Promise.resolve(
+          updateSpotInServerStore({
+            spotId,
+            authorId,
+            authorName,
+            rawPhone,
+            spotType,
+            title,
+            story,
+            species,
+            breed,
+            coatColor,
+            traits,
+            images,
+            exactLat: exactLat > 0 ? exactLat : undefined,
+            exactLng: exactLng > 0 ? exactLng : undefined,
+            hasExactLocation,
+            areaLabel,
+            formattedAddress,
+            allowFoster,
+          })
+        ).catch(() => null),
+      ]);
 
-      const dbUpdated = await updateSpotInSupabase({
-        spotId,
-        authorId,
-        authorName,
-        rawPhone,
-        spotType,
-        title,
-        story,
-        species,
-        breed,
-        coatColor,
-        traits,
-        images,
-        exactLat: exactLat > 0 ? exactLat : undefined,
-        exactLng: exactLng > 0 ? exactLng : undefined,
-        hasExactLocation,
-        areaLabel,
-        formattedAddress,
-        allowFoster,
-      }).catch(() => null);
-
-      const finalUpdated = srvUpdated || dbUpdated;
+      const finalUpdated = mongoUpdated || srvUpdated;
       if (finalUpdated) {
         syncIncomingPeerSpotInServerStore(finalUpdated);
       }
@@ -521,8 +534,12 @@ export async function PATCH(request: NextRequest) {
 
     if (action === 'DELETE_SPOT') {
       const spotId = String(body.spotId || '').trim();
-      const authorId = String(body.authorId || '').trim();
-      const rawPhone = String(body.rawPhone || '').trim();
+      const authorId = String(
+        body.authorId || body.requesterId || ''
+      ).trim();
+      const rawPhone = String(
+        body.rawPhone || body.requesterPhone || ''
+      ).trim();
 
       if (!spotId) {
         return NextResponse.json(
@@ -537,7 +554,11 @@ export async function PATCH(request: NextRequest) {
         rawPhone,
       });
 
-      await deleteSpotInSupabase(spotId).catch(() => false);
+      await deleteSpotInMongo({
+        spotId,
+        authorId,
+        rawPhone,
+      }).catch(() => false);
 
       return NextResponse.json({
         ok: true,
@@ -548,11 +569,11 @@ export async function PATCH(request: NextRequest) {
     if (action === 'BOOST_LIGHT') {
       const spotId = String(body.spotId || '');
       const delta = Number(body.delta || 20);
-      const [dbRes, srvRes] = await Promise.all([
-        boostSpotLightInSupabase(spotId, delta).catch(() => null),
+      const [mongoRes, srvRes] = await Promise.all([
+        boostSpotLightInMongo(spotId, delta).catch(() => null),
         Promise.resolve(boostSpotInServerStore(spotId, delta)),
       ]);
-      const result = dbRes || srvRes;
+      const result = mongoRes || srvRes;
       return NextResponse.json({
         ok: true,
         spotId,
@@ -575,8 +596,8 @@ export async function PATCH(request: NextRequest) {
         originLng: Number(body.originLng || 0),
       });
 
-      const dbSighting = await addSpotSightingInSupabase({
-        postId: spotId,
+      const mongoSighting = await addSpotSightingInMongo({
+        spotId,
         reporterId: body.reporterId ? String(body.reporterId) : undefined,
         reporterName: String(body.reporterName || '').trim(),
         reporterPhone: body.reporterPhone
@@ -593,7 +614,7 @@ export async function PATCH(request: NextRequest) {
 
       return NextResponse.json({
         ok: true,
-        sighting: dbSighting || srvSighting,
+        sighting: mongoSighting || srvSighting,
       });
     }
 
@@ -605,33 +626,38 @@ export async function PATCH(request: NextRequest) {
           ? body.requestType
           : 'SIGHTING_REPORT';
 
-      const srvUnlocked = unlockContactInServerStore({
-        spotId,
-        requesterId: String(body.requesterId || ''),
-        requesterName: String(body.requesterName || '').trim(),
-        requestType: reqType,
-        message: String(body.message || '').trim(),
-        proofImageUrl: body.proofImageUrl
-          ? String(body.proofImageUrl)
-          : undefined,
-      });
+      const [mongoUnlocked, srvUnlocked] = await Promise.all([
+        unlockSpotContactInMongo({
+          spotId,
+          requesterId: String(body.requesterId || ''),
+          requesterName: String(body.requesterName || '').trim(),
+          requesterPhone: String(body.requesterPhone || '').trim(),
+          requestType: reqType,
+          message: String(body.message || '').trim(),
+          proofImageUrl: body.proofImageUrl
+            ? String(body.proofImageUrl)
+            : undefined,
+        }).catch(() => null),
+        Promise.resolve(
+          unlockContactInServerStore({
+            spotId,
+            requesterId: String(body.requesterId || ''),
+            requesterName: String(body.requesterName || '').trim(),
+            requestType: reqType,
+            message: String(body.message || '').trim(),
+            proofImageUrl: body.proofImageUrl
+              ? String(body.proofImageUrl)
+              : undefined,
+          })
+        ),
+      ]);
 
-      const dbUnlocked = await unlockSpotContactInSupabase({
-        postId: spotId,
-        requesterId: String(body.requesterId || ''),
-        requesterName: String(body.requesterName || '').trim(),
-        requesterPhone: String(body.requesterPhone || '').trim(),
-        requestType: reqType,
-        message: String(body.message || '').trim(),
-        proofImageUrl: body.proofImageUrl
-          ? String(body.proofImageUrl)
-          : undefined,
-      }).catch(() => null);
-
-      const rawPhone = dbUnlocked?.rawPhone || srvUnlocked.rawPhone || '';
+      const rawPhone =
+        mongoUnlocked?.rawPhone || srvUnlocked.rawPhone || '';
       const maskedPhone =
-        dbUnlocked?.maskedPhone || srvUnlocked.maskedPhone || '';
-      const zaloLink = dbUnlocked?.zaloLink || srvUnlocked.zaloLink || '';
+        mongoUnlocked?.maskedPhone || srvUnlocked.maskedPhone || '';
+      const zaloLink =
+        mongoUnlocked?.zaloLink || srvUnlocked.zaloLink || '';
 
       return NextResponse.json({
         ok: true,
@@ -644,11 +670,11 @@ export async function PATCH(request: NextRequest) {
     if (action === 'RESOLVE_PEACE') {
       const spotId = String(body.spotId || '');
       const srvOk = resolveSpotToPeaceInServerStore(spotId);
-      const dbOk = await resolveSpotToPeaceInSupabase(spotId).catch(
+      const mongoOk = await resolveSpotToPeaceInMongo(spotId).catch(
         () => false
       );
       return NextResponse.json({
-        ok: dbOk || srvOk,
+        ok: mongoOk || srvOk,
         spotId,
       });
     }
@@ -656,11 +682,11 @@ export async function PATCH(request: NextRequest) {
     if (action === 'EMERGENCY_BOOST') {
       const spotId = String(body.spotId || '');
       const srvOk = activateEmergencyBoostInServerStore(spotId);
-      const dbOk = await activateEmergencyBoostInSupabase(spotId).catch(
+      const mongoOk = await activateEmergencyBoostInMongo(spotId).catch(
         () => false
       );
       return NextResponse.json({
-        ok: dbOk || srvOk,
+        ok: mongoOk || srvOk,
         spotId,
       });
     }
@@ -679,7 +705,7 @@ export async function PATCH(request: NextRequest) {
         lng: body.lng ? Number(body.lng) : undefined,
       });
 
-      const dbSnap = await createMemorySnapInSupabase({
+      const mongoSnap = await createMemorySnapInMongo({
         postId: body.postId ? String(body.postId) : undefined,
         authorId: body.authorId ? String(body.authorId) : undefined,
         authorName: body.authorName ? String(body.authorName) : undefined,
@@ -696,7 +722,7 @@ export async function PATCH(request: NextRequest) {
 
       return NextResponse.json({
         ok: true,
-        snap: dbSnap || srvSnap,
+        snap: mongoSnap || srvSnap,
       });
     }
 
@@ -723,10 +749,16 @@ export async function DELETE(request: NextRequest) {
       body.spotId || searchParams.get('spotId') || ''
     ).trim();
     const authorId = String(
-      body.authorId || searchParams.get('authorId') || ''
+      body.authorId ||
+        body.requesterId ||
+        searchParams.get('authorId') ||
+        ''
     ).trim();
     const rawPhone = String(
-      body.rawPhone || searchParams.get('rawPhone') || ''
+      body.rawPhone ||
+        body.requesterPhone ||
+        searchParams.get('rawPhone') ||
+        ''
     ).trim();
 
     if (!spotId) {
@@ -741,7 +773,11 @@ export async function DELETE(request: NextRequest) {
       authorId,
       rawPhone,
     });
-    await deleteSpotInSupabase(spotId).catch(() => false);
+    await deleteSpotInMongo({
+      spotId,
+      authorId,
+      rawPhone,
+    }).catch(() => false);
 
     return NextResponse.json({
       ok: true,

@@ -1580,7 +1580,7 @@ export default function DomNhoHomePage() {
   );
 
   return (
-    <div className="min-h-screen bg-[#FAF7F1] text-[#142820] flex flex-col font-sans selection:bg-[#E8EFE6] selection:text-[#0E513B]">
+    <div className="min-h-screen bg-[#F5F6F2] text-[#15251F] flex flex-col font-sans selection:bg-[#E4EDDD] selection:text-[#123F35]">
       <DomNhoHeader
         activeTab={mainTab}
         onChangeTab={handleTabChange}
@@ -1609,6 +1609,8 @@ export default function DomNhoHomePage() {
             onBackToExplore={() => handleTabChange('explore')}
             onOpenCreatePost={handleOpenCreatePost}
             vetStations={vetStations}
+            onOpenFilterModal={() => setIsFilterModalOpen(true)}
+            onOpenGoogleMapsVault={() => setIsGoogleMapsVaultOpen(true)}
           />
         ) : mainTab === 'stories' ? (
           <StoryPageView
@@ -1621,6 +1623,7 @@ export default function DomNhoHomePage() {
             userCoords={coords}
             locationLabel={coords.label}
             onOpenLocationPicker={() => setIsLocationPickerOpen(true)}
+            onRequestRealGps={handleRequestUserGpsWithToast}
             onOpenFullMap={() => handleTabChange('map')}
             onOpenStory={() => handleTabChange('stories')}
             onOpenFilterModal={() => setIsFilterModalOpen(true)}
