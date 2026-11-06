@@ -9,6 +9,7 @@ import {
   SpotVisibility,
   UserSession,
   deterministicAccountIdFromPhone,
+  isValidVietnamesePhone,
   normalizePhoneDigits,
 } from './types';
 
@@ -269,17 +270,27 @@ export async function registerZeroVerificationUser(params: {
   rawPhone: string;
   mode?: 'login' | 'register';
 }): Promise<UserSession> {
+  const mode: 'login' | 'register' =
+    params.mode === 'login' ? 'login' : 'register';
   const cleanName = (params.displayName || '').trim();
   const cleanPin = (params.pinCode || '').trim();
   const cleanPhone = (params.rawPhone || '').trim();
   const normalizedPhone = normalizePhoneDigits(cleanPhone);
 
-  if (normalizedPhone.length < 9 || normalizedPhone.length > 15) {
-    throw new Error('Vui lòng nhập số điện thoại hợp lệ (từ 9 đến 11 chữ số).');
+  if (!isValidVietnamesePhone(cleanPhone)) {
+    throw new Error(
+      'Số điện thoại không hợp lệ. Vui lòng nhập số điện thoại Việt Nam gồm 10 chữ số (bắt đầu bằng 03, 05, 07, 08, 09 hoặc +84).'
+    );
   }
 
   if (!/^\d{4,6}$/.test(cleanPin)) {
     throw new Error('Mã PIN bảo mật phải gồm từ 4 đến 6 chữ số.');
+  }
+
+  if (mode === 'register' && cleanName.length < 2) {
+    throw new Error(
+      'Vui lòng nhập Tên gọi / Biệt danh (tối thiểu 2 ký tự) để đăng ký tài khoản.'
+    );
   }
 
   const pinHash = await computePinHash(normalizedPhone, cleanPin);
@@ -305,6 +316,12 @@ export async function registerZeroVerificationUser(params: {
       .maybeSingle();
 
     if (!fetchError && existingRemote) {
+      if (mode === 'register') {
+        throw new Error(
+          'Số điện thoại này đã được đăng ký tài khoản. Vui lòng chuyển sang tab "Đăng nhập" và nhập mã PIN của bạn.'
+        );
+      }
+
       if (existingRemote.pin_hash !== pinHash) {
         throw new Error(
           'Số điện thoại này đã có tài khoản nhưng mã PIN không chính xác.'
@@ -313,28 +330,30 @@ export async function registerZeroVerificationUser(params: {
 
       verifiedFromRemote = true;
       profileId = existingRemote.id;
-      finalDisplayName = cleanName.length >= 2 ? cleanName : existingRemote.display_name;
+      finalDisplayName = existingRemote.display_name || finalDisplayName || 'Người dùng Đốm Nhỏ';
       patrolModeActive =
         typeof existingRemote.patrol_mode_active === 'boolean'
           ? existingRemote.patrol_mode_active
           : true;
       isShadowbanned = Boolean(existingRemote.is_shadowbanned);
       createdAt = existingRemote.created_at || createdAt;
-
-      if (cleanName.length >= 2 && cleanName !== existingRemote.display_name) {
-        await supabase
-          .from('profiles')
-          .update({
-            display_name: cleanName,
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', existingRemote.id);
-      }
     } else if (!fetchError && !existingRemote) {
       // Tài khoản chưa tồn tại trên Supabase
-      if (params.mode === 'login' && !localExisting && cleanName.length < 2) {
+      if (mode === 'login') {
+        // Kiểm tra xem tài khoản có trên local hay server store trước khi từ chối
+        if (!localExisting) {
+          throw new Error(
+            'Số điện thoại này chưa được đăng ký tài khoản. Vui lòng chuyển sang tab "Đăng ký mới" và nhập Tên gọi của bạn.'
+          );
+        }
+        if (localExisting.pinHash !== pinHash) {
+          throw new Error(
+            'Số điện thoại này đã có tài khoản nhưng mã PIN không chính xác.'
+          );
+        }
+      } else if (localExisting) {
         throw new Error(
-          'Số điện thoại này chưa được đăng ký. Vui lòng chuyển sang tab "Tạo tài khoản mới" và nhập Tên gọi của bạn.'
+          'Số điện thoại này đã được đăng ký tài khoản trên thiết bị. Vui lòng chuyển sang tab "Đăng nhập" và nhập mã PIN của bạn.'
         );
       }
 
@@ -345,9 +364,14 @@ export async function registerZeroVerificationUser(params: {
         );
       }
 
+      const candidateId = isValidUuid(profileId)
+        ? profileId
+        : deterministicAccountIdFromPhone(normalizedPhone);
+
       const { data: insertedRemote, error: insertError } = await supabase
         .from('profiles')
         .insert({
+          id: candidateId,
           display_name: nameToRegister,
           pin_hash: pinHash,
           device_secret_token: accountDeviceToken,
@@ -367,57 +391,62 @@ export async function registerZeroVerificationUser(params: {
     }
   }
 
-  // 2. Đồng bộ qua /api/auth của máy chủ để đảm bảo đăng nhập trên mọi thiết bị
-  if (!verifiedFromRemote && typeof window !== 'undefined') {
+  // 2. Đồng bộ qua /api/auth của máy chủ để đảm bảo kiểm tra trùng lặp & đăng nhập trên mọi thiết bị
+  if (typeof window !== 'undefined') {
+    let apiErrorToThrow: Error | null = null;
     try {
       const authRes = await fetch('/api/auth', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           id: profileId,
-          displayName: cleanName,
+          displayName: finalDisplayName || cleanName,
           rawPhone: cleanPhone,
           pinCode: cleanPin,
-          mode: params.mode || 'register',
+          mode,
+          allowSyncExisting: verifiedFromRemote,
         }),
       });
       const authData = await authRes.json().catch(() => null);
       if (!authRes.ok || !authData?.ok) {
-        if (authData?.error) {
-          throw new Error(authData.error);
+        if (authData?.error && !verifiedFromRemote) {
+          apiErrorToThrow = new Error(String(authData.error));
         }
       } else if (authData.account) {
         verifiedFromRemote = true;
         profileId = authData.account.id;
-        finalDisplayName = authData.account.displayName;
+        finalDisplayName = authData.account.displayName || finalDisplayName;
         patrolModeActive = Boolean(authData.account.patrolModeActive);
         isShadowbanned = Boolean(authData.account.isShadowbanned);
         createdAt = authData.account.createdAt || createdAt;
       }
-    } catch (err: any) {
-      if (
-        err?.message &&
-        (err.message.includes('PIN') || err.message.includes('chưa được đăng ký'))
-      ) {
-        throw err;
-      }
+    } catch {
+      // Mạng gián đoạn thì kiểm tra local registry bên dưới
+    }
+    if (apiErrorToThrow) {
+      throw apiErrorToThrow;
     }
   }
 
-  // 3. Nếu đang ngoại tuyến, kiểm tra bộ nhớ tài khoản trên thiết bị
+  // 3. Nếu đang ngoại tuyến, kiểm tra nghiêm ngặt bộ nhớ tài khoản trên thiết bị
   if (!verifiedFromRemote) {
     if (localExisting) {
+      if (mode === 'register') {
+        throw new Error(
+          'Số điện thoại này đã được đăng ký tài khoản. Vui lòng chuyển sang tab "Đăng nhập" và nhập mã PIN của bạn.'
+        );
+      }
       if (localExisting.pinHash !== pinHash) {
         throw new Error(
           'Số điện thoại này đã có tài khoản nhưng mã PIN không chính xác.'
         );
       }
-      finalDisplayName = cleanName.length >= 2 ? cleanName : localExisting.displayName;
+      finalDisplayName = localExisting.displayName;
       profileId = localExisting.id;
     } else {
-      if (params.mode === 'login' && cleanName.length < 2) {
+      if (mode === 'login') {
         throw new Error(
-          'Không tìm thấy tài khoản với số điện thoại này. Vui lòng chọn "Tạo tài khoản mới" và nhập Tên gọi của bạn.'
+          'Số điện thoại này chưa được đăng ký tài khoản. Vui lòng chuyển sang tab "Đăng ký mới" và nhập Tên gọi của bạn.'
         );
       }
       if (cleanName.length < 2) {
@@ -518,7 +547,7 @@ export async function ensureProfileInSupabase(
   dailyPostCount: number;
   lastPostDate: string;
 }> {
-  const normalizedPhone = (session.rawPhone || '').replace(/\D/g, '');
+  const normalizedPhone = normalizePhoneDigits(session.rawPhone);
   const deviceToken = normalizedPhone
     ? `dom_phone_${normalizedPhone}`
     : `dom_uid_${session.id}`;
@@ -755,10 +784,23 @@ export async function fetchCommunitySpotsFromSupabase(
     return [];
   }
 
-  const postIds = postRows.map((r) => String(r.id));
+  const activePostRows = postRows.filter(
+    (r) =>
+      Number(r.light_power ?? 100) > 0 &&
+      r.source_type !== 'DELETED_POST' &&
+      r.title !== '[DELETED]' &&
+      r.status !== 'FADED' &&
+      r.status !== 'SHADOWBANNED'
+  );
+
+  if (activePostRows.length === 0) {
+    return [];
+  }
+
+  const postIds = activePostRows.map((r) => String(r.id));
   const authorIds = Array.from(
     new Set(
-      postRows
+      activePostRows
         .map((r) => (r.author_id ? String(r.author_id) : ''))
         .filter((id) => isValidUuid(id))
     )
@@ -805,7 +847,7 @@ export async function fetchCommunitySpotsFromSupabase(
     (unlockRes.data || []).map((u: any) => String(u.post_id))
   );
 
-  return postRows.map((row) =>
+  return activePostRows.map((row) =>
     mapDbPostRowToDomSpot(row, {
       sightings: sightingsByPost.get(String(row.id)) || [],
       viewerId,
@@ -1589,26 +1631,24 @@ export async function updateSpotInSupabase(params: {
 export async function deleteSpotInSupabase(spotId: string): Promise<boolean> {
   if (!supabase || !isValidUuid(spotId)) return false;
 
-  const { error: deleteErr } = await supabase
-    .from('dom_nho_posts')
-    .delete()
-    .eq('id', spotId);
-
-  if (!deleteErr) {
-    return true;
-  }
-
-  // Fallback sang cập nhật trạng thái FADED / light_power = 0 nếu chính sách RLS DELETE chưa được bật
-  const { error: fadeErr } = await supabase
+  // 1. Luôn cập nhật light_power = 0 & source_type = 'DELETED_POST' trước (tương thích 100% với RLS FOR UPDATE & FOR SELECT gốc)
+  const { error: softDeleteErr } = await supabase
     .from('dom_nho_posts')
     .update({
-      status: 'FADED',
       light_power: 0,
+      source_type: 'DELETED_POST',
+      title: '[DELETED]',
       updated_at: new Date().toISOString(),
     })
     .eq('id', spotId);
 
-  return !fadeErr;
+  // 2. Đồng thời gửi lệnh DELETE vật lý
+  const { error: hardDeleteErr } = await supabase
+    .from('dom_nho_posts')
+    .delete()
+    .eq('id', spotId);
+
+  return !softDeleteErr || !hardDeleteErr;
 }
 
 /**

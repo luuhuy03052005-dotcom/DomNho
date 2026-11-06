@@ -35,7 +35,13 @@ import {
   unlockSpotContactInSupabase,
   updateSpotInSupabase,
 } from '@/lib/supabase';
-import { DomSpot, MemorySnap, SpotMatchResult, SpotType } from '@/lib/types';
+import {
+  DomSpot,
+  MemorySnap,
+  SpotMatchResult,
+  SpotType,
+  isSpotDeletedOrHidden,
+} from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
 
@@ -70,7 +76,7 @@ export async function GET(request: NextRequest) {
 
   const spotMap = new Map<string, DomSpot>();
   for (const sp of [...serverSpots, ...dbSpots, ...INITIAL_DOM_SPOTS]) {
-    if (!sp || !sp.id || deletedSet.has(sp.id)) continue;
+    if (isSpotDeletedOrHidden(sp, deletedSet)) continue;
     const prev = spotMap.get(sp.id);
     if (!prev) {
       spotMap.set(sp.id, sp);
@@ -333,6 +339,7 @@ export async function POST(request: NextRequest) {
       remainingToday = createdServer.remainingToday;
     }
 
+    const deletedSet = new Set(listDeletedSpotIdsFromServerStore());
     const [dbAll, serverAll] = await Promise.all([
       fetchCommunitySpotsFromSupabase(finalSpot.authorId).catch(
         () => [] as DomSpot[]
@@ -340,7 +347,15 @@ export async function POST(request: NextRequest) {
       Promise.resolve(listCommunitySpotsFromServerStore(finalSpot.authorId)),
     ]);
 
-    const candidatePool = [...dbAll, ...serverAll, ...INITIAL_DOM_SPOTS];
+    const seenCandidateIds = new Set<string>([finalSpot.id]);
+    const candidatePool: DomSpot[] = [];
+    for (const sp of [...dbAll, ...serverAll, ...INITIAL_DOM_SPOTS]) {
+      if (!sp || !sp.id || seenCandidateIds.has(sp.id)) continue;
+      if (isSpotDeletedOrHidden(sp, deletedSet)) continue;
+      seenCandidateIds.add(sp.id);
+      candidatePool.push(sp);
+    }
+
     const matches: SpotMatchResult[] = findDoubleMatchesWithin3Km(
       finalSpot,
       candidatePool

@@ -6,7 +6,7 @@ import {
   listCommunitySpotsFromServerStore,
   listDeletedSpotIdsFromServerStore,
 } from '@/lib/server-community-store';
-import { DomSpot } from '@/lib/types';
+import { DomSpot, isSpotDeletedOrHidden } from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
 
@@ -30,7 +30,8 @@ export async function POST(request: NextRequest) {
     const seenIds = new Set<string>();
     const pool: DomSpot[] = [];
     for (const sp of [...serverSpots, ...communitySpots, ...INITIAL_DOM_SPOTS]) {
-      if (!sp?.id || deletedIds.has(sp.id) || seenIds.has(sp.id)) continue;
+      if (!sp?.id || seenIds.has(sp.id)) continue;
+      if (isSpotDeletedOrHidden(sp, deletedIds)) continue;
       seenIds.add(sp.id);
       pool.push(sp);
     }

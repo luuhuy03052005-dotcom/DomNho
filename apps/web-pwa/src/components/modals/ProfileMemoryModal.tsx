@@ -3,6 +3,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
+  Bell,
   Camera,
   CheckCircle2,
   Eye,
@@ -15,6 +16,7 @@ import {
   Plus,
   Send,
   ShieldCheck,
+  Smartphone,
   Sparkles,
   Trash2,
   Users,
@@ -30,9 +32,21 @@ import {
   isSpotOwnedByUser,
 } from '@/lib/types';
 import { compressImageToWebpClient } from '@/lib/image-compressor';
+import {
+  DEFAULT_NOTIFICATION_SETTINGS,
+  NotificationLogItem,
+  NotificationSettings,
+} from '@/hooks/usePushNotification';
+
+export type ProfileModalTab =
+  | 'MY_SPOTS'
+  | 'NOTIFICATION_SETTINGS'
+  | 'WEEKLY_SNAP'
+  | 'COUPLE_WALK';
 
 interface ProfileMemoryModalProps {
   isOpen: boolean;
+  initialTab?: ProfileModalTab;
   themeId: ThemeId;
   userSession: UserSession | null;
   spots: DomSpot[];
@@ -56,10 +70,95 @@ interface ProfileMemoryModalProps {
   onOpenEditSpot?: (spot: DomSpot) => void;
   onDeleteSpot?: (spotId: string) => void;
   onSelectSpotDetail?: (spot: DomSpot) => void;
+  notificationSettings?: NotificationSettings;
+  notificationPermission?: NotificationPermission;
+  notificationPlatform?: 'ios' | 'android' | 'desktop';
+  notificationHistory?: NotificationLogItem[];
+  onUpdateNotificationSetting?: <K extends keyof NotificationSettings>(
+    key: K,
+    value: NotificationSettings[K]
+  ) => void;
+  onRequestPushPermission?: () => Promise<boolean>;
+  onTestNotification?: () => void;
+  onClearNotificationHistory?: () => void;
 }
+
+function ToggleSwitch({
+  checked,
+  disabled = false,
+  onChange,
+  label,
+}: {
+  checked: boolean;
+  disabled?: boolean;
+  onChange: (next: boolean) => void;
+  label: string;
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      aria-label={label}
+      disabled={disabled}
+      onClick={() => {
+        if (!disabled) {
+          onChange(!checked);
+        }
+      }}
+      className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full transition-colors duration-200 focus:outline-none ${
+        disabled ? 'opacity-45 cursor-not-allowed' : ''
+      } ${checked ? 'bg-[#0E513B]' : 'bg-[#D0CEC6]'}`}
+    >
+      <span
+        className={`inline-block h-5 w-5 transform rounded-full bg-white shadow-sm transition-transform duration-200 ${
+          checked ? 'translate-x-5' : 'translate-x-0.5'
+        }`}
+      />
+    </button>
+  );
+}
+
+const NOTIFICATION_TOGGLE_ITEMS: Array<{
+  key: keyof Omit<NotificationSettings, 'masterEnabled' | 'soundAndVibrate'>;
+  title: string;
+  description: string;
+}> = [
+  {
+    key: 'postStatus',
+    title: 'Trạng thái bài đăng của tôi',
+    description:
+      'Thông báo ngay khi bài đăng đang xử lý, đăng thành công hoặc hoàn tất cập nhật.',
+  },
+  {
+    key: 'doubleMatch',
+    title: 'Phát hiện thú cưng trùng khớp quanh bạn',
+    description:
+      'Cảnh báo khi hệ thống nhận diện ảnh hoặc quét bán kính 3km tìm thấy bài viết giống bé của bạn.',
+  },
+  {
+    key: 'sightingReport',
+    title: 'Manh mối mới & Yêu cầu liên hệ',
+    description:
+      'Thông báo khi có người báo nhìn thấy thú cưng hoặc gửi lời nhắn kết nối trên bài đăng của bạn.',
+  },
+  {
+    key: 'urgentSos',
+    title: 'Tin cứu trợ khẩn cấp gần vị trí của bạn',
+    description:
+      'Thông báo khi có ca cứu hộ chó mèo khẩn cấp mới trong khu vực bạn đang theo dõi.',
+  },
+  {
+    key: 'weeklyMemory',
+    title: 'Nhật ký kỷ niệm hàng tuần',
+    description:
+      'Thông báo khi người nhận nuôi gửi ảnh báo tin bình an hoặc nhắc lịch cập nhật tuần mới.',
+  },
+];
 
 export default function ProfileMemoryModal({
   isOpen,
+  initialTab = 'MY_SPOTS',
   userSession,
   spots,
   memorySnaps,
@@ -76,11 +175,17 @@ export default function ProfileMemoryModal({
   onOpenEditSpot,
   onDeleteSpot,
   onSelectSpotDetail,
+  notificationSettings = DEFAULT_NOTIFICATION_SETTINGS,
+  notificationPermission = 'default',
+  notificationPlatform = 'desktop',
+  notificationHistory = [],
+  onUpdateNotificationSetting,
+  onRequestPushPermission,
+  onTestNotification,
+  onClearNotificationHistory,
 }: ProfileMemoryModalProps) {
   const [mounted, setMounted] = useState(false);
-  const [activeTab, setActiveTab] = useState<
-    'MY_SPOTS' | 'WEEKLY_SNAP' | 'COUPLE_WALK'
-  >('MY_SPOTS');
+  const [activeTab, setActiveTab] = useState<ProfileModalTab>(initialTab);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   const [showAddSnapForm, setShowAddSnapForm] = useState(false);
@@ -101,6 +206,12 @@ export default function ProfileMemoryModal({
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  useEffect(() => {
+    if (isOpen && initialTab) {
+      setActiveTab(initialTab);
+    }
+  }, [isOpen, initialTab]);
 
   useEffect(() => {
     setPartnerInput(userSession?.partnerName || '');
@@ -179,109 +290,126 @@ export default function ProfileMemoryModal({
     setShowAddSnapForm(false);
   };
 
+  const handleMasterToggle = async (nextVal: boolean) => {
+    if (onUpdateNotificationSetting) {
+      onUpdateNotificationSetting('masterEnabled', nextVal);
+    }
+    if (nextVal && onRequestPushPermission) {
+      await onRequestPushPermission();
+    }
+  };
+
+  const platformLabel =
+    notificationPlatform === 'ios'
+      ? 'iPhone / iPad (iOS)'
+      : notificationPlatform === 'android'
+      ? 'Điện thoại Android'
+      : 'Trình duyệt máy tính';
+
   return createPortal(
     <div
       onClick={onClose}
       style={{
-        backdropFilter: 'blur(8px)',
-        WebkitBackdropFilter: 'blur(8px)',
+        backdropFilter: 'blur(6px)',
+        WebkitBackdropFilter: 'blur(6px)',
       }}
-      className="fixed inset-0 z-[110] bg-[#142820]/50 backdrop-blur-md flex items-end sm:items-center justify-center sm:p-4"
+      className="fixed inset-0 z-[110] bg-black/45 flex items-end sm:items-center justify-center sm:p-4"
       role="dialog"
       aria-modal="true"
-      aria-label="Tài khoản và kỷ niệm"
+      aria-label="Tài khoản, quản lý bài đăng và cài đặt thông báo"
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-h-[92dvh] sm:max-h-[88dvh] sm:max-w-xl bg-[#FAF7F1] text-[#142820] rounded-t-2xl sm:rounded-2xl border border-[#DDDCD4] shadow-2xl flex flex-col overflow-hidden"
+        className="w-full max-h-[92dvh] sm:max-h-[88dvh] sm:max-w-xl bg-white text-[#142820] rounded-t-2xl sm:rounded-xl border border-[#DDDCD4] shadow-xl flex flex-col overflow-hidden"
       >
-        <header className="shrink-0 bg-[#FAF7F1] border-b border-[#DDDCD4] px-4 sm:px-5 pt-3.5 pb-3 space-y-3">
-          <div className="flex items-center justify-between gap-2">
-            <h2 className="text-base sm:text-lg font-extrabold text-[#142820]">
-              Tài khoản &amp; Kỷ niệm
-            </h2>
-
-            <button
-              type="button"
-              onClick={onClose}
-              className="min-w-[44px] min-h-[44px] -mr-1 rounded-[10px] bg-white border border-[#DDDCD4] hover:border-[#0E513B] text-[#142820] flex items-center justify-center shrink-0 transition-colors"
-              aria-label="Đóng hộp thoại tài khoản"
-            >
-              <X className="w-5 h-5" />
-            </button>
-          </div>
-
-          <div className="p-3.5 rounded-xl bg-white border border-[#DDDCD4] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div className="flex items-start gap-3 min-w-0">
-              <div className="w-11 h-11 rounded-xl bg-[#0E513B] text-white font-extrabold text-base flex items-center justify-center shrink-0">
+        {/* Header phẳng, rõ ràng, không lồng nhiều khung bo góc */}
+        <header className="shrink-0 bg-white border-b border-[#E5E4DC] px-4 sm:px-5 pt-4 pb-0">
+          <div className="flex items-center justify-between gap-3 pb-3.5 border-b border-[#F1EFE8]">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="w-10 h-10 rounded-lg bg-[#0E513B] text-white font-bold text-sm flex items-center justify-center shrink-0">
                 {userSession
                   ? userSession.displayName.slice(0, 1).toUpperCase()
                   : 'Đ'}
               </div>
 
-              <div className="min-w-0 flex-1 space-y-1">
-                <div className="flex flex-wrap items-center gap-1.5">
-                  <h3 className="text-sm sm:text-base font-extrabold text-[#142820]">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h2 className="text-sm sm:text-base font-bold text-[#142820] truncate">
                     {userSession
                       ? userSession.displayName
-                      : 'Khách xem tự do'}
-                  </h3>
-                  <span className="px-2 py-0.5 rounded bg-[#E8EFE6] text-[#0E513B] text-[11px] font-bold inline-flex items-center gap-1">
+                      : 'Tài khoản & Cài đặt'}
+                  </h2>
+                  <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-[#F2F4F1] text-[#0E513B] inline-flex items-center gap-1">
                     <ShieldCheck className="w-3 h-3 shrink-0" />
                     <span>
                       {userSession ? 'Đã đăng nhập' : 'Chưa đăng nhập'}
                     </span>
                   </span>
                 </div>
-
-                <p className="text-xs text-[#52605A] leading-relaxed">
+                <p className="text-xs text-[#52605A] truncate mt-0.5">
                   {userSession
-                    ? `SĐT bảo mật: ${userSession.maskedPhone} • Mã ghép đôi: ${userSession.coupleRoomCode}`
-                    : 'Đăng nhập nhanh bằng tên gọi, số điện thoại và mã PIN để lưu bài tự đăng và Nhật ký kỷ niệm.'}
+                    ? `SĐT: ${userSession.maskedPhone} • Mã ghép đôi: ${userSession.coupleRoomCode}`
+                    : 'Đăng nhập để đồng bộ bài đăng và cài đặt trên mọi thiết bị'}
                 </p>
               </div>
             </div>
 
-            {!userSession ? (
-              <button
-                type="button"
-                onClick={onRequireAuth}
-                className="w-full sm:w-auto min-h-[44px] px-4 rounded-[10px] bg-[#AF421F] hover:bg-[#933516] text-white text-xs font-bold flex items-center justify-center gap-1.5 shrink-0 transition-colors shadow-sm"
-              >
-                <LogIn className="w-4 h-4 shrink-0" />
-                <span>Đăng nhập nhanh</span>
-              </button>
-            ) : (
-              onLogout && (
+            <div className="flex items-center gap-2 shrink-0">
+              {!userSession ? (
                 <button
                   type="button"
-                  onClick={onLogout}
-                  className="w-full sm:w-auto min-h-[40px] px-3.5 rounded-[10px] bg-[#FAF7F1] border border-[#DDDCD4] hover:border-[#AF421F] hover:text-[#AF421F] text-[#52605A] text-xs font-bold flex items-center justify-center gap-1.5 shrink-0 transition-colors"
+                  onClick={onRequireAuth}
+                  className="h-9 px-3.5 rounded-lg bg-[#0E513B] hover:bg-[#0A412F] text-white text-xs font-semibold inline-flex items-center gap-1.5 transition-colors"
                 >
-                  <LogOut className="w-3.5 h-3.5 shrink-0" />
-                  <span>Đăng xuất</span>
+                  <LogIn className="w-3.5 h-3.5 shrink-0" />
+                  <span>Đăng nhập</span>
                 </button>
-              )
-            )}
+              ) : (
+                onLogout && (
+                  <button
+                    type="button"
+                    onClick={onLogout}
+                    className="h-9 px-3 rounded-lg bg-[#FAF7F1] border border-[#DDDCD4] hover:border-[#AF421F] hover:text-[#AF421F] text-[#52605A] text-xs font-semibold inline-flex items-center gap-1.5 transition-colors"
+                  >
+                    <LogOut className="w-3.5 h-3.5 shrink-0" />
+                    <span className="hidden sm:inline">Đăng xuất</span>
+                  </button>
+                )
+              )}
+
+              <button
+                type="button"
+                onClick={onClose}
+                className="w-9 h-9 rounded-lg bg-[#FAF7F1] border border-[#DDDCD4] hover:border-[#142820] text-[#142820] flex items-center justify-center shrink-0 transition-colors"
+                aria-label="Đóng hộp thoại"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
           </div>
 
+          {/* Thanh chuyển tab dạng gạch chân phẳng (Flat Underline Tabs) */}
           <div
-            className="flex flex-wrap gap-1.5"
+            className="flex items-center gap-1 overflow-x-auto no-scrollbar pt-1"
             role="tablist"
-            aria-label="Các mục trong tài khoản"
+            aria-label="Các mục quản lý và cài đặt"
           >
             {[
               {
                 id: 'MY_SPOTS',
-                label: `Quản lý bài đăng (${mySpots.length})`,
+                label: `Bài đăng (${mySpots.length})`,
+              },
+              {
+                id: 'NOTIFICATION_SETTINGS',
+                label: 'Cài đặt thông báo',
               },
               {
                 id: 'WEEKLY_SNAP',
-                label: 'Chạm ảnh mỗi tuần',
+                label: 'Nhật ký tuần',
               },
               {
                 id: 'COUPLE_WALK',
-                label: 'Đi dạo cùng nhau',
+                label: 'Chế độ đi dạo',
               },
             ].map((t) => {
               const isActive = activeTab === t.id;
@@ -291,11 +419,11 @@ export default function ProfileMemoryModal({
                   type="button"
                   role="tab"
                   aria-selected={isActive}
-                  onClick={() => setActiveTab(t.id as typeof activeTab)}
-                  className={`min-h-[40px] px-3 py-1.5 rounded-[10px] text-xs font-bold border transition-colors ${
+                  onClick={() => setActiveTab(t.id as ProfileModalTab)}
+                  className={`px-3 py-2.5 text-xs sm:text-sm font-semibold whitespace-nowrap border-b-2 transition-colors ${
                     isActive
-                      ? 'bg-[#0E513B] text-white border-[#0E513B]'
-                      : 'bg-white text-[#142820] border-[#DDDCD4] hover:bg-[#F1EFE8]'
+                      ? 'border-[#0E513B] text-[#0E513B]'
+                      : 'border-transparent text-[#52605A] hover:text-[#142820]'
                   }`}
                 >
                   {t.label}
@@ -305,255 +433,18 @@ export default function ProfileMemoryModal({
           </div>
         </header>
 
-        <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-4 sm:p-5 pb-[max(28px,env(safe-area-inset-bottom,0px))] space-y-4">
-          {activeTab === 'WEEKLY_SNAP' && (
-            <div className="space-y-4">
-              <div className="p-4 rounded-xl bg-white border border-[#DDDCD4] flex flex-col sm:flex-row sm:items-center justify-between gap-3.5">
-                <div className="space-y-1.5 min-w-0 flex-1">
-                  <p className="text-xs font-extrabold uppercase tracking-wider text-[#0E513B] flex items-center gap-1.5">
-                    <Sparkles className="w-4 h-4 shrink-0" />
-                    <span>Cam kết kỷ niệm • Chạm ảnh mỗi tuần</span>
-                  </p>
-                  <p className="text-xs sm:text-sm text-[#52605A] leading-relaxed">
-                    Mỗi tuần chụp 1 bức ảnh cập nhật sau khi nhận nuôi: vừa gửi
-                    báo tin bình an cho người cứu hộ cũ, vừa ghép thành Nhật ký
-                    trưởng thành.
-                  </p>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => setShowAddSnapForm((v) => !v)}
-                  className="w-full sm:w-auto min-h-[46px] px-4 rounded-[10px] text-xs sm:text-sm font-bold text-white bg-[#0E513B] hover:bg-[#0A412F] flex items-center justify-center gap-2 shrink-0 transition-colors"
-                >
-                  <Camera className="w-4 h-4 shrink-0" />
-                  <span>Chạm ảnh tuần mới</span>
-                </button>
-              </div>
-
-              {showAddSnapForm && (
-                <form
-                  onSubmit={handleCreateMemorySnap}
-                  className="p-4 rounded-xl bg-white border border-[#0E513B] space-y-3"
-                >
-                  <p className="text-xs font-bold text-[#0E513B]">
-                    Thêm ảnh Nhật ký tuần mới (gửi thông báo tới Người cứu hộ)
-                  </p>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                    <input
-                      type="text"
-                      required
-                      value={petName}
-                      onChange={(e) => setPetName(e.target.value)}
-                      placeholder="Nhập tên bé..."
-                      className="w-full h-11 px-3 rounded-[10px] bg-[#FAF7F1] border border-[#DDDCD4] text-xs text-[#142820] outline-none focus:border-[#0E513B]"
-                    />
-                    <input
-                      type="number"
-                      step="0.1"
-                      value={weightKg}
-                      onChange={(e) => setWeightKg(e.target.value)}
-                      placeholder="Cân nặng (kg, tùy chọn)"
-                      className="w-full h-11 px-3 rounded-[10px] bg-[#FAF7F1] border border-[#DDDCD4] text-xs text-[#142820] outline-none focus:border-[#0E513B]"
-                    />
-                  </div>
-                  <input
-                    type="text"
-                    value={moodTag}
-                    onChange={(e) => setMoodTag(e.target.value)}
-                    placeholder="Cảm xúc / trạng thái tuần này của bé..."
-                    className="w-full h-11 px-3 rounded-[10px] bg-[#FAF7F1] border border-[#DDDCD4] text-xs text-[#142820] outline-none focus:border-[#0E513B]"
-                  />
-                  <textarea
-                    value={caption}
-                    onChange={(e) => setCaption(e.target.value)}
-                    rows={2}
-                    placeholder="Chia sẻ khoảnh khắc đáng yêu tuần này của bé..."
-                    className="w-full p-3 rounded-[10px] bg-[#FAF7F1] border border-[#DDDCD4] text-xs text-[#142820] outline-none focus:border-[#0E513B]"
-                    required
-                  />
-                  {snapFormError && (
-                    <p className="text-xs font-bold text-[#AF421F]">
-                      {snapFormError}
-                    </p>
-                  )}
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
-                    <input
-                      ref={snapFileRef}
-                      type="file"
-                      accept="image/*"
-                      onChange={handleSnapFileChange}
-                      className="hidden"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => snapFileRef.current?.click()}
-                      className="min-h-[42px] px-3.5 rounded-[10px] bg-[#F1EFE8] hover:bg-[#E8EFE6] text-xs font-semibold text-[#142820] inline-flex items-center justify-center gap-1.5"
-                    >
-                      <ImagePlus className="w-4 h-4 text-[#0E513B]" />
-                      <span>
-                        {uploadingSnap
-                          ? 'Đang nén WebP...'
-                          : snapImage
-                          ? 'Đã chọn ảnh tuần mới'
-                          : 'Chọn ảnh từ máy'}
-                      </span>
-                    </button>
-
-                    <button
-                      type="submit"
-                      className="min-h-[44px] px-4 rounded-[10px] text-xs font-bold text-white bg-[#0E513B] hover:bg-[#0A412F] inline-flex items-center justify-center gap-1.5"
-                    >
-                      <Send className="w-3.5 h-3.5" />
-                      <span>Lưu &amp; Báo bình an</span>
-                    </button>
-                  </div>
-                </form>
-              )}
-
-              {memorySnaps.length === 0 ? (
-                <div className="p-6 rounded-xl bg-white border border-[#DDDCD4] text-center space-y-2">
-                  <p className="text-xs sm:text-sm text-[#52605A] leading-relaxed">
-                    Chưa có kỷ niệm nào. Bấm “Chạm ảnh tuần mới” và chọn ảnh
-                    thật của bé để bắt đầu nhật ký.
-                  </p>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                  {memorySnaps.map((snap) => (
-                    <div
-                      key={snap.id}
-                      className="rounded-xl overflow-hidden bg-white border border-[#DDDCD4] flex flex-col justify-between"
-                    >
-                      <div className="relative h-40 w-full bg-[#F1EFE8]">
-                        <img
-                          src={snap.imageUrl}
-                          alt={snap.petName}
-                          className="w-full h-full object-cover"
-                        />
-                        <div className="absolute top-2.5 left-2.5 px-2.5 py-1 rounded-md text-[10px] font-bold bg-[#0E513B] text-white">
-                          Tuần thứ {snap.weekNumber} • {snap.petName}
-                        </div>
-                        {snap.weightKg && (
-                          <div className="absolute bottom-2 right-2 px-2 py-0.5 rounded-md text-[10px] font-bold bg-black/70 text-white">
-                            {snap.weightKg} kg
-                          </div>
-                        )}
-                      </div>
-                      <div className="p-3.5 space-y-1.5">
-                        <div className="flex items-center justify-between text-[11px]">
-                          {snap.moodTag ? (
-                            <span className="font-bold text-[#AF421F]">
-                              #{snap.moodTag}
-                            </span>
-                          ) : (
-                            <span />
-                          )}
-                          <span className="text-[#52605A]">{snap.createdAt}</span>
-                        </div>
-                        <p className="text-xs leading-relaxed text-[#142820]">
-                          {snap.caption}
-                        </p>
-                        {snap.rescuerName && (
-                          <div className="pt-1 flex items-center gap-1 text-[10px] font-semibold text-[#0E513B]">
-                            <CheckCircle2 className="w-3 h-3 shrink-0" />
-                            <span>Đã gửi báo bình an tới {snap.rescuerName}</span>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
-          {activeTab === 'COUPLE_WALK' && (
-            <div className="space-y-4">
-              <div className="p-4 rounded-xl bg-white border border-[#DDDCD4] space-y-3">
-                <div className="flex items-start gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-[#FFF0E5] text-[#AF421F] flex items-center justify-center shrink-0">
-                    <Footprints className="w-5 h-5" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <h4 className="text-sm font-bold text-[#142820]">
-                      Bản đồ Kỷ niệm • Chế độ Đi dạo cùng nhau
-                    </h4>
-                    <p className="text-xs text-[#52605A] leading-relaxed mt-0.5">
-                      Khi bật chế độ Đi dạo, hệ thống tự động ưu tiên hiển thị
-                      các bài tìm thú lạc và cứu trợ trong bán kính 1.5km quanh
-                      bạn.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pt-2 border-t border-[#F1EFE8]">
-                  <span className="text-xs font-semibold text-[#142820]">
-                    Trạng thái Radar tuần tra quanh bạn:
-                  </span>
-                  <button
-                    type="button"
-                    onClick={onTogglePatrolMode}
-                    aria-pressed={patrolModeActive}
-                    className={`min-h-[42px] px-4 rounded-[10px] text-xs font-bold transition-colors ${
-                      patrolModeActive
-                        ? 'bg-[#0E513B] text-white'
-                        : 'bg-[#F1EFE8] text-[#142820]'
-                    }`}
-                  >
-                    {patrolModeActive
-                      ? 'Đang bật Đi dạo (1.5km)'
-                      : 'Đang tắt • Bấm để bật'}
-                  </button>
-                </div>
-              </div>
-
-              <div className="p-4 rounded-xl bg-white border border-[#DDDCD4] space-y-3">
-                <div className="flex items-center gap-2">
-                  <Users className="w-4 h-4 text-[#AF421F] shrink-0" />
-                  <h4 className="text-xs font-bold uppercase tracking-wider text-[#142820]">
-                    Ghép đôi Không gian Đi dạo &amp; Nuôi thú cưng
-                  </h4>
-                </div>
-                <p className="text-xs text-[#52605A] leading-relaxed">
-                  Nhập tên người đồng hành để lưu chung Sổ tay vị trí và Nhật ký
-                  Chạm ảnh mỗi tuần:
-                </p>
-                <div className="flex flex-col sm:flex-row gap-2">
-                  <input
-                    type="text"
-                    value={partnerInput}
-                    onChange={(e) => setPartnerInput(e.target.value)}
-                    placeholder="Tên người thương / bạn đồng hành..."
-                    className="flex-1 h-11 px-3.5 rounded-[10px] bg-[#FAF7F1] border border-[#DDDCD4] text-xs text-[#142820] outline-none focus:border-[#0E513B]"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (partnerInput.trim()) {
-                        onLinkPartnerName(partnerInput.trim());
-                      }
-                    }}
-                    className="min-h-[44px] px-4 rounded-[10px] text-xs font-bold text-white bg-[#AF421F] hover:bg-[#933516] inline-flex items-center justify-center gap-1.5 shrink-0 transition-colors"
-                  >
-                    <Heart className="w-3.5 h-3.5 fill-current" />
-                    <span>Kết nối</span>
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-
+        {/* Nội dung chính phẳng, thoáng, dùng đường kẻ mảnh thay vì nhiều hộp chồng chéo */}
+        <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-4 sm:p-5 pb-[max(24px,env(safe-area-inset-bottom,0px))]">
+          {/* TAB 1: QUẢN LÝ BÀI ĐĂNG */}
           {activeTab === 'MY_SPOTS' && (
-            <div className="space-y-3.5">
-              <div className="p-4 rounded-xl bg-white border border-[#DDDCD4] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div className="space-y-1 min-w-0 flex-1">
-                  <p className="text-xs font-extrabold uppercase tracking-wider text-[#0E513B]">
-                    Quản lý bài đăng của bạn ({mySpots.length} bài)
-                  </p>
-                  <p className="text-xs text-[#52605A] leading-relaxed">
-                    Thêm bài đăng mới, chỉnh sửa hình ảnh &amp; thông tin nhận
-                    diện, đánh dấu đoàn tụ hoặc xóa bài viết.
+            <div className="space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3.5 border-b border-[#ECEAE2]">
+                <div>
+                  <h3 className="text-sm font-bold text-[#142820]">
+                    Bài đăng của bạn ({mySpots.length})
+                  </h3>
+                  <p className="text-xs text-[#52605A] mt-0.5">
+                    Thêm bài mới, chỉnh sửa nội dung, đánh dấu đoàn tụ hoặc xóa bài viết.
                   </p>
                 </div>
 
@@ -564,7 +455,7 @@ export default function ProfileMemoryModal({
                       onClose();
                       onOpenCreatePost();
                     }}
-                    className="w-full sm:w-auto min-h-[42px] px-4 rounded-[10px] bg-[#0E513B] hover:bg-[#0A412F] text-white text-xs font-bold inline-flex items-center justify-center gap-1.5 shrink-0 transition-colors shadow-sm"
+                    className="h-9 px-3.5 rounded-lg bg-[#0E513B] hover:bg-[#0A412F] text-white text-xs font-semibold inline-flex items-center justify-center gap-1.5 shrink-0 transition-colors"
                   >
                     <Plus className="w-4 h-4 shrink-0" />
                     <span>Đăng bài mới</span>
@@ -573,25 +464,23 @@ export default function ProfileMemoryModal({
               </div>
 
               {mySpots.length === 0 ? (
-                <div className="p-6 rounded-xl bg-white border border-[#DDDCD4] text-center space-y-3">
-                  <p className="text-sm font-bold text-[#142820]">
+                <div className="py-8 text-center space-y-3">
+                  <p className="text-sm font-semibold text-[#142820]">
                     {userSession
-                      ? 'Bạn chưa đăng bài viết nào trên tài khoản này'
-                      : 'Vui lòng đăng nhập để quản lý các bài viết của bạn'}
+                      ? 'Bạn chưa có bài đăng nào'
+                      : 'Vui lòng đăng nhập để quản lý bài đăng'}
                   </p>
-                  <p className="text-xs text-[#52605A] leading-relaxed">
-                    Khi bạn đăng tin tìm thú lạc, cứu trợ hoặc nhận nuôi, bài
-                    viết sẽ xuất hiện tại đây để bạn chỉnh sửa, cập nhật trạng
-                    thái hoặc xóa bất cứ lúc nào.
+                  <p className="text-xs text-[#52605A] max-w-md mx-auto leading-relaxed">
+                    Các bài đăng cứu hộ, tìm thú lạc hoặc nhận nuôi của bạn sẽ hiển thị tại đây để chỉnh sửa hoặc xóa bất kỳ lúc nào.
                   </p>
                   {!userSession ? (
                     <button
                       type="button"
                       onClick={onRequireAuth}
-                      className="min-h-[42px] px-4 rounded-[10px] bg-[#AF421F] hover:bg-[#933516] text-white text-xs font-bold inline-flex items-center justify-center gap-1.5"
+                      className="h-9 px-4 rounded-lg bg-[#0E513B] hover:bg-[#0A412F] text-white text-xs font-semibold inline-flex items-center gap-1.5"
                     >
-                      <LogIn className="w-4 h-4 shrink-0" />
-                      <span>Đăng nhập nhanh để bắt đầu</span>
+                      <LogIn className="w-3.5 h-3.5" />
+                      <span>Đăng nhập ngay</span>
                     </button>
                   ) : (
                     onOpenCreatePost && (
@@ -601,151 +490,496 @@ export default function ProfileMemoryModal({
                           onClose();
                           onOpenCreatePost();
                         }}
-                        className="min-h-[42px] px-4 rounded-[10px] bg-[#0E513B] hover:bg-[#0A412F] text-white text-xs font-bold inline-flex items-center justify-center gap-1.5"
+                        className="h-9 px-4 rounded-lg bg-[#0E513B] hover:bg-[#0A412F] text-white text-xs font-semibold inline-flex items-center gap-1.5"
                       >
-                        <Plus className="w-4 h-4 shrink-0" />
+                        <Plus className="w-3.5 h-3.5" />
                         <span>Đăng bài đầu tiên</span>
                       </button>
                     )
                   )}
                 </div>
               ) : (
-                mySpots.map((sp) => {
-                  const badge = getSpotBadgeMeta(sp);
-                  const isConfirmingDelete = confirmDeleteId === sp.id;
-                  return (
-                    <div
-                      key={sp.id}
-                      className="p-3.5 rounded-xl bg-white border border-[#DDDCD4] space-y-3"
-                    >
-                      <div className="flex items-start gap-3 min-w-0">
-                        <img
-                          src={sp.images[0]}
-                          alt={sp.title}
-                          className="w-16 h-16 rounded-[10px] object-cover shrink-0 bg-[#F1EFE8] border border-[#DDDCD4]"
-                        />
-                        <div className="min-w-0 flex-1 space-y-1">
-                          <div className="flex flex-wrap items-center gap-1.5">
-                            <span
-                              className="px-2 py-0.5 rounded text-[10px] font-extrabold uppercase tracking-wider"
-                              style={{
-                                backgroundColor: badge.bgHex,
-                                color: badge.textHex,
-                              }}
-                            >
-                              {badge.uppercaseLabel}
-                            </span>
-                            {sp.isEmergencyBoosted && (
-                              <span className="px-2 py-0.5 rounded bg-[#FFF0E5] text-[#AF421F] text-[10px] font-bold">
-                                Khẩn cấp 48h
+                <div className="divide-y divide-[#ECEAE2]">
+                  {mySpots.map((sp) => {
+                    const badge = getSpotBadgeMeta(sp);
+                    const isConfirmingDelete = confirmDeleteId === sp.id;
+                    return (
+                      <div key={sp.id} className="py-3.5 first:pt-0 last:pb-0 space-y-2.5">
+                        <div className="flex items-start gap-3 min-w-0">
+                          <img
+                            src={sp.images[0]}
+                            alt={sp.title}
+                            className="w-14 h-14 rounded-lg object-cover shrink-0 bg-[#F1EFE8] border border-[#E5E4DC]"
+                          />
+                          <div className="min-w-0 flex-1 space-y-1">
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              <span
+                                className="px-2 py-0.5 rounded text-[10px] font-bold uppercase"
+                                style={{
+                                  backgroundColor: badge.bgHex,
+                                  color: badge.textHex,
+                                }}
+                              >
+                                {badge.uppercaseLabel}
                               </span>
-                            )}
+                              {sp.isEmergencyBoosted && (
+                                <span className="px-2 py-0.5 rounded bg-[#FFF0E5] text-[#AF421F] text-[10px] font-semibold">
+                                  Khẩn cấp 48h
+                                </span>
+                              )}
+                            </div>
+                            <h4 className="text-xs sm:text-sm font-bold text-[#142820] line-clamp-1">
+                              {sp.title}
+                            </h4>
+                            <p className="text-xs text-[#52605A] truncate">
+                              {sp.formattedAddress || sp.areaLabel} • Quan tâm:{' '}
+                              {sp.boostCount || 1} • Manh mối:{' '}
+                              {sp.sightings?.length || 0}
+                            </p>
                           </div>
-                          <h4 className="text-xs sm:text-sm font-extrabold text-[#142820] line-clamp-1">
-                            {sp.title}
-                          </h4>
-                          <p className="text-[11px] text-[#52605A] truncate">
-                            {sp.formattedAddress || sp.areaLabel} • Quan tâm:{' '}
-                            {sp.boostCount || 1} • Manh mối:{' '}
-                            {sp.sightings?.length || 0}
-                          </p>
                         </div>
-                      </div>
 
-                      <div className="pt-2.5 border-t border-[#F1EFE8] flex flex-wrap items-center justify-between gap-2">
-                        <div className="flex flex-wrap items-center gap-1.5">
-                          {onSelectSpotDetail && (
-                            <button
-                              type="button"
-                              onClick={() => {
-                                onClose();
-                                onSelectSpotDetail(sp);
-                              }}
-                              className="min-h-[36px] px-3 rounded-[9px] text-xs font-bold bg-[#FAF7F1] hover:bg-[#F1EFE8] text-[#142820] border border-[#DDDCD4] inline-flex items-center gap-1.5 transition-colors"
-                            >
-                              <Eye className="w-3.5 h-3.5 text-[#0E513B]" />
-                              <span>Xem</span>
-                            </button>
-                          )}
-
-                          {onOpenEditSpot && (
-                            <button
-                              type="button"
-                              onClick={() => {
-                                onClose();
-                                onOpenEditSpot(sp);
-                              }}
-                              className="min-h-[36px] px-3 rounded-[9px] text-xs font-bold bg-[#E8EFE6] hover:bg-[#0E513B] text-[#0E513B] hover:text-white inline-flex items-center gap-1.5 transition-colors"
-                            >
-                              <Pencil className="w-3.5 h-3.5" />
-                              <span>Sửa bài</span>
-                            </button>
-                          )}
-
-                          {sp.spotType !== 'GREEN_PEACE' && (
-                            <button
-                              type="button"
-                              onClick={() => onResolveSpotToPeace(sp.id)}
-                              className="min-h-[36px] px-3 rounded-[9px] text-xs font-bold bg-[#FAF7F1] hover:bg-[#E8EFE6] text-[#0E513B] border border-[#DDDCD4] inline-flex items-center gap-1.5 transition-colors"
-                            >
-                              <CheckCircle2 className="w-3.5 h-3.5" />
-                              <span>Đã đoàn tụ</span>
-                            </button>
-                          )}
-
-                          {sp.spotType === 'RED_SOS' &&
-                            !sp.isEmergencyBoosted && (
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            {onSelectSpotDetail && (
                               <button
                                 type="button"
-                                onClick={() => onActivateEmergencyBoost(sp.id)}
-                                className="min-h-[36px] px-3 rounded-[9px] text-xs font-bold bg-[#FFF0E5] hover:bg-[#AF421F] text-[#AF421F] hover:text-white inline-flex items-center gap-1.5 transition-colors"
+                                onClick={() => {
+                                  onClose();
+                                  onSelectSpotDetail(sp);
+                                }}
+                                className="h-8 px-2.5 rounded-md text-xs font-semibold bg-[#FAF7F1] hover:bg-[#F1EFE8] text-[#142820] border border-[#DDDCD4] inline-flex items-center gap-1 transition-colors"
                               >
-                                <Zap className="w-3.5 h-3.5" />
-                                <span>Khẩn cấp</span>
+                                <Eye className="w-3.5 h-3.5 text-[#0E513B]" />
+                                <span>Xem</span>
                               </button>
                             )}
-                        </div>
 
-                        {onDeleteSpot && (
-                          <div className="flex items-center gap-1.5">
-                            {isConfirmingDelete ? (
-                              <>
+                            {onOpenEditSpot && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  onClose();
+                                  onOpenEditSpot(sp);
+                                }}
+                                className="h-8 px-2.5 rounded-md text-xs font-semibold bg-[#F2F4F1] hover:bg-[#0E513B] text-[#0E513B] hover:text-white inline-flex items-center gap-1 transition-colors"
+                              >
+                                <Pencil className="w-3.5 h-3.5" />
+                                <span>Sửa bài</span>
+                              </button>
+                            )}
+
+                            {sp.spotType !== 'GREEN_PEACE' && (
+                              <button
+                                type="button"
+                                onClick={() => onResolveSpotToPeace(sp.id)}
+                                className="h-8 px-2.5 rounded-md text-xs font-semibold bg-[#FAF7F1] hover:bg-[#F2F4F1] text-[#0E513B] border border-[#DDDCD4] inline-flex items-center gap-1 transition-colors"
+                              >
+                                <CheckCircle2 className="w-3.5 h-3.5" />
+                                <span>Đã đoàn tụ</span>
+                              </button>
+                            )}
+
+                            {sp.spotType === 'RED_SOS' &&
+                              !sp.isEmergencyBoosted && (
                                 <button
                                   type="button"
-                                  onClick={() => {
-                                    setConfirmDeleteId(null);
-                                    onDeleteSpot(sp.id);
-                                  }}
-                                  className="min-h-[36px] px-3 rounded-[9px] text-xs font-bold bg-[#AF421F] hover:bg-[#933516] text-white inline-flex items-center gap-1 transition-colors"
+                                  onClick={() => onActivateEmergencyBoost(sp.id)}
+                                  className="h-8 px-2.5 rounded-md text-xs font-semibold bg-[#FFF0E5] hover:bg-[#AF421F] text-[#AF421F] hover:text-white inline-flex items-center gap-1 transition-colors"
+                                >
+                                  <Zap className="w-3.5 h-3.5" />
+                                  <span>Khẩn cấp</span>
+                                </button>
+                              )}
+                          </div>
+
+                          {onDeleteSpot && (
+                            <div className="flex items-center gap-1.5">
+                              {isConfirmingDelete ? (
+                                <>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setConfirmDeleteId(null);
+                                      onDeleteSpot(sp.id);
+                                    }}
+                                    className="h-8 px-2.5 rounded-md text-xs font-semibold bg-[#AF421F] hover:bg-[#933516] text-white inline-flex items-center gap-1 transition-colors"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                    <span>Xác nhận xóa</span>
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => setConfirmDeleteId(null)}
+                                    className="h-8 px-2 rounded-md text-xs font-medium text-[#52605A] hover:bg-[#F1EFE8]"
+                                  >
+                                    Hủy
+                                  </button>
+                                </>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => setConfirmDeleteId(sp.id)}
+                                  className="h-8 px-2.5 rounded-md text-xs font-semibold text-[#AF421F] hover:bg-[#FFF0E5] inline-flex items-center gap-1 transition-colors"
                                 >
                                   <Trash2 className="w-3.5 h-3.5" />
-                                  <span>Xác nhận xóa</span>
+                                  <span>Xóa bài</span>
                                 </button>
-                                <button
-                                  type="button"
-                                  onClick={() => setConfirmDeleteId(null)}
-                                  className="min-h-[36px] px-2.5 rounded-[9px] text-xs font-semibold text-[#52605A] hover:bg-[#F1EFE8]"
-                                >
-                                  Hủy
-                                </button>
-                              </>
-                            ) : (
-                              <button
-                                type="button"
-                                onClick={() => setConfirmDeleteId(sp.id)}
-                                className="min-h-[36px] px-3 rounded-[9px] text-xs font-bold text-[#AF421F] bg-[#FFF0E5]/70 hover:bg-[#AF421F] hover:text-white border border-[#AF421F]/25 inline-flex items-center gap-1.5 transition-colors"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                                <span>Xóa bài</span>
-                              </button>
-                            )}
-                          </div>
-                        )}
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* TAB 2: CÀI ĐẶT THÔNG BÁO (HỖ TRỢ IPHONE, ANDROID & TRÌNH DUYỆT) */}
+          {activeTab === 'NOTIFICATION_SETTINGS' && (
+            <div className="space-y-5">
+              {/* Thiết lập tổng */}
+              <div className="pb-4 border-b border-[#ECEAE2] space-y-3.5">
+                <div className="flex items-center justify-between gap-4">
+                  <div className="min-w-0">
+                    <h3 className="text-sm font-bold text-[#142820]">
+                      Nhận thông báo trên thiết bị
+                    </h3>
+                    <p className="text-xs text-[#52605A] mt-0.5">
+                      Đang sử dụng: {platformLabel} •{' '}
+                      {notificationSettings.masterEnabled
+                        ? 'Đang bật thông báo'
+                        : 'Đang tắt thông báo'}
+                    </p>
+                  </div>
+                  <ToggleSwitch
+                    checked={notificationSettings.masterEnabled}
+                    onChange={handleMasterToggle}
+                    label="Nhận thông báo trên thiết bị"
+                  />
+                </div>
+
+                <div className="flex items-center justify-between gap-4 pt-2 border-t border-[#F5F4EE]">
+                  <div className="min-w-0">
+                    <p className="text-xs sm:text-sm font-semibold text-[#142820]">
+                      Âm báo &amp; Rung khi có tin mới
+                    </p>
+                    <p className="text-xs text-[#52605A] mt-0.5">
+                      Phát âm báo nhẹ trên iPhone/Android và rung thiết bị khi có cảnh báo quan trọng.
+                    </p>
+                  </div>
+                  <ToggleSwitch
+                    checked={
+                      notificationSettings.masterEnabled &&
+                      notificationSettings.soundAndVibrate
+                    }
+                    disabled={!notificationSettings.masterEnabled}
+                    onChange={(val) =>
+                      onUpdateNotificationSetting?.('soundAndVibrate', val)
+                    }
+                    label="Âm báo và rung khi có tin mới"
+                  />
+                </div>
+
+                <div className="flex flex-wrap items-center justify-between gap-2 pt-2">
+                  <div className="flex items-center gap-1.5 text-xs text-[#52605A]">
+                    <Smartphone className="w-3.5 h-3.5 text-[#0E513B] shrink-0" />
+                    <span>
+                      {notificationPlatform === 'ios'
+                        ? 'Hỗ trợ thông báo trực tiếp trên iPhone/iPad & màn hình chính iOS.'
+                        : notificationPermission === 'granted'
+                        ? 'Trình duyệt đã cấp quyền thông báo đẩy.'
+                        : 'Bấm kiểm tra để cấp quyền hiển thị thông báo trên màn hình.'}
+                    </span>
+                  </div>
+
+                  {onTestNotification && (
+                    <button
+                      type="button"
+                      onClick={onTestNotification}
+                      className="h-8 px-3 rounded-md bg-[#FAF7F1] border border-[#DDDCD4] hover:border-[#0E513B] text-xs font-semibold text-[#142820] inline-flex items-center gap-1.5 transition-colors"
+                    >
+                      <Bell className="w-3.5 h-3.5 text-[#0E513B]" />
+                      <span>Gửi thông báo thử</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Danh sách từng mục thông báo có Toggle Switch riêng */}
+              <div>
+                <h4 className="text-xs font-bold uppercase tracking-wider text-[#52605A] mb-2">
+                  Tùy chỉnh từng mục thông báo
+                </h4>
+                <div className="divide-y divide-[#ECEAE2]">
+                  {NOTIFICATION_TOGGLE_ITEMS.map((item) => {
+                    const isChecked =
+                      notificationSettings.masterEnabled &&
+                      Boolean(notificationSettings[item.key]);
+                    return (
+                      <div
+                        key={item.key}
+                        className="py-3 flex items-center justify-between gap-4"
+                      >
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs sm:text-sm font-semibold text-[#142820]">
+                            {item.title}
+                          </p>
+                          <p className="text-xs text-[#52605A] leading-relaxed mt-0.5">
+                            {item.description}
+                          </p>
+                        </div>
+                        <ToggleSwitch
+                          checked={isChecked}
+                          disabled={!notificationSettings.masterEnabled}
+                          onChange={(val) =>
+                            onUpdateNotificationSetting?.(item.key, val)
+                          }
+                          label={item.title}
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Lịch sử thông báo gần đây */}
+              <div className="pt-3 border-t border-[#ECEAE2] space-y-2.5">
+                <div className="flex items-center justify-between gap-2">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-[#52605A]">
+                    Thông báo gần đây ({notificationHistory.length})
+                  </h4>
+                  {notificationHistory.length > 0 &&
+                    onClearNotificationHistory && (
+                      <button
+                        type="button"
+                        onClick={onClearNotificationHistory}
+                        className="text-xs font-semibold text-[#52605A] hover:text-[#AF421F]"
+                      >
+                        Xóa lịch sử
+                      </button>
+                    )}
+                </div>
+
+                {notificationHistory.length === 0 ? (
+                  <p className="text-xs text-[#52605A] py-2">
+                    Chưa có thông báo nào được ghi nhận trên thiết bị này.
+                  </p>
+                ) : (
+                  <div className="divide-y divide-[#ECEAE2] max-h-48 overflow-y-auto">
+                    {notificationHistory.slice(0, 8).map((item) => (
+                      <div key={item.id} className="py-2.5 space-y-0.5">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-xs font-bold text-[#142820]">
+                            {item.title}
+                          </p>
+                          <span className="text-[11px] text-[#52605A] shrink-0">
+                            {item.createdAt}
+                          </span>
+                        </div>
+                        <p className="text-xs text-[#52605A] leading-relaxed">
+                          {item.body}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* TAB 3: NHẬT KÝ KỶ NIỆM HÀNG TUẦN */}
+          {activeTab === 'WEEKLY_SNAP' && (
+            <div className="space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3.5 border-b border-[#ECEAE2]">
+                <div className="min-w-0 flex-1">
+                  <h3 className="text-sm font-bold text-[#142820] flex items-center gap-1.5">
+                    <Sparkles className="w-4 h-4 text-[#0E513B] shrink-0" />
+                    <span>Nhật ký Chạm ảnh mỗi tuần</span>
+                  </h3>
+                  <p className="text-xs text-[#52605A] mt-0.5">
+                    Cập nhật hình ảnh sau khi nhận nuôi để báo tin bình an cho người cứu hộ.
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setShowAddSnapForm((v) => !v)}
+                  className="h-9 px-3.5 rounded-lg text-xs font-semibold text-white bg-[#0E513B] hover:bg-[#0A412F] inline-flex items-center justify-center gap-1.5 shrink-0 transition-colors"
+                >
+                  <Camera className="w-3.5 h-3.5 shrink-0" />
+                  <span>Chạm ảnh tuần mới</span>
+                </button>
+              </div>
+
+              {showAddSnapForm && (
+                <form
+                  onSubmit={handleCreateMemorySnap}
+                  className="pb-4 border-b border-[#ECEAE2] space-y-3"
+                >
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    <input
+                      type="text"
+                      required
+                      value={petName}
+                      onChange={(e) => setPetName(e.target.value)}
+                      placeholder="Nhập tên bé..."
+                      className="w-full h-10 px-3 rounded-lg bg-[#FAF7F1] border border-[#DDDCD4] text-xs text-[#142820] outline-none focus:border-[#0E513B]"
+                    />
+                    <input
+                      type="number"
+                      step="0.1"
+                      value={weightKg}
+                      onChange={(e) => setWeightKg(e.target.value)}
+                      placeholder="Cân nặng (kg, tùy chọn)"
+                      className="w-full h-10 px-3 rounded-lg bg-[#FAF7F1] border border-[#DDDCD4] text-xs text-[#142820] outline-none focus:border-[#0E513B]"
+                    />
+                  </div>
+                  <input
+                    type="text"
+                    value={moodTag}
+                    onChange={(e) => setMoodTag(e.target.value)}
+                    placeholder="Cảm xúc / trạng thái tuần này của bé..."
+                    className="w-full h-10 px-3 rounded-lg bg-[#FAF7F1] border border-[#DDDCD4] text-xs text-[#142820] outline-none focus:border-[#0E513B]"
+                  />
+                  <textarea
+                    value={caption}
+                    onChange={(e) => setCaption(e.target.value)}
+                    rows={2}
+                    placeholder="Chia sẻ khoảnh khắc đáng yêu tuần này của bé..."
+                    className="w-full p-3 rounded-lg bg-[#FAF7F1] border border-[#DDDCD4] text-xs text-[#142820] outline-none focus:border-[#0E513B]"
+                    required
+                  />
+                  {snapFormError && (
+                    <p className="text-xs font-semibold text-[#AF421F]">
+                      {snapFormError}
+                    </p>
+                  )}
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <input
+                      ref={snapFileRef}
+                      type="file"
+                      accept="image/*"
+                      onChange={handleSnapFileChange}
+                      className="hidden"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => snapFileRef.current?.click()}
+                      className="h-9 px-3 rounded-lg bg-[#FAF7F1] border border-[#DDDCD4] text-xs font-semibold text-[#142820] inline-flex items-center justify-center gap-1.5"
+                    >
+                      <ImagePlus className="w-3.5 h-3.5 text-[#0E513B]" />
+                      <span>
+                        {uploadingSnap
+                          ? 'Đang xử lý ảnh...'
+                          : snapImage
+                          ? 'Đã chọn ảnh tuần mới'
+                          : 'Chọn ảnh từ thiết bị'}
+                      </span>
+                    </button>
+
+                    <button
+                      type="submit"
+                      className="h-9 px-4 rounded-lg text-xs font-semibold text-white bg-[#0E513B] hover:bg-[#0A412F] inline-flex items-center justify-center gap-1.5"
+                    >
+                      <Send className="w-3.5 h-3.5" />
+                      <span>Lưu &amp; Báo bình an</span>
+                    </button>
+                  </div>
+                </form>
+              )}
+
+              {memorySnaps.length === 0 ? (
+                <p className="text-xs text-[#52605A] py-6 text-center">
+                  Chưa có kỷ niệm nào. Bấm “Chạm ảnh tuần mới” để bắt đầu lưu nhật ký.
+                </p>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                  {memorySnaps.map((snap) => (
+                    <div
+                      key={snap.id}
+                      className="rounded-lg overflow-hidden border border-[#E5E4DC] flex flex-col justify-between"
+                    >
+                      <div className="relative h-36 w-full bg-[#F1EFE8]">
+                        <img
+                          src={snap.imageUrl}
+                          alt={snap.petName}
+                          className="w-full h-full object-cover"
+                        />
+                        <div className="absolute top-2 left-2 px-2 py-0.5 rounded text-[10px] font-bold bg-[#0E513B] text-white">
+                          Tuần {snap.weekNumber} • {snap.petName}
+                        </div>
+                      </div>
+                      <div className="p-3 space-y-1">
+                        <div className="flex items-center justify-between text-[11px] text-[#52605A]">
+                          <span>{snap.moodTag ? `#${snap.moodTag}` : ''}</span>
+                          <span>{snap.createdAt}</span>
+                        </div>
+                        <p className="text-xs text-[#142820] leading-relaxed">
+                          {snap.caption}
+                        </p>
                       </div>
                     </div>
-                  );
-                })
+                  ))}
+                </div>
               )}
+            </div>
+          )}
+
+          {/* TAB 4: CHẾ ĐỘ ĐI DẠO & GHÉP ĐÔI */}
+          {activeTab === 'COUPLE_WALK' && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between gap-4 pb-4 border-b border-[#ECEAE2]">
+                <div className="min-w-0 flex-1">
+                  <h3 className="text-sm font-bold text-[#142820] flex items-center gap-1.5">
+                    <Footprints className="w-4 h-4 text-[#0E513B] shrink-0" />
+                    <span>Radar Đi dạo quanh bạn (1.5km)</span>
+                  </h3>
+                  <p className="text-xs text-[#52605A] mt-0.5 leading-relaxed">
+                    Ưu tiên hiển thị các bài tìm thú lạc và cứu trợ trong bán kính 1.5km quanh vị trí của bạn.
+                  </p>
+                </div>
+                <ToggleSwitch
+                  checked={patrolModeActive}
+                  onChange={() => onTogglePatrolMode()}
+                  label="Chế độ Đi dạo quanh bạn"
+                />
+              </div>
+
+              <div className="space-y-2.5">
+                <div className="flex items-center gap-1.5">
+                  <Users className="w-4 h-4 text-[#0E513B] shrink-0" />
+                  <h4 className="text-xs sm:text-sm font-bold text-[#142820]">
+                    Ghép đôi người đồng hành
+                  </h4>
+                </div>
+                <p className="text-xs text-[#52605A]">
+                  Nhập tên người đồng hành để lưu chung Sổ tay vị trí và Nhật ký chăm sóc thú cưng:
+                </p>
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <input
+                    type="text"
+                    value={partnerInput}
+                    onChange={(e) => setPartnerInput(e.target.value)}
+                    placeholder="Nhập tên bạn đồng hành..."
+                    className="flex-1 h-10 px-3 rounded-lg bg-[#FAF7F1] border border-[#DDDCD4] text-xs text-[#142820] outline-none focus:border-[#0E513B]"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (partnerInput.trim()) {
+                        onLinkPartnerName(partnerInput.trim());
+                      }
+                    }}
+                    className="h-10 px-4 rounded-lg text-xs font-semibold text-white bg-[#0E513B] hover:bg-[#0A412F] inline-flex items-center justify-center gap-1.5 shrink-0 transition-colors"
+                  >
+                    <Heart className="w-3.5 h-3.5" />
+                    <span>Kết nối</span>
+                  </button>
+                </div>
+              </div>
             </div>
           )}
         </div>

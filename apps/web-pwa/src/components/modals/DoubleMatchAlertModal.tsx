@@ -3,7 +3,7 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowRight, MapPin, X } from 'lucide-react';
-import { DomSpot, SpotMatchResult, ThemeId } from '@/lib/types';
+import { DomSpot, isSpotDeletedOrHidden, SpotMatchResult, ThemeId } from '@/lib/types';
 
 const FALLBACK_PET_IMAGE =
   'https://images.unsplash.com/photo-1543852786-1cf6624b9987?auto=format&fit=crop&w=400&q=80';
@@ -20,9 +20,21 @@ export default function DoubleMatchAlertModal({
   onClose,
   onOpenMatchedSpot,
 }: DoubleMatchAlertModalProps) {
-  if (!matches || matches.length === 0) return null;
+  const validMatches = React.useMemo(() => {
+    if (!Array.isArray(matches)) return [];
+    const seen = new Set<string>();
+    return matches.filter((m) => {
+      const sp = m?.matchedSpot;
+      if (!sp?.id || seen.has(sp.id)) return false;
+      if (isSpotDeletedOrHidden(sp)) return false;
+      seen.add(sp.id);
+      return true;
+    });
+  }, [matches]);
 
-  const topMatch = matches[0];
+  if (validMatches.length === 0) return null;
+
+  const topMatch = validMatches[0];
   const topPercent =
     topMatch.similarityScore <= 1
       ? Math.round(topMatch.similarityScore * 100)
@@ -47,7 +59,7 @@ export default function DoubleMatchAlertModal({
           <div className="flex items-start justify-between gap-3">
             <div>
               <span className="inline-block px-2.5 py-1 rounded-md text-[11px] font-bold bg-[#E8EFE6] text-[#0E513B]">
-                Gợi ý bài viết tương đồng ({matches.length})
+                Gợi ý bài viết tương đồng ({validMatches.length})
               </span>
               <h3 className="text-base sm:text-lg font-bold mt-2 text-[#142820]">
                 Phát hiện trường hợp giống {topPercent}% với bài bạn vừa đăng
@@ -67,7 +79,7 @@ export default function DoubleMatchAlertModal({
           </p>
 
           <div className="mt-4 space-y-2.5 max-h-72 overflow-y-auto pr-1">
-            {matches.slice(0, 3).map((item) => {
+            {validMatches.slice(0, 3).map((item) => {
               const pct =
                 item.similarityScore <= 1
                   ? Math.round(item.similarityScore * 100)

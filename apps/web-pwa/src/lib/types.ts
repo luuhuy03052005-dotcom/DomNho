@@ -156,6 +156,37 @@ export function normalizePhoneDigits(rawPhone?: string | null): string {
   return digits;
 }
 
+export function isValidVietnamesePhone(rawPhone?: string | null): boolean {
+  const normalized = normalizePhoneDigits(rawPhone);
+  return /^0[235789]\d{8,9}$/.test(normalized);
+}
+
+export function isSpotDeletedOrHidden(
+  spot?: Partial<DomSpot> | null,
+  deletedIds?: Set<string> | string[]
+): boolean {
+  if (!spot || !spot.id) return true;
+  if (deletedIds) {
+    const inDeleted =
+      deletedIds instanceof Set
+        ? deletedIds.has(spot.id)
+        : Array.isArray(deletedIds) && deletedIds.includes(spot.id);
+    if (inDeleted) return true;
+  }
+  if (typeof spot.lightPower === 'number' && spot.lightPower <= 0) return true;
+  if (spot.status === 'FADED' || spot.status === 'SHADOWBANNED') return true;
+  if ((spot.sourceType as string) === 'DELETED_POST') return true;
+  const normalizedTitle = String(spot.title || '').trim().toLowerCase();
+  if (
+    normalizedTitle === '[deleted]' ||
+    normalizedTitle.includes('pizza xúc xích') ||
+    normalizedTitle.includes('đế bánh tròn')
+  ) {
+    return true;
+  }
+  return false;
+}
+
 export function deterministicAccountIdFromPhone(rawPhone?: string | null): string {
   const clean = normalizePhoneDigits(rawPhone);
   if (!clean) return '00000000-0000-4000-8000-000000000000';

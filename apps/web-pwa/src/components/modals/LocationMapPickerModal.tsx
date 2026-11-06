@@ -37,6 +37,26 @@ export default function LocationMapPickerModal({
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapInstanceRef = useRef<any>(null);
   const geocodeTimerRef = useRef<number | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const coordsBadgeRef = useRef<HTMLDivElement | null>(null);
+  const currentCoordsRef = useRef<{ lat: number; lng: number }>({
+    lat: initialLat || 10.8505,
+    lng: initialLng || 106.765,
+  });
+  const lastGeocodedCoordsRef = useRef<{ lat: number; lng: number }>({
+    lat: 0,
+    lng: 0,
+  });
+  const initialPropsRef = useRef({
+    lat: initialLat || 10.8505,
+    lng: initialLng || 106.765,
+    address: initialAddress || '',
+  });
+  initialPropsRef.current = {
+    lat: initialLat || 10.8505,
+    lng: initialLng || 106.765,
+    address: initialAddress || '',
+  };
 
   const [mounted, setMounted] = useState(false);
   const [isMovingMap, setIsMovingMap] = useState(false);
@@ -64,19 +84,32 @@ export default function LocationMapPickerModal({
   }, []);
 
   const fetchAddressForCoords = useCallback(async (lat: number, lng: number) => {
+    lastGeocodedCoordsRef.current = { lat, lng };
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
     setIsGeocoding(true);
     try {
-      const res = await fetch(`/api/geocode?lat=${lat}&lng=${lng}`);
+      const res = await fetch(`/api/geocode?lat=${lat}&lng=${lng}`, {
+        signal: controller.signal,
+      });
       const data = await res.json();
+      if (controller.signal.aborted) return;
       if (data.ok && data.address) {
         setResolvedAddress(data.address);
       } else {
         setResolvedAddress(`Tọa độ: ${lat.toFixed(5)}, ${lng.toFixed(5)}`);
       }
-    } catch {
+    } catch (err: any) {
+      if (err?.name === 'AbortError') return;
       setResolvedAddress(`Tọa độ: ${lat.toFixed(5)}, ${lng.toFixed(5)}`);
     } finally {
-      setIsGeocoding(false);
+      if (abortControllerRef.current === controller) {
+        setIsGeocoding(false);
+      }
     }
   }, []);
 
@@ -87,36 +120,29 @@ export default function LocationMapPickerModal({
       }
       geocodeTimerRef.current = window.setTimeout(() => {
         fetchAddressForCoords(lat, lng);
-      }, 220);
+      }, 280);
     },
     [fetchAddressForCoords]
   );
 
   useEffect(() => {
-    if (!isOpen) return;
-
-    const startLat = initialLat || 10.8505;
-    const startLng = initialLng || 106.765;
-
-    setCurrentCoords({
-      lat: startLat,
-      lng: startLng,
-    });
-    if (initialAddress && initialAddress.trim().length > 0) {
-      setResolvedAddress(initialAddress);
-    } else {
-      fetchAddressForCoords(startLat, startLng);
-    }
-  }, [isOpen, initialLat, initialLng, initialAddress, fetchAddressForCoords]);
-
-  useEffect(() => {
     if (!isOpen || !mounted) return;
 
     let cancelled = false;
-    let resizeObserver: ResizeObserver | null = null;
 
-    const startLat = initialLat || 10.8505;
-    const startLng = initialLng || 106.765;
+    const startLat = initialPropsRef.current.lat;
+    const startLng = initialPropsRef.current.lng;
+    const startAddr = initialPropsRef.current.address;
+
+    currentCoordsRef.current = { lat: startLat, lng: startLng };
+    lastGeocodedCoordsRef.current = { lat: startLat, lng: startLng };
+    setCurrentCoords({ lat: startLat, lng: startLng });
+
+    if (startAddr && startAddr.trim().length > 0) {
+      setResolvedAddress(startAddr);
+    } else {
+      fetchAddressForCoords(startLat, startLng);
+    }
 
     async function initPickerMap() {
       if (!mapContainerRef.current) return;
@@ -168,21 +194,24 @@ export default function LocationMapPickerModal({
       map.on('load', () => {
         if (cancelled) return;
         map.resize();
-        map.setCenter([startLng, startLat]);
       });
 
-      map.on('movestart', () => {
+      map.on('movestart', (e: any) => {
         if (cancelled) return;
-        setIsMovingMap(true);
+        if (e?.originalEvent) {
+          setIsMovingMap(true);
+        }
       });
 
       map.on('move', () => {
         if (cancelled) return;
         const center = map.getCenter();
-        setCurrentCoords({
-          lat: Number(center.lat.toFixed(6)),
-          lng: Number(center.lng.toFixed(6)),
-        });
+        const nextLat = Number(center.lat.toFixed(6));
+        const nextLng = Number(center.lng.toFixed(6));
+        currentCoordsRef.current = { lat: nextLat, lng: nextLng };
+        if (coordsBadgeRef.current) {
+          coordsBadgeRef.current.textContent = `${nextLat.toFixed(5)}, ${nextLng.toFixed(5)}`;
+        }
       });
 
       map.on('moveend', () => {
@@ -191,40 +220,43 @@ export default function LocationMapPickerModal({
         const center = map.getCenter();
         const nextLat = Number(center.lat.toFixed(6));
         const nextLng = Number(center.lng.toFixed(6));
+        currentCoordsRef.current = { lat: nextLat, lng: nextLng };
         setCurrentCoords({ lat: nextLat, lng: nextLng });
-        scheduleReverseGeocode(nextLat, nextLng);
+
+        const prev = lastGeocodedCoordsRef.current;
+        const deltaLat = Math.abs(nextLat - prev.lat);
+        const deltaLng = Math.abs(nextLng - prev.lng);
+        // Chỉ gọi reverse geocode khi vị trí ghim thực sự dịch chuyển (> ~3 mét), chống lặp vô hạn
+        if (deltaLat > 0.00003 || deltaLng > 0.00003) {
+          scheduleReverseGeocode(nextLat, nextLng);
+        }
       });
 
       map.on('click', (e) => {
         if (cancelled) return;
         map.easeTo({
           center: [e.lngLat.lng, e.lngLat.lat],
-          duration: 280,
+          duration: 260,
         });
       });
-
-      if (typeof ResizeObserver !== 'undefined' && mapContainerRef.current) {
-        resizeObserver = new ResizeObserver(() => {
-          map.resize();
-        });
-        resizeObserver.observe(mapContainerRef.current);
-      }
     }
 
     initPickerMap();
 
     return () => {
       cancelled = true;
-      resizeObserver?.disconnect();
       if (geocodeTimerRef.current) {
         window.clearTimeout(geocodeTimerRef.current);
+      }
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
       }
       if (mapInstanceRef.current) {
         mapInstanceRef.current.remove();
         mapInstanceRef.current = null;
       }
     };
-  }, [isOpen, mounted, initialLat, initialLng, googleMapsApiKey, scheduleReverseGeocode]);
+  }, [isOpen, mounted, googleMapsApiKey, fetchAddressForCoords, scheduleReverseGeocode]);
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -262,7 +294,12 @@ export default function LocationMapPickerModal({
   };
 
   const flyToCoords = (lat: number, lng: number, addressCandidate?: string) => {
+    currentCoordsRef.current = { lat, lng };
+    lastGeocodedCoordsRef.current = { lat, lng };
     setCurrentCoords({ lat, lng });
+    if (coordsBadgeRef.current) {
+      coordsBadgeRef.current.textContent = `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+    }
     if (mapInstanceRef.current) {
       mapInstanceRef.current.flyTo({
         center: [lng, lat],
@@ -298,8 +335,8 @@ export default function LocationMapPickerModal({
 
   const handleConfirm = () => {
     onConfirmLocation({
-      lat: currentCoords.lat,
-      lng: currentCoords.lng,
+      lat: currentCoordsRef.current.lat || currentCoords.lat,
+      lng: currentCoordsRef.current.lng || currentCoords.lng,
       formattedAddress: resolvedAddress,
     });
     onClose();
@@ -438,7 +475,10 @@ export default function LocationMapPickerModal({
             </div>
           </div>
 
-          <div className="absolute top-3 right-3 z-10 bg-white/95 px-2.5 py-1 rounded-full text-[11px] font-bold text-[#142820] shadow-sm border border-[#DDDCD4] pointer-events-none">
+          <div
+            ref={coordsBadgeRef}
+            className="absolute top-3 right-3 z-10 bg-white/95 px-2.5 py-1 rounded-full text-[11px] font-bold text-[#142820] shadow-sm border border-[#DDDCD4] pointer-events-none"
+          >
             {currentCoords.lat.toFixed(5)}, {currentCoords.lng.toFixed(5)}
           </div>
 
@@ -477,7 +517,7 @@ export default function LocationMapPickerModal({
               <span className="text-[10px] font-bold uppercase tracking-wider text-[#52605A] block">
                 Địa chỉ được xác định từ ghim:
               </span>
-              <p className="text-xs font-bold text-[#142820] line-clamp-2 min-h-[2rem] flex items-center break-words">
+              <p className="text-xs font-bold text-[#142820] line-clamp-2 h-8 flex items-center break-words">
                 {resolvedAddress}
               </p>
             </div>

@@ -1,4 +1,4 @@
-import { DomSpot, SpotMatchResult } from './types';
+import { DomSpot, SpotMatchResult, isSpotDeletedOrHidden } from './types';
 
 /**
  * 1. Làm mờ tọa độ tự động (Coordinate Fuzzing / Jittering ±150m-300m)
@@ -221,14 +221,19 @@ export function findDoubleMatchesWithin3Km(
     newSpot.spotType === 'ORANGE_SIGHT' ? 'RED_SOS' : 'ORANGE_SIGHT';
 
   const results: SpotMatchResult[] = [];
+  const seenIds = new Set<string>([newSpot.id]);
 
   for (const candidate of existingSpots) {
+    if (!candidate || !candidate.id || seenIds.has(candidate.id)) {
+      continue;
+    }
+    seenIds.add(candidate.id);
+
     if (
-      candidate.id === newSpot.id ||
+      isSpotDeletedOrHidden(candidate) ||
       candidate.spotType !== targetOppositeType ||
       candidate.status === 'RESOLVED' ||
-      candidate.status === 'FADED' ||
-      candidate.status === 'SHADOWBANNED' ||
+      candidate.entityCategory === 'RESCUE_CENTER' ||
       candidate.hasExactLocation === false ||
       !Number.isFinite(candidate.publicLat) ||
       !Number.isFinite(candidate.publicLng) ||
@@ -260,11 +265,22 @@ export function findDoubleMatchesWithin3Km(
       )
     );
 
-    const colorMatch =
+    const colorMatch = Boolean(
       candidate.coatColor &&
-      newSpot.coatColor &&
-      (candidate.coatColor.toLowerCase().includes(newSpot.coatColor.toLowerCase()) ||
-        newSpot.coatColor.toLowerCase().includes(candidate.coatColor.toLowerCase()));
+        newSpot.coatColor &&
+        candidate.coatColor !== 'Chưa rõ màu lông' &&
+        newSpot.coatColor !== 'Chưa rõ màu lông' &&
+        (candidate.coatColor
+          .toLowerCase()
+          .includes(newSpot.coatColor.toLowerCase()) ||
+          newSpot.coatColor
+            .toLowerCase()
+            .includes(candidate.coatColor.toLowerCase()))
+    );
+
+    if (!colorMatch && commonTraits.length === 0) {
+      continue;
+    }
 
     const score = Math.min(
       0.98,

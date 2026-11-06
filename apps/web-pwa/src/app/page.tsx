@@ -2,7 +2,12 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { AlertCircle, BellRing, CheckCircle2 } from 'lucide-react';
+import {
+  AlertCircle,
+  BellRing,
+  CheckCircle2,
+  Loader2,
+} from 'lucide-react';
 import DomNhoHeader from '@/components/navigation/DomNhoHeader';
 import DomNhoFooter from '@/components/navigation/DomNhoFooter';
 import MobileBottomNav from '@/components/navigation/MobileBottomNav';
@@ -13,7 +18,9 @@ import SpotDetailModal from '@/components/modals/SpotDetailModal';
 import LocationPickerModal from '@/components/modals/LocationPickerModal';
 import FilterModal from '@/components/modals/FilterModal';
 import CameraQuickModal from '@/components/camera-modal/CameraQuickModal';
-import ProfileMemoryModal from '@/components/modals/ProfileMemoryModal';
+import ProfileMemoryModal, {
+  ProfileModalTab,
+} from '@/components/modals/ProfileMemoryModal';
 import GoogleMapsVaultModal from '@/components/modals/GoogleMapsVaultModal';
 import DoubleMatchAlertModal from '@/components/modals/DoubleMatchAlertModal';
 import ZeroVerifyAuthModal from '@/components/modals/ZeroVerifyAuthModal';
@@ -34,6 +41,7 @@ import {
   VetStation,
   detectPlatformFromUrl,
   detectRegionFromAddress,
+  isSpotDeletedOrHidden,
   isSpotOwnedByUser,
   isUserWebPost,
 } from '@/lib/types';
@@ -68,10 +76,11 @@ import {
 } from '@/lib/spot-validation';
 import { rankSpotsByVisualSimilarity } from '@/lib/visual-matcher';
 
-const REAL_SPOTS_STORAGE_KEY = 'dom_nho_real_verified_spots_v10';
+const REAL_SPOTS_STORAGE_KEY = 'dom_nho_real_verified_spots_v11';
 const SAVED_GMAPS_STORAGE_KEY = 'dom_nho_saved_gmaps_places_v10';
 const MEMORY_STORAGE_KEY = 'dom_nho_real_memories_v10';
 const SAVED_SPOT_IDS_KEY = 'dom_nho_saved_spot_ids_v1';
+const DELETED_SPOT_IDS_KEY = 'dom_nho_deleted_spot_ids_v1';
 
 const LEGACY_STORAGE_KEYS = [
   'dom_nho_spots_store_v1',
@@ -97,6 +106,7 @@ const LEGACY_STORAGE_KEYS = [
   'dom_nho_real_verified_spots_v9',
   'dom_nho_saved_gmaps_places_v9',
   'dom_nho_real_memories_v9',
+  'dom_nho_real_verified_spots_v10',
 ];
 
 export default function DomNhoHomePage() {
@@ -126,6 +136,8 @@ export default function DomNhoHomePage() {
   const [isFilterModalOpen, setIsFilterModalOpen] = useState<boolean>(false);
   const [isCameraModalOpen, setIsCameraModalOpen] = useState<boolean>(false);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState<boolean>(false);
+  const [profileInitialTab, setProfileInitialTab] =
+    useState<ProfileModalTab>('MY_SPOTS');
   const [isGoogleMapsVaultOpen, setIsGoogleMapsVaultOpen] =
     useState<boolean>(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
@@ -138,10 +150,13 @@ export default function DomNhoHomePage() {
   const [toastBanner, setToastBanner] = useState<{
     title: string;
     subtitle: string;
-    tone?: 'success' | 'info' | 'error';
+    tone?: 'success' | 'info' | 'error' | 'processing';
   } | null>(null);
 
   const exploreScrollYRef = useRef<number>(0);
+  const toastTimerRef = useRef<number | null>(null);
+  const isSubmittingPostRef = useRef<boolean>(false);
+  const deletedSpotIdsRef = useRef<Set<string>>(new Set());
 
   const {
     coords,
@@ -150,18 +165,54 @@ export default function DomNhoHomePage() {
     requestCurrentGps,
     setCustomLocation,
   } = useGeolocation(patrolModeActive);
-  const { triggerWebPushAlert, requestPushPermission } = usePushNotification();
+  const {
+    permission: notificationPermission,
+    platform: notificationPlatform,
+    settings: notificationSettings,
+    history: notificationHistory,
+    updateNotificationSetting,
+    clearNotificationHistory,
+    triggerWebPushAlert,
+    requestPushPermission,
+  } = usePushNotification();
+
+  const recordDeletedSpotIds = useCallback((ids: string[]) => {
+    if (!Array.isArray(ids) || ids.length === 0) return;
+    let changed = false;
+    for (const id of ids) {
+      if (id && !deletedSpotIdsRef.current.has(id)) {
+        deletedSpotIdsRef.current.add(id);
+        changed = true;
+      }
+    }
+    if (changed && typeof window !== 'undefined') {
+      try {
+        window.localStorage.setItem(
+          DELETED_SPOT_IDS_KEY,
+          JSON.stringify(Array.from(deletedSpotIdsRef.current))
+        );
+      } catch {
+        // Ignore storage error
+      }
+    }
+  }, []);
 
   const showToast = useCallback(
     (
       title: string,
       subtitle: string,
-      tone: 'success' | 'info' | 'error' = 'info'
+      tone: 'success' | 'info' | 'error' | 'processing' = 'info'
     ) => {
+      if (toastTimerRef.current) {
+        window.clearTimeout(toastTimerRef.current);
+        toastTimerRef.current = null;
+      }
       setToastBanner({ title, subtitle, tone });
-      window.setTimeout(() => {
-        setToastBanner((curr) => (curr?.title === title ? null : curr));
-      }, 4500);
+      if (tone !== 'processing') {
+        toastTimerRef.current = window.setTimeout(() => {
+          setToastBanner((curr) => (curr?.title === title ? null : curr));
+        }, 4500);
+      }
     },
     []
   );
@@ -187,10 +238,24 @@ export default function DomNhoHomePage() {
 
     LEGACY_STORAGE_KEYS.forEach((k) => window.localStorage.removeItem(k));
 
+    const storedDeletedIds = window.localStorage.getItem(DELETED_SPOT_IDS_KEY);
+    if (storedDeletedIds) {
+      try {
+        const parsedDeleted = JSON.parse(storedDeletedIds);
+        if (Array.isArray(parsedDeleted)) {
+          deletedSpotIdsRef.current = new Set(parsedDeleted.map(String));
+        }
+      } catch {
+        window.localStorage.removeItem(DELETED_SPOT_IDS_KEY);
+      }
+    }
+
     const savedRealSpots = window.localStorage.getItem(REAL_SPOTS_STORAGE_KEY);
     if (savedRealSpots) {
       try {
-        const parsed = filterTrustedSpots(JSON.parse(savedRealSpots) as DomSpot[]);
+        const parsed = filterTrustedSpots(
+          JSON.parse(savedRealSpots) as DomSpot[]
+        ).filter((s) => !isSpotDeletedOrHidden(s, deletedSpotIdsRef.current));
         if (parsed.length > 0) {
           setSpots(parsed);
         }
@@ -246,7 +311,15 @@ export default function DomNhoHomePage() {
   const updateSpotsAndPersist = useCallback(
     (updater: (prev: DomSpot[]) => DomSpot[]) => {
       setSpots((prev) => {
-        const next = updater(prev);
+        const rawNext = updater(prev);
+        const seenIds = new Set<string>();
+        const next: DomSpot[] = [];
+        for (const sp of rawNext) {
+          if (!sp || !sp.id || seenIds.has(sp.id)) continue;
+          if (isSpotDeletedOrHidden(sp, deletedSpotIdsRef.current)) continue;
+          seenIds.add(sp.id);
+          next.push(sp);
+        }
         if (typeof window !== 'undefined') {
           try {
             window.localStorage.setItem(
@@ -276,13 +349,14 @@ export default function DomNhoHomePage() {
         const data = await res.json().catch(() => null);
         if (!data?.ok) return;
 
+        if (Array.isArray(data.deletedSpotIds) && data.deletedSpotIds.length > 0) {
+          recordDeletedSpotIds(data.deletedSpotIds.map(String));
+        }
+
         if (Array.isArray(data.spots)) {
-          const deletedSet = new Set<string>(
-            Array.isArray(data.deletedSpotIds) ? data.deletedSpotIds : []
-          );
           const trustedIncoming = filterTrustedSpots(
             data.spots as DomSpot[]
-          ).filter((s) => !deletedSet.has(s.id));
+          ).filter((s) => !isSpotDeletedOrHidden(s, deletedSpotIdsRef.current));
           updateSpotsAndPersist((prev) => {
             const incomingIds = new Set(trustedIncoming.map((s) => s.id));
             // Giữ lại các bài crawl thêm từ phiên hiện tại chưa có trong batch đầu
@@ -290,7 +364,7 @@ export default function DomNhoHomePage() {
               (s) =>
                 s.sourceType !== 'USER_POST' &&
                 !incomingIds.has(s.id) &&
-                !deletedSet.has(s.id)
+                !isSpotDeletedOrHidden(s, deletedSpotIdsRef.current)
             );
             return [...trustedIncoming, ...extraCrawled];
           });
@@ -325,8 +399,12 @@ export default function DomNhoHomePage() {
     const unsubscribe = subscribeToRealtimeCommunityFeed(
       (incomingSpot, deletedSpotId) => {
         if (deletedSpotId) {
+          recordDeletedSpotIds([deletedSpotId]);
           updateSpotsAndPersist((prev) =>
             prev.filter((s) => s.id !== deletedSpotId)
+          );
+          setDoubleMatches((prev) =>
+            prev.filter((m) => m.matchedSpot.id !== deletedSpotId)
           );
           setSelectedSpot((curr) =>
             curr && curr.id === deletedSpotId ? null : curr
@@ -345,7 +423,11 @@ export default function DomNhoHomePage() {
           return;
         }
 
-        if (incomingSpot && incomingSpot.id) {
+        if (
+          incomingSpot &&
+          incomingSpot.id &&
+          !isSpotDeletedOrHidden(incomingSpot, deletedSpotIdsRef.current)
+        ) {
           updateSpotsAndPersist((prev) => [
             incomingSpot,
             ...prev.filter((s) => s.id !== incomingSpot.id),
@@ -693,9 +775,13 @@ export default function DomNhoHomePage() {
       pinnedLat?: number;
       pinnedLng?: number;
     }) => {
+      if (isSubmittingPostRef.current) return;
+
       ensureAuthenticated(
         'Đăng tin tìm kiếm hoặc cứu hộ thú cưng',
         async (session) => {
+          if (isSubmittingPostRef.current) return;
+
           if (!Array.isArray(payload.images) || payload.images.length === 0) {
             showToast(
               'Thiếu hình ảnh thực tế',
@@ -708,6 +794,8 @@ export default function DomNhoHomePage() {
           const accountRateKey = session.rawPhone || session.id;
           const rateCheck = checkAndIncrementDeviceRateLimit(accountRateKey);
           if (!rateCheck.allowed) {
+            setIsCameraModalOpen(false);
+            setEditingSpot(null);
             showToast(
               'Giới hạn tạo tin',
               rateCheck.reason ||
@@ -716,6 +804,16 @@ export default function DomNhoHomePage() {
             );
             return;
           }
+
+          // Đóng ngay giao diện đăng tin để người dùng không phải chờ đợi trong modal
+          isSubmittingPostRef.current = true;
+          setIsCameraModalOpen(false);
+          setEditingSpot(null);
+          showToast(
+            'Đang xử lý bài viết của bạn...',
+            'Hệ thống đang lưu ảnh, bảo mật thông tin liên hệ và đồng bộ tin lên cộng đồng.',
+            'processing'
+          );
 
           const exactLat = payload.pinnedLat || coords.lat;
           const exactLng = payload.pinnedLng || coords.lng;
@@ -776,7 +874,12 @@ export default function DomNhoHomePage() {
               ...prev.filter((s) => s.id !== createdSpot.id),
             ]);
             broadcastCommunitySpotRealtime(createdSpot);
-            setIsCameraModalOpen(false);
+
+            const activePool = spots.filter(
+              (s) =>
+                s.id !== createdSpot.id &&
+                !isSpotDeletedOrHidden(s, deletedSpotIdsRef.current)
+            );
 
             const visualMatches = rankSpotsByVisualSimilarity(
               {
@@ -788,12 +891,24 @@ export default function DomNhoHomePage() {
                 traits: createdSpot.traits,
                 suggestedTitle: createdSpot.title,
               },
-              spots,
+              activePool,
               createdSpot.publicLat > 0
                 ? { lat: createdSpot.publicLat, lng: createdSpot.publicLng }
                 : { lat: coords.lat, lng: coords.lng },
-              createdSpot.id
+              createdSpot.id,
+              deletedSpotIdsRef.current
             ).filter((m) => m.matchPercent >= 62);
+
+            const serverMatches = Array.isArray(data.matches)
+              ? (data.matches as SpotMatchResult[]).filter(
+                  (m) =>
+                    m?.matchedSpot &&
+                    !isSpotDeletedOrHidden(
+                      m.matchedSpot,
+                      deletedSpotIdsRef.current
+                    )
+                )
+              : [];
 
             if (visualMatches.length > 0) {
               const alertMatches: SpotMatchResult[] = visualMatches
@@ -807,29 +922,40 @@ export default function DomNhoHomePage() {
               setDoubleMatches(alertMatches);
               triggerWebPushAlert(
                 'Phát hiện bài viết trùng khớp!',
-                `Có ${alertMatches.length} bài viết có hình ảnh & đặc điểm rất giống bé bạn vừa đăng.`
+                `Có ${alertMatches.length} bài viết có hình ảnh & đặc điểm rất giống bé bạn vừa đăng.`,
+                'doubleMatch'
               );
-            } else if (Array.isArray(data.matches) && data.matches.length > 0) {
-              setDoubleMatches(data.matches as SpotMatchResult[]);
+            } else if (serverMatches.length > 0) {
+              setDoubleMatches(serverMatches);
               triggerWebPushAlert(
                 'Tìm thấy thông tin trùng khớp quanh bạn!',
-                `Có ${data.matches.length} trường hợp rất giống đặc điểm bé bạn vừa đăng trong bán kính 3km.`
+                `Có ${serverMatches.length} trường hợp rất giống đặc điểm bé bạn vừa đăng trong bán kính 3km.`,
+                'doubleMatch'
               );
             } else if (payload.hasExactLocation && createdSpot.publicLat > 0) {
-              const matched = findDoubleMatchesWithin3Km(createdSpot, spots);
+              const matched = findDoubleMatchesWithin3Km(
+                createdSpot,
+                activePool
+              );
               if (matched.length > 0) {
                 setDoubleMatches(matched);
                 triggerWebPushAlert(
                   'Tìm thấy thông tin trùng khớp quanh bạn!',
-                  `Có ${matched.length} trường hợp rất giống đặc điểm bé bạn vừa đăng trong bán kính 3km.`
+                  `Có ${matched.length} trường hợp rất giống đặc điểm bé bạn vừa đăng trong bán kính 3km.`,
+                  'doubleMatch'
                 );
               }
             }
 
             showToast(
               'Đăng tin thành công',
-              `Bài viết đã được lưu lên hệ thống chung và hiển thị cho mọi người trong cộng đồng Đốm Nhỏ.`,
+              'Bài viết đã được lưu lên hệ thống chung và hiển thị cho mọi người trong cộng đồng Đốm Nhỏ.',
               'success'
+            );
+            triggerWebPushAlert(
+              'Đăng tin thành công',
+              `Bài viết "${createdSpot.title}" đã được hiển thị trên cộng đồng Đốm Nhỏ.`,
+              'postStatus'
             );
           } catch {
             decrementDeviceRateLimit(accountRateKey);
@@ -838,6 +964,8 @@ export default function DomNhoHomePage() {
               'Không thể lưu bài viết lên hệ thống lúc này. Vui lòng thử lại.',
               'error'
             );
+          } finally {
+            isSubmittingPostRef.current = false;
           }
         }
       );
@@ -883,9 +1011,23 @@ export default function DomNhoHomePage() {
         pinnedLng?: number;
       }
     ) => {
+      if (isSubmittingPostRef.current) return;
+
       ensureAuthenticated(
         'Chỉnh sửa bài đăng của bạn',
         async (session) => {
+          if (isSubmittingPostRef.current) return;
+          isSubmittingPostRef.current = true;
+
+          // Đóng ngay giao diện chỉnh sửa và hiển thị thông báo đang xử lý
+          setIsCameraModalOpen(false);
+          setEditingSpot(null);
+          showToast(
+            'Đang lưu thay đổi bài viết...',
+            'Hệ thống đang cập nhật thông tin bài đăng của bạn lên cộng đồng.',
+            'processing'
+          );
+
           const effectiveAddress = payload.customAddress || coords.label;
           try {
             const res = await fetch('/api/spots', {
@@ -961,12 +1103,15 @@ export default function DomNhoHomePage() {
               broadcastCommunitySpotRealtime(updatedSpotToBroadcast);
             }
 
-            setIsCameraModalOpen(false);
-            setEditingSpot(null);
             showToast(
               'Đã cập nhật bài đăng',
               'Thông tin bài viết đã được lưu và đồng bộ tới cộng đồng.',
               'success'
+            );
+            triggerWebPushAlert(
+              'Đã cập nhật bài đăng',
+              `Bài viết "${payload.title}" đã được cập nhật thành công.`,
+              'postStatus'
             );
           } catch {
             showToast(
@@ -974,16 +1119,29 @@ export default function DomNhoHomePage() {
               'Không thể cập nhật bài viết lúc này. Vui lòng thử lại.',
               'error'
             );
+          } finally {
+            isSubmittingPostRef.current = false;
           }
         }
       );
     },
-    [ensureAuthenticated, coords.label, updateSpotsAndPersist, showToast]
+    [
+      ensureAuthenticated,
+      coords.label,
+      updateSpotsAndPersist,
+      showToast,
+      triggerWebPushAlert,
+    ]
   );
 
   const handleDeleteSpot = useCallback(
     (spotId: string) => {
       ensureAuthenticated('Xóa bài đăng của bạn', async (session) => {
+        showToast(
+          'Đang xóa bài đăng...',
+          'Hệ thống đang gỡ bài viết khỏi bản đồ và danh sách cộng đồng.',
+          'processing'
+        );
         try {
           const res = await fetch('/api/spots', {
             method: 'PATCH',
@@ -1005,9 +1163,13 @@ export default function DomNhoHomePage() {
             return;
           }
 
+          recordDeletedSpotIds([spotId]);
           decrementDeviceRateLimit(session.rawPhone || session.id);
           updateSpotsAndPersist((prev) =>
             prev.filter((s) => s.id !== spotId)
+          );
+          setDoubleMatches((prev) =>
+            prev.filter((m) => m.matchedSpot.id !== spotId)
           );
           setSavedSpotIds((prev) => {
             if (!prev.has(spotId)) return prev;
@@ -1027,8 +1189,8 @@ export default function DomNhoHomePage() {
 
           showToast(
             'Đã xóa bài đăng',
-            'Bài viết của bạn đã được xóa khỏi hệ thống và danh sách cộng đồng.',
-            'info'
+            'Bài viết của bạn đã được xóa vĩnh viễn khỏi hệ thống và danh sách cộng đồng.',
+            'success'
           );
         } catch {
           showToast(
@@ -1039,7 +1201,7 @@ export default function DomNhoHomePage() {
         }
       });
     },
-    [ensureAuthenticated, updateSpotsAndPersist, showToast]
+    [ensureAuthenticated, recordDeletedSpotIds, updateSpotsAndPersist, showToast]
   );
 
   const handleUnlockContactOrAdopt = useCallback(
@@ -1357,7 +1519,7 @@ export default function DomNhoHomePage() {
 
   const visibleSpots = useMemo(() => {
     return spots.filter((s) => {
-      if (s.lightPower <= 0 || s.status === 'FADED') return false;
+      if (isSpotDeletedOrHidden(s, deletedSpotIdsRef.current)) return false;
       if (
         s.status === 'SHADOWBANNED' &&
         !isSpotOwnedByUser(s, userSession)
@@ -1524,6 +1686,8 @@ export default function DomNhoHomePage() {
             >
               {toastBanner.tone === 'error' ? (
                 <AlertCircle className="w-4 h-4" />
+              ) : toastBanner.tone === 'processing' ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
               ) : toastBanner.tone === 'success' ? (
                 <CheckCircle2 className="w-4 h-4" />
               ) : (
@@ -1683,10 +1847,30 @@ export default function DomNhoHomePage() {
       <ProfileMemoryModal
         isOpen={isProfileModalOpen}
         themeId="morning_sun"
+        initialTab={profileInitialTab}
         userSession={userSession}
         spots={spots}
         memorySnaps={memorySnaps}
         patrolModeActive={patrolModeActive}
+        notificationSettings={notificationSettings}
+        notificationPermission={notificationPermission}
+        notificationPlatform={notificationPlatform}
+        notificationHistory={notificationHistory}
+        onUpdateNotificationSetting={updateNotificationSetting}
+        onRequestPushPermission={requestPushPermission}
+        onClearNotificationHistory={clearNotificationHistory}
+        onTestNotification={() => {
+          triggerWebPushAlert(
+            'Thông báo thử nghiệm từ Đốm Nhỏ',
+            'Hệ thống thông báo trên thiết bị của bạn đang hoạt động tốt!',
+            'postStatus'
+          );
+          showToast(
+            'Đã gửi thông báo thử nghiệm',
+            'Kiểm tra âm báo và biểu ngữ thông báo trên màn hình của bạn.',
+            'success'
+          );
+        }}
         onTogglePatrolMode={() => {
           setPatrolModeActive((prev) => {
             const nextVal = !prev;

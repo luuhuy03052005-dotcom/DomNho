@@ -25,6 +25,7 @@ import {
   DomSpot,
   SpotType,
   ThemeId,
+  isSpotDeletedOrHidden,
 } from '@/lib/types';
 import { compressImageToWebpClient } from '@/lib/image-compressor';
 import {
@@ -192,6 +193,7 @@ export default function CameraQuickModal({
 }: CameraQuickModalProps) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const isSubmittingRef = useRef<boolean>(false);
 
   const [mounted, setMounted] = useState(false);
   const [cameraActive, setCameraActive] = useState(false);
@@ -229,7 +231,11 @@ export default function CameraQuickModal({
   }, []);
 
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen) {
+      isSubmittingRef.current = false;
+      return;
+    }
+    isSubmittingRef.current = false;
     if (editingSpot) {
       setSpotType(
         editingSpot.spotType === 'GREEN_PEACE'
@@ -330,7 +336,16 @@ export default function CameraQuickModal({
 
   const suggestedMatches: VisualMatchItem[] = useMemo(() => {
     if (images.length === 0 || existingSpots.length === 0) return [];
+    if (lastAiAnalysis?.isPet === false) return [];
+    const activeSpots = existingSpots.filter(
+      (s) =>
+        !isSpotDeletedOrHidden(s) &&
+        (!editingSpot || s.id !== editingSpot.id)
+    );
+    if (activeSpots.length === 0) return [];
+
     const effectiveAnalysis: VisualAnalysisResult = {
+      isPet: lastAiAnalysis?.isPet ?? true,
       species: lastAiAnalysis?.species || species,
       breed: breed || lastAiAnalysis?.breed || '',
       coatColor: coatColor || lastAiAnalysis?.coatColor || '',
@@ -349,9 +364,7 @@ export default function CameraQuickModal({
     };
     return rankSpotsByVisualSimilarity(
       effectiveAnalysis,
-      editingSpot
-        ? existingSpots.filter((s) => s.id !== editingSpot.id)
-        : existingSpots,
+      activeSpots,
       effectiveCoords
     ).slice(0, 4);
   }, [
@@ -456,6 +469,12 @@ export default function CameraQuickModal({
       if (data.ok && data.analysis) {
         const a: VisualAnalysisResult = data.analysis;
         setLastAiAnalysis(a);
+        if (a.isPet === false) {
+          setAiStatusText(
+            'Ảnh tải lên không rõ hình thú cưng (chó/mèo). Vui lòng chọn ảnh rõ mặt/lông của bé hoặc tự nhập thông tin bên dưới.'
+          );
+          return;
+        }
         if (a.species === 'dog' || a.species === 'cat' || a.species === 'other') {
           setSpecies(a.species);
         }
@@ -504,12 +523,15 @@ export default function CameraQuickModal({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmittingRef.current) return;
     if (images.length === 0) {
       setAiStatusText(
         'Vui lòng chụp hoặc tải lên ít nhất 1 bức ảnh thực tế của bé!'
       );
       return;
     }
+
+    isSubmittingRef.current = true;
 
     const effectiveAddress = customAddress.trim() || userCoords.label;
     const effectiveBreed =

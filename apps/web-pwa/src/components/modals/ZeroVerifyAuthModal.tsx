@@ -12,7 +12,11 @@ import {
   UserPlus,
   X,
 } from 'lucide-react';
-import { ThemeId, UserSession } from '@/lib/types';
+import {
+  ThemeId,
+  UserSession,
+  isValidVietnamesePhone,
+} from '@/lib/types';
 import { maskPhoneNumber } from '@/lib/security';
 import { registerZeroVerificationUser } from '@/lib/supabase';
 
@@ -63,13 +67,38 @@ export default function ZeroVerifyAuthModal({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (submitting) return;
     setErrorMsg(null);
+
+    const cleanName = displayName.trim();
+    const cleanPhone = rawPhone.trim();
+    const cleanPin = pinCode.trim();
+
+    if (authMode === 'register' && cleanName.length < 2) {
+      setErrorMsg(
+        'Vui lòng nhập Tên gọi / Biệt danh của bạn (tối thiểu 2 ký tự).'
+      );
+      return;
+    }
+
+    if (!isValidVietnamesePhone(cleanPhone)) {
+      setErrorMsg(
+        'Số điện thoại không hợp lệ. Vui lòng nhập số điện thoại Việt Nam gồm 10 chữ số (bắt đầu bằng 03, 05, 07, 08, 09 hoặc +84).'
+      );
+      return;
+    }
+
+    if (!/^\d{4,6}$/.test(cleanPin)) {
+      setErrorMsg('Mã PIN bảo mật phải gồm từ 4 đến 6 chữ số.');
+      return;
+    }
+
     setSubmitting(true);
     try {
       const session = await registerZeroVerificationUser({
-        displayName: authMode === 'register' ? displayName : displayName.trim() || undefined,
-        pinCode,
-        rawPhone,
+        displayName: authMode === 'register' ? cleanName : undefined,
+        pinCode: cleanPin,
+        rawPhone: cleanPhone,
         mode: authMode,
       });
       setDisplayName('');
@@ -80,7 +109,7 @@ export default function ZeroVerifyAuthModal({
       const message =
         err instanceof Error
           ? err.message
-          : 'Không thể đăng nhập lúc này. Vui lòng kiểm tra lại thông tin.';
+          : 'Không thể xác thực tài khoản lúc này. Vui lòng kiểm tra lại thông tin.';
       setErrorMsg(message);
     } finally {
       setSubmitting(false);
@@ -243,10 +272,38 @@ export default function ZeroVerifyAuthModal({
             {errorMsg && (
               <div
                 role="alert"
-                className="p-3 rounded-[10px] bg-[#FFF0E5] border border-[#AF421F]/40 text-[#AF421F] text-xs font-semibold flex items-start gap-2"
+                className="p-3 rounded-[10px] bg-[#FFF0E5] border border-[#AF421F]/40 text-[#AF421F] text-xs font-semibold space-y-2"
               >
-                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-                <span className="leading-relaxed">{errorMsg}</span>
+                <div className="flex items-start gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                  <span className="leading-relaxed">{errorMsg}</span>
+                </div>
+                {authMode === 'register' &&
+                  errorMsg.includes('đã được đăng ký') && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAuthMode('login');
+                        setErrorMsg(null);
+                      }}
+                      className="w-full py-1.5 px-3 rounded-lg bg-white border border-[#AF421F]/30 text-[#142820] hover:bg-[#FAF7F1] text-xs font-bold transition-colors text-center"
+                    >
+                      Chuyển sang tab Đăng nhập với SĐT này →
+                    </button>
+                  )}
+                {authMode === 'login' &&
+                  errorMsg.includes('chưa được đăng ký') && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAuthMode('register');
+                        setErrorMsg(null);
+                      }}
+                      className="w-full py-1.5 px-3 rounded-lg bg-white border border-[#AF421F]/30 text-[#142820] hover:bg-[#FAF7F1] text-xs font-bold transition-colors text-center"
+                    >
+                      Chuyển sang tab Đăng ký mới với SĐT này →
+                    </button>
+                  )}
               </div>
             )}
 

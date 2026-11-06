@@ -1,8 +1,9 @@
-import { DomSpot } from './types';
+import { DomSpot, isSpotDeletedOrHidden } from './types';
 import { calculateDistanceMeters } from './security';
 import { isSpotPinAllowedOnMap } from './spot-validation';
 
 export interface VisualAnalysisResult {
+  isPet?: boolean;
   species: 'cat' | 'dog' | 'other';
   breed: string;
   coatColor: string;
@@ -92,8 +93,23 @@ export function rankSpotsByVisualSimilarity(
   analysis: VisualAnalysisResult,
   spots: DomSpot[],
   userCoords?: { lat: number; lng: number },
-  excludeSpotId?: string
+  excludeSpotIdOrDeletedIds?: string | Set<string> | string[],
+  deletedIdsParam?: Set<string> | string[]
 ): VisualMatchItem[] {
+  if (analysis.isPet === false) {
+    return [];
+  }
+
+  const excludeSpotId =
+    typeof excludeSpotIdOrDeletedIds === 'string'
+      ? excludeSpotIdOrDeletedIds
+      : undefined;
+  const deletedIds =
+    deletedIdsParam ??
+    (typeof excludeSpotIdOrDeletedIds === 'object'
+      ? excludeSpotIdOrDeletedIds
+      : undefined);
+
   const aiMap = new Map<string, { confidence: number; reason: string }>();
   if (Array.isArray(analysis.visualMatches)) {
     for (const m of analysis.visualMatches) {
@@ -113,10 +129,16 @@ export function rankSpotsByVisualSimilarity(
   const queryTraits = (analysis.traits || []).map(normalizeVi).filter(Boolean);
 
   const results: VisualMatchItem[] = [];
+  const seenIds = new Set<string>(excludeSpotId ? [excludeSpotId] : []);
 
   for (const spot of spots) {
-    if (excludeSpotId && spot.id === excludeSpotId) continue;
-    if (spot.status === 'FADED' || spot.status === 'SHADOWBANNED') continue;
+    if (!spot || !spot.id || seenIds.has(spot.id)) continue;
+    seenIds.add(spot.id);
+
+    if (isSpotDeletedOrHidden(spot, deletedIds)) continue;
+    if (spot.status === 'RESOLVED' || spot.entityCategory === 'RESCUE_CENTER') {
+      continue;
+    }
 
     const spotSpecies = detectEffectiveSpecies(spot);
 
@@ -132,6 +154,7 @@ export function rankSpotsByVisualSimilarity(
 
     const reasons: string[] = [];
     let deterministicScore = 0;
+    let hasConcreteMatch = false;
 
     const isExactSingleSpecies =
       (analysis.species === 'cat' && spotSpecies.hasCat && !spotSpecies.hasDog) ||
@@ -159,12 +182,15 @@ export function rankSpotsByVisualSimilarity(
     const spotColors = extractColorGroups(spotFullText);
     const sharedColors = queryColors.filter((c) => spotColors.includes(c));
     if (sharedColors.length > 0) {
+      hasConcreteMatch = true;
       deterministicScore += Math.min(28, 18 + sharedColors.length * 5);
       reasons.push(`Trùng màu lông (${analysis.coatColor})`);
     } else if (
       analysis.coatColor &&
+      normalizeVi(analysis.coatColor) !== 'chưa rõ màu lông' &&
       spotFullText.includes(normalizeVi(analysis.coatColor))
     ) {
+      hasConcreteMatch = true;
       deterministicScore += 22;
       reasons.push(`Trùng màu lông (${analysis.coatColor})`);
     }
@@ -173,8 +199,12 @@ export function rankSpotsByVisualSimilarity(
       queryBreed &&
       queryBreed.length > 2 &&
       queryBreed !== 'chưa rõ giống' &&
+      queryBreed !== 'mèo' &&
+      queryBreed !== 'chó' &&
+      queryBreed !== 'thú cưng' &&
       spotFullText.includes(queryBreed)
     ) {
+      hasConcreteMatch = true;
       deterministicScore += 18;
       reasons.push(`Trùng giống (${analysis.breed})`);
     }
@@ -185,6 +215,7 @@ export function rankSpotsByVisualSimilarity(
     });
 
     if (matchedTraits.length > 0) {
+      hasConcreteMatch = true;
       deterministicScore += Math.min(16, matchedTraits.length * 8);
       reasons.push(`Khớp đặc điểm: ${matchedTraits.slice(0, 2).join(', ')}`);
     }
@@ -206,10 +237,15 @@ export function rankSpotsByVisualSimilarity(
     let finalPercent = deterministicScore;
 
     if (aiMatch && aiMatch.confidence > 0) {
+      hasConcreteMatch = true;
       if (aiMatch.reason && !reasons.includes(aiMatch.reason)) {
         reasons.unshift(aiMatch.reason);
       }
       finalPercent = Math.round(aiMatch.confidence * 0.6 + deterministicScore * 0.4);
+    }
+
+    if (!hasConcreteMatch) {
+      continue;
     }
 
     finalPercent = Math.min(98, Math.max(0, finalPercent));

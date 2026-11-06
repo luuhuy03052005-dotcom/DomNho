@@ -11,6 +11,8 @@ import {
   SpotType,
   SpotVisibility,
   deterministicAccountIdFromPhone,
+  isSpotDeletedOrHidden,
+  isValidVietnamesePhone,
   normalizePhoneDigits,
 } from './types';
 import {
@@ -169,6 +171,7 @@ export function authenticateOrRegisterInServerStore(params: {
   rawPhone: string;
   pinCode: string;
   mode?: 'login' | 'register';
+  allowSyncExisting?: boolean;
 }): ServerAccountRecord {
   const store = loadServerCommunityStore();
   const cleanName = (params.displayName || '').trim();
@@ -176,8 +179,10 @@ export function authenticateOrRegisterInServerStore(params: {
   const cleanPin = (params.pinCode || '').trim();
   const normalizedPhone = normalizePhoneDigits(cleanPhone);
 
-  if (normalizedPhone.length < 9 || normalizedPhone.length > 15) {
-    throw new Error('Vui lòng nhập số điện thoại hợp lệ (từ 9 đến 11 chữ số).');
+  if (!isValidVietnamesePhone(cleanPhone)) {
+    throw new Error(
+      'Số điện thoại không hợp lệ. Vui lòng nhập số điện thoại Việt Nam gồm 10 chữ số (bắt đầu bằng 03, 05, 07, 08, 09 hoặc +84).'
+    );
   }
   if (!/^\d{4,6}$/.test(cleanPin)) {
     throw new Error('Mã PIN bảo mật phải gồm từ 4 đến 6 chữ số.');
@@ -188,12 +193,21 @@ export function authenticateOrRegisterInServerStore(params: {
   const today = new Date().toISOString().slice(0, 10);
 
   if (existing) {
+    if (params.mode === 'register' && !params.allowSyncExisting) {
+      throw new Error(
+        'Số điện thoại này đã được đăng ký tài khoản. Vui lòng chuyển sang tab "Đăng nhập" và nhập mã PIN của bạn.'
+      );
+    }
     if (existing.pinHash !== pinHash) {
       throw new Error(
         'Số điện thoại này đã có tài khoản nhưng mã PIN không chính xác.'
       );
     }
-    if (cleanName.length >= 2 && cleanName !== existing.displayName) {
+    if (
+      params.allowSyncExisting &&
+      cleanName.length >= 2 &&
+      cleanName !== existing.displayName
+    ) {
       existing.displayName = cleanName;
     }
     if (existing.lastPostDate !== today) {
@@ -206,9 +220,9 @@ export function authenticateOrRegisterInServerStore(params: {
     return existing;
   }
 
-  if (params.mode === 'login' && cleanName.length < 2) {
+  if (params.mode === 'login') {
     throw new Error(
-      'Số điện thoại này chưa được đăng ký. Vui lòng chọn tab "Tạo tài khoản mới" và nhập Tên gọi của bạn.'
+      'Số điện thoại này chưa được đăng ký tài khoản. Vui lòng chọn tab "Đăng ký mới" và nhập Tên gọi của bạn.'
     );
   }
   if (cleanName.length < 2) {
@@ -441,7 +455,7 @@ export function listCommunitySpotsFromServerStore(
   const now = Date.now();
 
   return store.posts
-    .filter((rec) => !deletedSet.has(rec.spot.id))
+    .filter((rec) => !isSpotDeletedOrHidden(rec.spot, deletedSet))
     .map((rec) => {
       const isOwner = Boolean(viewerId && rec.spot.authorId === viewerId);
       const isUnlocked =

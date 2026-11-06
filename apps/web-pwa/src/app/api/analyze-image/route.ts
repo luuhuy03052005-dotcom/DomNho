@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import https from 'node:https';
 import { INITIAL_DOM_SPOTS } from '@/lib/seed-data';
-import { DomSpot } from '@/lib/types';
+import { listDeletedSpotIdsFromServerStore } from '@/lib/server-community-store';
+import { DomSpot, isSpotDeletedOrHidden } from '@/lib/types';
 import {
   VisualAnalysisResult,
   rankSpotsByVisualSimilarity,
@@ -52,10 +53,21 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { imageDataUrl, candidateSpots, userCoords } = body;
 
-    const pool: DomSpot[] =
+    const deletedSet = new Set(listDeletedSpotIdsFromServerStore());
+    const rawPool: DomSpot[] =
       Array.isArray(candidateSpots) && candidateSpots.length > 0
         ? candidateSpots
         : INITIAL_DOM_SPOTS;
+
+    const seenIds = new Set<string>();
+    const pool: DomSpot[] = [];
+    for (const s of rawPool) {
+      if (!s || !s.id || seenIds.has(s.id)) continue;
+      seenIds.add(s.id);
+      if (isSpotDeletedOrHidden(s, deletedSet)) continue;
+      if (s.status === 'RESOLVED' || s.entityCategory === 'RESCUE_CENTER') continue;
+      pool.push(s);
+    }
 
     const compactCandidates = pool.slice(0, 30).map((s) => ({
       id: s.id,
@@ -76,13 +88,14 @@ ${JSON.stringify(compactCandidates)}
 
 Yêu cầu trả về đúng 1 đối tượng JSON theo cấu trúc:
 {
+  "isPet": true nếu ảnh có chó, mèo hoặc động vật/thú cưng thực tế; false nếu ảnh là đồ ăn (VD: pizza), đồ vật, văn bản hoặc không có động vật,
   "species": "cat" hoặc "dog" hoặc "other",
-  "breed": "tên giống ngắn gọn bằng tiếng Việt (VD: Mèo mướp, Mèo cam, Mèo tam thể, Chó cỏ, Chó Poodle...)",
-  "coatColor": "màu lông chính bằng tiếng Việt (VD: Vàng cam, Vàng trắng, Đen, Trắng, Mướp xám, Tam thể...)",
+  "breed": "tên giống ngắn gọn bằng tiếng Việt (VD: Mèo mướp, Mèo cam, Mèo tam thể, Chó cỏ, Chó Poodle... Nếu isPet=false thì để chuỗi rỗng)",
+  "coatColor": "màu lông chính bằng tiếng Việt (VD: Vàng cam, Vàng trắng, Đen, Trắng, Mướp xám, Tam thể... Nếu isPet=false thì để chuỗi rỗng)",
   "primaryColors": ["màu 1", "màu 2"],
   "coatPattern": "kiểu hoa văn lông (VD: mướp vằn, đơn sắc, nhị thể, tam thể, đốm...)",
-  "traits": ["3 đến 4 đặc điểm nhận dạng ngoại hình thực tế nhìn thấy trong ảnh"],
-  "suggestedTitle": "tiêu đề ngắn mô tả đúng con vật trong ảnh",
+  "traits": ["3 đến 4 đặc điểm nhận dạng ngoại hình thú cưng thực tế nhìn thấy trong ảnh; nếu isPet=false thì trả về mảng rỗng []"],
+  "suggestedTitle": "tiêu đề ngắn mô tả đúng thú cưng trong ảnh; nếu isPet=false thì để chuỗi rỗng",
   "visualMatches": [
     {
       "spotId": "id của bài viết trong danh sách ứng viên có đặc điểm loài/màu lông/ngoại hình trùng khớp cao với ảnh",
@@ -91,7 +104,7 @@ Yêu cầu trả về đúng 1 đối tượng JSON theo cấu trúc:
     }
   ]
 }
-Lưu ý quan trọng: Tuyệt đối KHÔNG ghép nhầm loài (ví dụ ảnh là mèo thì không chọn bài chỉ nói về chó hoặc chim). Chỉ đưa vào visualMatches những bài có độ tương đồng thực sự từ 60 trở lên.`;
+Lưu ý quan trọng: Nếu ảnh KHÔNG phải là động vật/thú cưng (isPet = false), bắt buộc trả về visualMatches: [], traits: [], breed: "", coatColor: "", suggestedTitle: "". Tuyệt đối KHÔNG ghép nhầm loài (ví dụ ảnh là mèo thì không chọn bài chỉ nói về chó hoặc chim). Chỉ đưa vào visualMatches những bài có độ tương đồng thực sự từ 60 trở lên.`;
 
     const parts: any[] = [{ text: promptText }];
 
@@ -134,11 +147,16 @@ Lưu ý quan trọng: Tuyệt đối KHÔNG ghép nhầm loài (ví dụ ảnh l
         outText.slice(firstBracket, lastBracket + 1)
       );
 
-      const matchedItems = rankSpotsByVisualSimilarity(
-        analysis,
-        pool,
-        userCoords
-      );
+      const matchedItems =
+        analysis.isPet === false
+          ? []
+          : rankSpotsByVisualSimilarity(
+              analysis,
+              pool,
+              userCoords,
+              undefined,
+              deletedSet
+            );
 
       return NextResponse.json({
         ok: true,
