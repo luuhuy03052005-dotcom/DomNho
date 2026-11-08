@@ -1,99 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
-import fs from 'node:fs/promises';
-import os from 'node:os';
-import path from 'node:path';
-import bundledCrawledData from '@/lib/crawled-data.json';
+import {
+  loadCurrentFeedStore,
+  persistFeedStoreSafely,
+} from '@/lib/crawler-feed-store';
 import { filterTrustedSpots } from '@/lib/spot-validation';
 import { PlatformFilter, detectPlatformFromUrl } from '@/lib/types';
 import {
-  VerifiedScrapedPost,
-  discoverMultiPlatformCandidateUrls,
-  extractVerifiedPostFromUrl,
-  filterAndStructurePostsWithGemini,
-  isRelevantVietnamPetText,
-} from '@/lib/multi-source-crawler';
+  CRAWL4AI_PROVIDER,
+  crawlRescuePostsWithCrawl4AI,
+  createSavedGoogleMapsPlaces,
+} from '@/lib/crawl4ai-crawler';
 
-interface CrawledFeedStore {
-  crawledAt?: string;
-  spots: any[];
-  vetStations?: any[];
-  savedGoogleMapsPlaces?: any[];
-}
-
-const globalForFeed = globalThis as unknown as {
-  __domNhoFeedCache?: CrawledFeedStore;
-};
-
-const TMP_FEED_PATH = path.join(os.tmpdir(), 'dom-nho-crawled-feed.json');
-
-async function loadCurrentFeedStore(): Promise<CrawledFeedStore> {
-  if (globalForFeed.__domNhoFeedCache) {
-    return {
-      ...globalForFeed.__domNhoFeedCache,
-      spots: filterTrustedSpots(globalForFeed.__domNhoFeedCache.spots || []),
-    };
-  }
-
-  try {
-    const tmpRaw = await fs.readFile(TMP_FEED_PATH, 'utf-8');
-    const parsedTmp = JSON.parse(tmpRaw) as CrawledFeedStore;
-    if (Array.isArray(parsedTmp?.spots) && parsedTmp.spots.length > 0) {
-      parsedTmp.spots = filterTrustedSpots(parsedTmp.spots);
-      globalForFeed.__domNhoFeedCache = parsedTmp;
-      return parsedTmp;
-    }
-  } catch {
-    // Ignore when tmp cache does not exist yet
-  }
-
-  try {
-    const publicFeedPath = path.join(
-      process.cwd(),
-      'public',
-      'crawled-feed.json'
-    );
-    const publicRaw = await fs.readFile(publicFeedPath, 'utf-8');
-    const parsedPublic = JSON.parse(publicRaw) as CrawledFeedStore;
-    parsedPublic.spots = filterTrustedSpots(parsedPublic.spots || []);
-    globalForFeed.__domNhoFeedCache = parsedPublic;
-    return parsedPublic;
-  } catch {
-    const fallbackStore: CrawledFeedStore = {
-      crawledAt:
-        (bundledCrawledData as any)?.crawledAt || new Date().toISOString(),
-      spots: filterTrustedSpots(((bundledCrawledData as any)?.spots || []) as any[]),
-      vetStations: (bundledCrawledData as any)?.vetStations || [],
-      savedGoogleMapsPlaces:
-        (bundledCrawledData as any)?.savedGoogleMapsPlaces || [],
-    };
-    globalForFeed.__domNhoFeedCache = fallbackStore;
-    return fallbackStore;
-  }
-}
-
-async function persistFeedStoreSafely(store: CrawledFeedStore): Promise<void> {
-  globalForFeed.__domNhoFeedCache = store;
-  const serialized = JSON.stringify(store, null, 2);
-
-  try {
-    await fs.writeFile(TMP_FEED_PATH, serialized, 'utf-8');
-  } catch (tmpErr) {
-    console.warn('[crawl-live] Could not write tmp feed cache:', tmpErr);
-  }
-
-  if (!process.env.VERCEL && process.env.NODE_ENV === 'development') {
-    try {
-      const publicFeedPath = path.join(
-        process.cwd(),
-        'public',
-        'crawled-feed.json'
-      );
-      await fs.writeFile(publicFeedPath, serialized, 'utf-8');
-    } catch {
-      // Read-only deployment directories are expected in serverless environments
-    }
-  }
-}
+export const runtime = 'nodejs';
+export const maxDuration = 300;
 
 export async function GET() {
   try {
@@ -157,57 +76,17 @@ export async function POST(request: NextRequest) {
       (existingData.spots || []).map((s: any) => String(s.sourceUrl || ''))
     );
 
-    const discoveredUrls = await discoverMultiPlatformCandidateUrls(
-      targetPlatform
-    );
-    const candidateUrls = [
-      ...new Set([...customUrls, ...discoveredUrls]),
-    ].filter((u) => !existingUrlSet.has(u));
-
-    const verifiedPosts: VerifiedScrapedPost[] = [];
-    const socialFollowUpUrls = new Set<string>();
-
-    const firstBatch = candidateUrls.slice(0, 8);
-    const firstResults = await Promise.allSettled(
-      firstBatch.map((url) => extractVerifiedPostFromUrl(url))
-    );
-
-    for (const res of firstResults) {
-      if (res.status !== 'fulfilled' || !res.value) continue;
-      const post = res.value;
-      if (existingUrlSet.has(post.canonicalUrl)) continue;
-      if (isRelevantVietnamPetText(`${post.title} ${post.description}`)) {
-        verifiedPosts.push(post);
-        for (const sLink of post.discoveredSocialLinks) {
-          if (!existingUrlSet.has(sLink)) {
-            socialFollowUpUrls.add(sLink);
-          }
-        }
-      }
-    }
-
-    if (socialFollowUpUrls.size > 0 && verifiedPosts.length < 8) {
-      const socialBatch = [...socialFollowUpUrls].slice(0, 4);
-      const socialResults = await Promise.allSettled(
-        socialBatch.map((url) => extractVerifiedPostFromUrl(url))
-      );
-      for (const res of socialResults) {
-        if (res.status !== 'fulfilled' || !res.value) continue;
-        const post = res.value;
-        if (
-          !existingUrlSet.has(post.canonicalUrl) &&
-          isRelevantVietnamPetText(`${post.title} ${post.description}`)
-        ) {
-          verifiedPosts.push(post);
-        }
-      }
-    }
+    const newSpots = await crawlRescuePostsWithCrawl4AI({
+      targetPlatform,
+      customUrls,
+      excludeUrls: existingUrlSet,
+      // Nút cập nhật thủ công dùng lượt tìm nhỏ hơn; job tháng mới chạy bộ 50+ đầy đủ.
+      perQueryLimit: targetPlatform === 'ALL' ? 4 : 8,
+      concurrency: 4,
+    });
 
     let newlyAddedCount = 0;
-    if (verifiedPosts.length > 0) {
-      const { spots: newSpots, savedPlaces: newPlaces } =
-        await filterAndStructurePostsWithGemini(verifiedPosts);
-
+    if (newSpots.length > 0) {
       for (const sp of newSpots) {
         const exists = (existingData.spots || []).some(
           (s: any) => s.sourceUrl === sp.sourceUrl
@@ -221,6 +100,7 @@ export async function POST(request: NextRequest) {
       if (!Array.isArray(existingData.savedGoogleMapsPlaces)) {
         existingData.savedGoogleMapsPlaces = [];
       }
+      const newPlaces = createSavedGoogleMapsPlaces(newSpots);
       for (const pl of newPlaces) {
         const exists = existingData.savedGoogleMapsPlaces.some(
           (p: any) => p.id === pl.id || p.sourceUrl === pl.sourceUrl
@@ -233,6 +113,9 @@ export async function POST(request: NextRequest) {
 
     existingData.spots = filterTrustedSpots(existingData.spots || []);
     existingData.crawledAt = new Date().toISOString();
+    existingData.crawlProvider = CRAWL4AI_PROVIDER;
+    existingData.verifiedArticlesCount = existingData.spots.length;
+    existingData.crawlMode = 'MANUAL';
 
     const platformBreakdown: Record<string, number> = {
       FACEBOOK: 0,

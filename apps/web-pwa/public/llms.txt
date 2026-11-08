@@ -1,0 +1,8 @@
+# Đốm Nhỏ
+
+Đốm Nhỏ là ứng dụng cộng đồng tiếng Việt hỗ trợ cứu trợ chó mèo, tìm thú cưng đi lạc và kết nối nhận nuôi.
+
+- Trang chủ và tin quanh bạn: https://dom-nho.vercel.app/
+- Câu chuyện cộng đồng: https://dom-nho.vercel.app/cau-chuyen
+
+Tin cộng đồng do người dùng đăng và các bài tổng hợp liên kết đến nguồn gốc. Nên kiểm tra ngày đăng và bài gốc trước khi sử dụng lại thông tin.

@@ -606,7 +606,7 @@ export default function NearbySearchModal({
                               {formatDistanceVi(distanceMeters)}
                             </span>
                           ) : (
-                            <span className="absolute bottom-1.5 left-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#133E35] text-white backdrop-blur-md">
+                            <span className="absolute bottom-1.5 left-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold bg-brand text-white backdrop-blur-md">
                               {spot.areaLabel}
                             </span>
                           )}
@@ -620,7 +620,7 @@ export default function NearbySearchModal({
                                 Tự đăng trên Web
                               </span>
                             ) : (
-                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#133E35]/10 text-[#133E35] flex items-center gap-1">
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-brand/10 text-brand flex items-center gap-1">
                                 <Globe className="w-2.5 h-2.5" />
                                 {sourceName}
                               </span>

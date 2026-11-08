@@ -31,6 +31,9 @@ yarn-error.log*
 .env
 !.env.example
 
+# Local durable account/community data (contains user data)
+.data/
+
 # Vercel
 .vercel
 

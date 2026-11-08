@@ -94,15 +94,15 @@ export default function LocationPickerModal({
             >
               <div className="p-4 sm:p-5 border-b border-[#DDDCD4] flex items-center justify-between bg-[#FAF7F1]">
                 <div className="flex items-center gap-2">
-                  <MapPin className="w-4 h-4 text-[#0E513B]" />
-                  <h3 className="text-base font-bold text-[#142820]">
+                  <MapPin className="w-4 h-4 text-brand" />
+                  <h3 className="text-base font-bold text-ink">
                     Chọn khu vực quanh bạn
                   </h3>
                 </div>
                 <button
                   type="button"
                   onClick={onClose}
-                  className="min-w-[40px] min-h-[40px] rounded-[10px] bg-white border border-[#DDDCD4] flex items-center justify-center text-[#142820] hover:bg-[#F1EFE8]"
+                  className="min-w-[40px] min-h-[40px] rounded-[10px] bg-white border border-[#DDDCD4] flex items-center justify-center text-ink hover:bg-[#F1EFE8]"
                   aria-label="Đóng bảng chọn vị trí"
                 >
                   <X className="w-4 h-4" />
@@ -117,10 +117,10 @@ export default function LocationPickerModal({
                     onClose();
                   }}
                   disabled={isLocatingGps}
-                  className="w-full p-3.5 rounded-[12px] bg-[#E8EFE6] text-[#0E513B] border border-[#0E513B]/30 flex items-center justify-between gap-3 text-left hover:bg-[#d8e7d5] transition-all"
+                  className="w-full p-3.5 rounded-[12px] bg-brand-soft text-brand border border-brand/30 flex items-center justify-between gap-3 text-left hover:bg-[#d8e7d5] transition-all"
                 >
                   <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-full bg-[#0E513B] text-white flex items-center justify-center shrink-0">
+                    <div className="w-9 h-9 rounded-full bg-brand text-white flex items-center justify-center shrink-0">
                       <LocateFixed
                         className={`w-4 h-4 ${
                           isLocatingGps ? 'animate-spin' : ''
@@ -133,7 +133,7 @@ export default function LocationPickerModal({
                           ? 'Đang xác định GPS...'
                           : 'Định vị GPS thực tế của bạn'}
                       </p>
-                      <p className="text-[11px] text-[#52605A] mt-0.5">
+                      <p className="text-[11px] text-ink-secondary mt-0.5">
                         Tự động tìm kiếm các bé ở gần bạn nhất
                       </p>
                     </div>
@@ -143,17 +143,17 @@ export default function LocationPickerModal({
                 <button
                   type="button"
                   onClick={() => setIsInteractiveMapOpen(true)}
-                  className="w-full p-3.5 rounded-[12px] bg-[#FFF0E5]/70 text-[#142820] border border-[#AF421F]/35 flex items-center justify-between gap-3 text-left hover:bg-[#FFF0E5] transition-all"
+                  className="w-full p-3.5 rounded-[12px] bg-[#FFF0E5]/70 text-ink border border-[#AF421F]/35 flex items-center justify-between gap-3 text-left hover:bg-[#FFF0E5] transition-all"
                 >
                   <div className="flex items-center gap-3">
                     <div className="w-9 h-9 rounded-full bg-[#AF421F] text-white flex items-center justify-center shrink-0">
                       <Navigation className="w-4 h-4" />
                     </div>
                     <div>
-                      <p className="text-xs font-bold text-[#142820]">
+                      <p className="text-xs font-bold text-ink">
                         Ghim vị trí trên bản đồ
                       </p>
-                      <p className="text-[11px] text-[#52605A] mt-0.5">
+                      <p className="text-[11px] text-ink-secondary mt-0.5">
                         Di chuyển bản đồ để chọn chính xác con đường, ngõ hẻm
                       </p>
                     </div>
@@ -161,7 +161,7 @@ export default function LocationPickerModal({
                 </button>
 
                 <div className="pt-2">
-                  <p className="text-xs font-bold uppercase tracking-wider text-[#52605A] mb-2 px-1">
+                  <p className="text-xs font-bold uppercase tracking-wider text-ink-secondary mb-2 px-1">
                     Khu vực trọng điểm
                   </p>
                   <div className="space-y-1.5">
@@ -179,18 +179,18 @@ export default function LocationPickerModal({
                           }}
                           className={`w-full p-3 rounded-[10px] border flex items-center justify-between text-left transition-all ${
                             isCurrent
-                              ? 'border-[#0E513B] bg-[#E8EFE6]/60 text-[#142820]'
-                              : 'border-[#DDDCD4]/80 bg-[#FAF7F1] hover:bg-white hover:border-[#0E513B] text-[#142820]'
+                              ? 'border-brand bg-brand-soft/60 text-ink'
+                              : 'border-[#DDDCD4]/80 bg-[#FAF7F1] hover:bg-white hover:border-brand text-ink'
                           }`}
                         >
                           <div>
                             <p className="text-xs font-bold">{loc.label}</p>
-                            <p className="text-[11px] text-[#52605A] mt-0.5">
+                            <p className="text-[11px] text-ink-secondary mt-0.5">
                               {loc.sub}
                             </p>
                           </div>
                           {isCurrent && (
-                            <Check className="w-4 h-4 text-[#0E513B] shrink-0" />
+                            <Check className="w-4 h-4 text-brand shrink-0" />
                           )}
                         </button>
                       );

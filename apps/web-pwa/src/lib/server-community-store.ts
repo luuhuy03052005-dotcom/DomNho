@@ -28,6 +28,8 @@ export interface ServerAccountRecord {
   rawPhone: string;
   maskedPhone: string;
   pinHash: string;
+  pinSalt?: string;
+  pinHashVersion?: 'scrypt-v1';
   deviceSecretToken: string;
   coupleRoomCode: string;
   partnerName?: string;
@@ -56,10 +58,16 @@ interface CommunityStoreData {
   deletedSpotIds?: string[];
 }
 
-const STORE_FILE_PATH = path.join(
+const LEGACY_STORE_FILE_PATH = path.join(
   os.tmpdir(),
   'dom_nho_community_store_v1.json'
 );
+const LOCAL_DATA_DIR = process.env.DOM_NHO_DATA_DIR?.trim()
+  ? path.resolve(process.env.DOM_NHO_DATA_DIR.trim())
+  : path.join(process.cwd(), '.data');
+const STORE_FILE_PATH = process.env.VERCEL
+  ? LEGACY_STORE_FILE_PATH
+  : path.join(LOCAL_DATA_DIR, 'community-store.json');
 
 declare global {
   // eslint-disable-next-line no-var
@@ -76,57 +84,84 @@ function createEmptyStore(): CommunityStoreData {
   };
 }
 
+function normalizeStore(parsed: CommunityStoreData): CommunityStoreData {
+  return {
+    accounts: parsed.accounts || {},
+    posts: Array.isArray(parsed.posts) ? parsed.posts : [],
+    unlockRequests: Array.isArray(parsed.unlockRequests)
+      ? parsed.unlockRequests
+      : [],
+    memorySnaps: Array.isArray(parsed.memorySnaps) ? parsed.memorySnaps : [],
+    deletedSpotIds: Array.isArray(parsed.deletedSpotIds)
+      ? parsed.deletedSpotIds
+      : [],
+  };
+}
+
+function readStoreFile(filePath: string): CommunityStoreData | null {
+  if (!fs.existsSync(filePath)) return null;
+  const parsed = JSON.parse(fs.readFileSync(filePath, 'utf-8')) as CommunityStoreData;
+  return parsed && typeof parsed === 'object' ? normalizeStore(parsed) : null;
+}
+
+function ensurePersistentLocalStore(): void {
+  if (process.env.VERCEL) return;
+  fs.mkdirSync(path.dirname(STORE_FILE_PATH), { recursive: true });
+  if (
+    !fs.existsSync(STORE_FILE_PATH) &&
+    fs.existsSync(LEGACY_STORE_FILE_PATH)
+  ) {
+    fs.copyFileSync(LEGACY_STORE_FILE_PATH, STORE_FILE_PATH);
+  }
+  if (
+    fs.existsSync(STORE_FILE_PATH) &&
+    !fs.existsSync(`${STORE_FILE_PATH}.bak`)
+  ) {
+    fs.copyFileSync(STORE_FILE_PATH, `${STORE_FILE_PATH}.bak`);
+  }
+}
+
 export function loadServerCommunityStore(): CommunityStoreData {
+  try {
+    ensurePersistentLocalStore();
+  } catch {
+    // A read-only filesystem still gets the in-memory fallback below.
+  }
   if (globalThis.__domNhoCommunityStoreV1) {
     try {
-      if (fs.existsSync(STORE_FILE_PATH)) {
-        const raw = fs.readFileSync(STORE_FILE_PATH, 'utf-8');
-        const parsed = JSON.parse(raw) as CommunityStoreData;
-        if (parsed && typeof parsed === 'object') {
-          globalThis.__domNhoCommunityStoreV1 = {
-            accounts: parsed.accounts || {},
-            posts: Array.isArray(parsed.posts) ? parsed.posts : [],
-            unlockRequests: Array.isArray(parsed.unlockRequests)
-              ? parsed.unlockRequests
-              : [],
-            memorySnaps: Array.isArray(parsed.memorySnaps)
-              ? parsed.memorySnaps
-              : [],
-            deletedSpotIds: Array.isArray(parsed.deletedSpotIds)
-              ? parsed.deletedSpotIds
-              : [],
-          };
-        }
-      }
+      const stored =
+        readStoreFile(STORE_FILE_PATH) ||
+        readStoreFile(`${STORE_FILE_PATH}.bak`);
+      if (stored) globalThis.__domNhoCommunityStoreV1 = stored;
     } catch {
-      // Keep in-memory state if temp file read fails
+      try {
+        const backup = readStoreFile(`${STORE_FILE_PATH}.bak`);
+        if (backup) globalThis.__domNhoCommunityStoreV1 = backup;
+      } catch {
+        // Keep the last valid in-memory state.
+      }
     }
     return globalThis.__domNhoCommunityStoreV1;
   }
 
   try {
-    if (fs.existsSync(STORE_FILE_PATH)) {
-      const raw = fs.readFileSync(STORE_FILE_PATH, 'utf-8');
-      const parsed = JSON.parse(raw) as CommunityStoreData;
-      if (parsed && typeof parsed === 'object') {
-        globalThis.__domNhoCommunityStoreV1 = {
-          accounts: parsed.accounts || {},
-          posts: Array.isArray(parsed.posts) ? parsed.posts : [],
-          unlockRequests: Array.isArray(parsed.unlockRequests)
-            ? parsed.unlockRequests
-            : [],
-          memorySnaps: Array.isArray(parsed.memorySnaps)
-            ? parsed.memorySnaps
-            : [],
-          deletedSpotIds: Array.isArray(parsed.deletedSpotIds)
-            ? parsed.deletedSpotIds
-            : [],
-        };
-        return globalThis.__domNhoCommunityStoreV1;
-      }
+    const stored =
+      readStoreFile(STORE_FILE_PATH) ||
+      readStoreFile(`${STORE_FILE_PATH}.bak`);
+    if (stored) {
+      globalThis.__domNhoCommunityStoreV1 = stored;
+      return stored;
     }
   } catch {
-    // Ignore file read error
+    try {
+      const backup = readStoreFile(`${STORE_FILE_PATH}.bak`);
+      if (backup) {
+        globalThis.__domNhoCommunityStoreV1 = backup;
+        return backup;
+      }
+    } catch {
+      // Both copies are unavailable; initialize below.
+    }
   }
 
   globalThis.__domNhoCommunityStoreV1 = createEmptyStore();
@@ -135,10 +170,24 @@ export function loadServerCommunityStore(): CommunityStoreData {
 
 export function saveServerCommunityStore(store: CommunityStoreData): void {
   globalThis.__domNhoCommunityStoreV1 = store;
+  const tempPath = `${STORE_FILE_PATH}.${process.pid}.tmp`;
   try {
-    fs.writeFileSync(STORE_FILE_PATH, JSON.stringify(store), 'utf-8');
-  } catch {
-    // Never throw EROFS; keep in-memory store active
+    ensurePersistentLocalStore();
+    fs.writeFileSync(tempPath, JSON.stringify(store), 'utf-8');
+    if (fs.existsSync(STORE_FILE_PATH)) {
+      fs.copyFileSync(STORE_FILE_PATH, `${STORE_FILE_PATH}.bak`);
+    }
+    fs.copyFileSync(tempPath, STORE_FILE_PATH);
+    fs.unlinkSync(tempPath);
+  } catch (error) {
+    try {
+      if (fs.existsSync(tempPath)) fs.unlinkSync(tempPath);
+    } catch {
+      // Preserve the original write error.
+    }
+    throw new Error(
+      `Không thể ghi kho dữ liệu người dùng: ${error instanceof Error ? error.message : 'lỗi hệ thống tệp'}`
+    );
   }
 }
 
@@ -148,6 +197,45 @@ export function computeServerPinHash(
 ): string {
   const payload = `domnho_auth_v1:${normalizedPhone}:${pinCode}`;
   return crypto.createHash('sha256').update(payload).digest('hex');
+}
+
+function createPinCredentials(normalizedPhone: string, pinCode: string): {
+  pinHash: string;
+  pinSalt: string;
+  pinHashVersion: 'scrypt-v1';
+} {
+  const pinSalt = crypto.randomBytes(16).toString('hex');
+  const pinHash = crypto
+    .scryptSync(`${normalizedPhone}:${pinCode}`, pinSalt, 32)
+    .toString('hex');
+  return { pinHash, pinSalt, pinHashVersion: 'scrypt-v1' };
+}
+
+export function isServerPinValid(
+  account: ServerAccountRecord,
+  normalizedPhone: string,
+  pinCode: string
+): boolean {
+  const expected = account.pinHash || '';
+  const actual =
+    account.pinHashVersion === 'scrypt-v1' && account.pinSalt
+      ? crypto
+          .scryptSync(`${normalizedPhone}:${pinCode}`, account.pinSalt, 32)
+          .toString('hex')
+      : computeServerPinHash(normalizedPhone, pinCode);
+  if (expected.length !== actual.length) return false;
+  return crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(actual));
+}
+
+export function createServerPinCredentials(
+  normalizedPhone: string,
+  pinCode: string
+) {
+  return createPinCredentials(normalizedPhone, pinCode);
+}
+
+function createSessionToken(): string {
+  return crypto.randomBytes(32).toString('base64url');
 }
 
 function deriveRoomCode(seed: string): string {
@@ -172,6 +260,7 @@ export function authenticateOrRegisterInServerStore(params: {
   pinCode: string;
   mode?: 'login' | 'register';
   allowSyncExisting?: boolean;
+  sessionToken?: string;
 }): ServerAccountRecord {
   const store = loadServerCommunityStore();
   const cleanName = (params.displayName || '').trim();
@@ -188,7 +277,6 @@ export function authenticateOrRegisterInServerStore(params: {
     throw new Error('Mã PIN bảo mật phải gồm từ 4 đến 6 chữ số.');
   }
 
-  const pinHash = computeServerPinHash(normalizedPhone, cleanPin);
   const existing = store.accounts[normalizedPhone];
   const today = new Date().toISOString().slice(0, 10);
 
@@ -198,11 +286,15 @@ export function authenticateOrRegisterInServerStore(params: {
         'Số điện thoại này đã được đăng ký tài khoản. Vui lòng chuyển sang tab "Đăng nhập" và nhập mã PIN của bạn.'
       );
     }
-    if (existing.pinHash !== pinHash) {
+    if (!isServerPinValid(existing, normalizedPhone, cleanPin)) {
       throw new Error(
         'Số điện thoại này đã có tài khoản nhưng mã PIN không chính xác.'
       );
     }
+    if (existing.pinHashVersion !== 'scrypt-v1' || !existing.pinSalt) {
+      Object.assign(existing, createPinCredentials(normalizedPhone, cleanPin));
+    }
+    existing.deviceSecretToken = params.sessionToken || createSessionToken();
     if (
       params.allowSyncExisting &&
       cleanName.length >= 2 &&
@@ -240,14 +332,15 @@ export function authenticateOrRegisterInServerStore(params: {
       : deterministicAccountIdFromPhone(normalizedPhone);
 
   const nowIso = new Date().toISOString();
+  const credentials = createPinCredentials(normalizedPhone, cleanPin);
   const record: ServerAccountRecord = {
     id: profileId,
     displayName: cleanName,
     normalizedPhone,
     rawPhone: cleanPhone,
     maskedPhone: maskPhoneNumber(cleanPhone),
-    pinHash,
-    deviceSecretToken: `dom_phone_${normalizedPhone}`,
+    ...credentials,
+    deviceSecretToken: params.sessionToken || createSessionToken(),
     coupleRoomCode: deriveRoomCode(profileId),
     patrolModeActive: true,
     dailyPostCount: 0,
@@ -261,6 +354,48 @@ export function authenticateOrRegisterInServerStore(params: {
   store.accounts[normalizedPhone] = record;
   saveServerCommunityStore(store);
   return record;
+}
+
+export function findAccountBySessionTokenInServerStore(
+  sessionToken: string
+): ServerAccountRecord | null {
+  if (!sessionToken || sessionToken.length < 32) return null;
+  const store = loadServerCommunityStore();
+  return (
+    Object.values(store.accounts).find((account) => {
+      const candidate = account.deviceSecretToken || '';
+      if (candidate.length !== sessionToken.length) return false;
+      return crypto.timingSafeEqual(
+        Buffer.from(candidate),
+        Buffer.from(sessionToken)
+      );
+    }) || null
+  );
+}
+
+export function updateAccountPreferencesInServerStore(params: {
+  accountId: string;
+  patrolModeActive?: boolean;
+  partnerName?: string;
+  coupleRoomCode?: string;
+}): ServerAccountRecord | null {
+  const store = loadServerCommunityStore();
+  const account = Object.values(store.accounts).find(
+    (item) => item.id === params.accountId
+  );
+  if (!account) return null;
+  if (typeof params.patrolModeActive === 'boolean') {
+    account.patrolModeActive = params.patrolModeActive;
+  }
+  if (typeof params.partnerName === 'string') {
+    account.partnerName = params.partnerName.trim().slice(0, 80);
+  }
+  if (typeof params.coupleRoomCode === 'string' && params.coupleRoomCode.trim()) {
+    account.coupleRoomCode = params.coupleRoomCode.trim().slice(0, 32);
+  }
+  account.updatedAt = new Date().toISOString();
+  saveServerCommunityStore(store);
+  return account;
 }
 
 export function createSpotInServerStore(params: {
@@ -299,32 +434,10 @@ export function createSpotInServerStore(params: {
 
   let account = store.accounts[normalizedPhone];
   if (!account) {
-    const profileId =
-      params.authorId &&
-      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
-        params.authorId
-      )
-        ? params.authorId
-        : deterministicAccountIdFromPhone(normalizedPhone);
-    const nowIso = new Date().toISOString();
-    account = {
-      id: profileId,
-      displayName: params.authorName.trim(),
-      normalizedPhone,
-      rawPhone: cleanPhone,
-      maskedPhone: maskPhoneNumber(cleanPhone),
-      pinHash: computeServerPinHash(normalizedPhone, params.pinCode || '0000'),
-      deviceSecretToken: `dom_phone_${normalizedPhone}`,
-      coupleRoomCode: deriveRoomCode(profileId),
-      patrolModeActive: true,
-      dailyPostCount: 0,
-      lastPostDate: today,
-      spamAttempts: 0,
-      isShadowbanned: false,
-      createdAt: nowIso,
-      updatedAt: nowIso,
-    };
-    store.accounts[normalizedPhone] = account;
+    throw new Error('Tài khoản không tồn tại hoặc phiên đăng nhập không hợp lệ.');
+  }
+  if (account.id !== params.authorId) {
+    throw new Error('Tài khoản không có quyền tạo bài đăng này.');
   } else if (account.lastPostDate !== today) {
     account.dailyPostCount = 0;
     account.spamAttempts = 0;
@@ -509,9 +622,10 @@ export function addSightingInServerStore(params: {
 }): SightingItem {
   const store = loadServerCommunityStore();
   const rec = store.posts.find((p) => p.spot.id === params.spotId);
+  if (!rec) throw new Error('Không tìm thấy bài đăng để lưu báo cáo nhìn thấy.');
 
-  const originLat = params.originLat || rec?.exactLat || rec?.spot.publicLat || 0;
-  const originLng = params.originLng || rec?.exactLng || rec?.spot.publicLng || 0;
+  const originLat = params.originLat || rec.exactLat || rec.spot.publicLat || 0;
+  const originLng = params.originLng || rec.exactLng || rec.spot.publicLng || 0;
   const distanceMeters =
     originLat && originLng && params.lat && params.lng
       ? calculateDistanceMeters(originLat, originLng, params.lat, params.lng)
@@ -538,11 +652,9 @@ export function addSightingInServerStore(params: {
         : undefined,
   };
 
-  if (rec) {
-    rec.spot.sightings = [item, ...(rec.spot.sightings || [])];
-    rec.spot.lightPower = Math.min(500, (rec.spot.lightPower || 100) + 25);
-    saveServerCommunityStore(store);
-  }
+  rec.spot.sightings = [item, ...(rec.spot.sightings || [])];
+  rec.spot.lightPower = Math.min(500, (rec.spot.lightPower || 100) + 25);
+  saveServerCommunityStore(store);
 
   return item;
 }
@@ -561,6 +673,7 @@ export function unlockContactInServerStore(params: {
 } {
   const store = loadServerCommunityStore();
   const rec = store.posts.find((p) => p.spot.id === params.spotId);
+  if (!rec) throw new Error('Không tìm thấy bài đăng để mở thông tin liên hệ.');
 
   const unlockReq: ContactUnlockRequest = {
     id: crypto.randomUUID(),
@@ -574,14 +687,14 @@ export function unlockContactInServerStore(params: {
   };
   store.unlockRequests.unshift(unlockReq);
 
-  let rawPhone = rec?.rawPhone || '';
-  if (rec && params.requesterId) {
+  let rawPhone = rec.rawPhone || '';
+  if (params.requesterId) {
     if (!rec.unlockedByViewerIds.includes(params.requesterId)) {
       rec.unlockedByViewerIds.push(params.requesterId);
     }
   }
 
-  if (!rawPhone && rec?.spot.authorId) {
+  if (!rawPhone && rec.spot.authorId) {
     const authorAcc = Object.values(store.accounts).find(
       (a) => a.id === rec.spot.authorId
     );
@@ -595,7 +708,7 @@ export function unlockContactInServerStore(params: {
   const digits = rawPhone.replace(/\D/g, '');
   return {
     rawPhone,
-    maskedPhone: rec?.spot.maskedPhone || maskPhoneNumber(rawPhone),
+    maskedPhone: rec.spot.maskedPhone || maskPhoneNumber(rawPhone),
     zaloLink: digits ? `https://zalo.me/${digits}` : '',
   };
 }

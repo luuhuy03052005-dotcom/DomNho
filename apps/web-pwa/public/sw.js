@@ -4,8 +4,8 @@
    hoặc lịch nhắc "Chạm Ảnh Mỗi Tuần" (Weekly Memory Pact) trên iOS 16.4+ & Android.
    ========================================================================== */
 
-const CACHE_NAME = 'dom-nho-pwa-v1';
-const OFFLINE_ASSETS = ['/', '/manifest.json', '/icons/icon-192.svg'];
+const CACHE_NAME = 'dom-nho-pwa-v2';
+const OFFLINE_ASSETS = ['/', '/manifest.json', '/logo-dom-nho.png'];
 
 self.addEventListener('install', (event) => {
   self.skipWaiting();
@@ -50,8 +50,8 @@ self.addEventListener('push', (event) => {
   event.waitUntil(
     self.registration.showNotification(payload.title, {
       body: payload.body,
-      icon: '/icons/icon-192.svg',
-      badge: '/icons/icon-192.svg',
+      icon: '/logo-dom-nho.png',
+      badge: '/logo-dom-nho.png',
       tag: payload.tag,
       vibrate: [120, 60, 120],
       data: { url: payload.url || '/' },

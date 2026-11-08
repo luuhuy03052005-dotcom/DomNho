@@ -1,127 +1,42 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <kml xmlns="http://www.opengis.net/kml/2.2">
   <Document>
-    <name>Đốm Nhỏ — Bản Đồ Cứu Hộ Thực Tế Đã Xác Minh &amp; Lưu Trên Google Maps</name>
-    <description>100% bài viết đa nền tảng có địa chỉ cụ thể và hình ảnh thực tế đã xác minh HTTP 200 và lọc qua Gemini 2.5 Flash.</description>
-    
+    <name>Đốm Nhỏ — Dữ liệu Crawl4AI</name>
     <Placemark>
-      <name><![CDATA[[GREEN_PEACE] Cà phê mèo 'không giống ai' ở TP.HCM: Những hành trình hồi sinh kỳ diệu]]></name>
-      <description><![CDATA[
-        <b>Nền tảng nguồn:</b> RESCUE_PORTAL<br/>
-        <b>Nguồn bài viết đã xác minh:</b> BoNé Petkery (thanhnien.vn)<br/>
-        <b>Địa chỉ định vị:</b> phường Bình Thới, TP.HCM<br/>
-        <b>Nội dung bài viết:</b> Quán cà phê BoNé Petkery ở phường Bình Thới, TP.HCM, đang cưu mang và chăm sóc hơn 150 chú mèo. Nhiều bé từng bị bỏ rơi, mắc bệnh, mang khiếm khuyết bẩm sinh hoặc gặp tai nạn nghiêm trọng đã được hồi sinh tại đây.<br/>
-        <b>Ảnh gốc bài viết:</b> https://images2.thanhnien.vn/zoom/1200_630/528068263637045248/2026/10/18/ca-phe-meo-khong-giong-ai-o-tp-17923171424001672490655-0-0-875-1672-crop-17923171595221898312709.jpg<br/>
-        <b>Link bài viết gốc (HTTP 200):</b> <a href="https://thanhnien.vn/ca-phe-meo-khong-giong-ai-o-tphcm-nhung-hanh-trinh-hoi-sinh-ky-dieu-185261018141711795.htm">https://thanhnien.vn/ca-phe-meo-khong-giong-ai-o-tphcm-nhung-hanh-trinh-hoi-sinh-ky-dieu-185261018141711795.htm</a><br/>
-        <b>Google Maps:</b> <a href="https://www.google.com/maps/search/?api=1&query=10.762608,106.642167&query_place_id=BoN%C3%A9%20Petkery%20ph%C6%B0%E1%BB%9Dng%20B%C3%ACnh%20Th%E1%BB%9Bi%2C%20TP.HCM">Mở trên Google Maps</a>
-      ]]></description>
-      <Point>
-        <coordinates>106.642167,10.762608,0</coordinates>
-      </Point>
+      <name>Bệnh viện Thú y PetCare Thảo Điền</name>
+      <description>124 Xuân Thủy, Phường Thảo Điền, TP. Thủ Đức, TP.HCM
+028 3744 2505</description>
+      <Point><coordinates>106.736781,10.803923,0</coordinates></Point>
     </Placemark>
-
     <Placemark>
-      <name><![CDATA[[YELLOW_ADOPT] Nữ shipper cưu mang gần 100 chú chó bị bỏ rơi ở TP.HCM: "Để lo cho các bé, mỗi tháng cũng hơn 20 triệu đồng"]]></name>
-      <description><![CDATA[
-        <b>Nền tảng nguồn:</b> RESCUE_PORTAL<br/>
-        <b>Nguồn bài viết đã xác minh:</b> Cao Thị Ngọc Ánh (kenh14.vn)<br/>
-        <b>Địa chỉ định vị:</b> Bình Quới, TP.HCM<br/>
-        <b>Nội dung bài viết:</b> Chị Cao Thị Ngọc Ánh, một nữ shipper, đã biến căn nhà nhỏ ở Bình Quới (TP.HCM) thành mái ấm cho gần 100 chú chó bị bỏ rơi. Chị dành trọn thời gian và thu nhập, với chi phí hơn 20 triệu đồng mỗi tháng, để lo cho các bé.<br/>
-        <b>Ảnh gốc bài viết:</b> https://kenh14cdn.com/thumb_w/1200/203336854389633024/2026/8/2/avatar1785637254139-178563725439930529685.png<br/>
-        <b>Link bài viết gốc (HTTP 200):</b> <a href="https://kenh14.vn/nu-shipper-cuu-mang-gan-100-chu-cho-bi-bo-roi-o-tphcm-de-lo-cho-cac-be-moi-thang-cung-hon-20-trieu-dong-215260802092153561.chn">https://kenh14.vn/nu-shipper-cuu-mang-gan-100-chu-cho-bi-bo-roi-o-tphcm-de-lo-cho-cac-be-moi-thang-cung-hon-20-trieu-dong-215260802092153561.chn</a><br/>
-        <b>Google Maps:</b> <a href="https://www.google.com/maps/search/?api=1&query=10.821954,106.74207&query_place_id=Cao%20Th%E1%BB%8B%20Ng%E1%BB%8Dc%20%C3%81nh%20B%C3%ACnh%20Qu%E1%BB%9Bi%2C%20TP.HCM">Mở trên Google Maps</a>
-      ]]></description>
-      <Point>
-        <coordinates>106.74207,10.821954,0</coordinates>
-      </Point>
+      <name>Bệnh viện Thú y PetPro Cộng Hòa</name>
+      <description>389 Cộng Hòa, Phường 13, Quận Tân Bình, TP.HCM
+1800 599 941</description>
+      <Point><coordinates>106.637892,10.803387,0</coordinates></Point>
     </Placemark>
-
     <Placemark>
-      <name><![CDATA[[YELLOW_ADOPT] 'Biệt đội' cứu hộ chó, mèo ở Đà Nẵng]]></name>
-      <description><![CDATA[
-        <b>Nền tảng nguồn:</b> RESCUE_PORTAL<br/>
-        <b>Nguồn bài viết đã xác minh:</b> Team 16 Đà Nẵng (vietnamnet.vn)<br/>
-        <b>Địa chỉ định vị:</b> cuối con hẻm trên đường Mẹ Suốt, phường Hòa Khánh Nam, quận Liên Chiểu, TP Đà Nẵng<br/>
-        <b>Nội dung bài viết:</b> Team 16 Đà Nẵng, với hơn 10 thành viên, đã thành lập mái ấm cho chó, mèo bị bỏ rơi tại cuối con hẻm trên đường Mẹ Suốt (phường Hòa Khánh Nam, quận Liên Chiểu, TP Đà Nẵng). Nhóm đã cứu và chăm sóc không đếm xuể số chó, mèo bị thương, bị bỏ rơi trong hơn 1 năm qua.<br/>
-        <b>Ảnh gốc bài viết:</b> https://static-images.vnncdn.net/files/publish/2023/1/14/nhom-cuu-ho-cho-meo-1185.jpg?width=0&s=My45pbsslh87uX1BRkL_IQ<br/>
-        <b>Link bài viết gốc (HTTP 200):</b> <a href="https://vietnamnet.vn/biet-doi-cuu-ho-cho-meo-o-da-nang-2100906.html">https://vietnamnet.vn/biet-doi-cuu-ho-cho-meo-o-da-nang-2100906.html</a><br/>
-        <b>Google Maps:</b> <a href="https://www.google.com/maps/search/?api=1&query=16.05227,108.14635&query_place_id=Team%2016%20%C4%90%C3%A0%20N%E1%BA%B5ng%20cu%E1%BB%91i%20con%20h%E1%BA%BBm%20tr%C3%AAn%20%C4%91%C6%B0%E1%BB%9Dng%20M%E1%BA%B9%20Su%E1%BB%91t%2C%20ph%C6%B0%E1%BB%9Dng%20H%C3%B2a%20Kh%C3%A1nh%20Nam%2C%20qu%E1%BA%ADn%20Li%C3%AAn%20Chi%E1%BB%83u%2C%20TP%20%C4%90%C3%A0%20N%E1%BA%B5ng">Mở trên Google Maps</a>
-      ]]></description>
-      <Point>
-        <coordinates>108.14635,16.05227,0</coordinates>
-      </Point>
+      <name>Phòng khám Thú y Thi Thi Pet Clinic</name>
+      <description>62B Hòa Bình, Phường 5, Quận 11, TP.HCM
+028 6264 6998</description>
+      <Point><coordinates>106.641311,10.767019,0</coordinates></Point>
     </Placemark>
-
     <Placemark>
-      <name><![CDATA[[Thú Y 24/7] Bệnh viện Thú y PetCare Thảo Điền]]></name>
-      <description><![CDATA[
-        <b>Địa chỉ:</b> 124 Xuân Thủy, Phường Thảo Điền, TP. Thủ Đức, TP.HCM<br/>
-        <b>Hotline:</b> 028 3744 2505<br/>
-        <b>Google Maps:</b> <a href="https://www.google.com/maps/search/?api=1&query=10.803923,106.736781&query_place_id=B%E1%BB%87nh%20vi%E1%BB%87n%20Th%C3%BA%20y%20PetCare%20Th%E1%BA%A3o%20%C4%90i%E1%BB%81n%20124%20Xu%C3%A2n%20Th%E1%BB%A7y%2C%20Ph%C6%B0%E1%BB%9Dng%20Th%E1%BA%A3o%20%C4%90i%E1%BB%81n%2C%20TP.%20Th%E1%BB%A7%20%C4%90%E1%BB%A9c%2C%20TP.HCM">Mở trên Google Maps</a>
-      ]]></description>
-      <Point>
-        <coordinates>106.736781,10.803923,0</coordinates>
-      </Point>
+      <name>Phòng khám Thú y K9 Veterinary Clinic</name>
+      <description>712 Lê Văn Lương, Phường Tân Phong, Quận 7, TP.HCM
+028 3775 1829</description>
+      <Point><coordinates>106.706939,10.739105,0</coordinates></Point>
     </Placemark>
-
     <Placemark>
-      <name><![CDATA[[Thú Y 24/7] Bệnh viện Thú y PetPro Cộng Hòa]]></name>
-      <description><![CDATA[
-        <b>Địa chỉ:</b> 389 Cộng Hòa, Phường 13, Quận Tân Bình, TP.HCM<br/>
-        <b>Hotline:</b> 1800 599 941<br/>
-        <b>Google Maps:</b> <a href="https://www.google.com/maps/search/?api=1&query=10.803387,106.637892&query_place_id=B%E1%BB%87nh%20vi%E1%BB%87n%20Th%C3%BA%20y%20PetPro%20C%E1%BB%99ng%20H%C3%B2a%20389%20C%E1%BB%99ng%20H%C3%B2a%2C%20Ph%C6%B0%E1%BB%9Dng%2013%2C%20Qu%E1%BA%ADn%20T%C3%A2n%20B%C3%ACnh%2C%20TP.HCM">Mở trên Google Maps</a>
-      ]]></description>
-      <Point>
-        <coordinates>106.637892,10.803387,0</coordinates>
-      </Point>
+      <name>Bệnh viện Thú y New Pet Hospital</name>
+      <description>262 Lý Thường Kiệt, Phường 14, Quận 10, TP.HCM
+028 6269 3399</description>
+      <Point><coordinates>106.657413,10.775551,0</coordinates></Point>
     </Placemark>
-
     <Placemark>
-      <name><![CDATA[[Thú Y 24/7] Phòng khám Thú y Thi Thi Pet Clinic]]></name>
-      <description><![CDATA[
-        <b>Địa chỉ:</b> 62B Hòa Bình, Phường 5, Quận 11, TP.HCM<br/>
-        <b>Hotline:</b> 028 6264 6998<br/>
-        <b>Google Maps:</b> <a href="https://www.google.com/maps/search/?api=1&query=10.767019,106.641311&query_place_id=Ph%C3%B2ng%20kh%C3%A1m%20Th%C3%BA%20y%20Thi%20Thi%20Pet%20Clinic%2062B%20H%C3%B2a%20B%C3%ACnh%2C%20Ph%C6%B0%E1%BB%9Dng%205%2C%20Qu%E1%BA%ADn%2011%2C%20TP.HCM">Mở trên Google Maps</a>
-      ]]></description>
-      <Point>
-        <coordinates>106.641311,10.767019,0</coordinates>
-      </Point>
-    </Placemark>
-
-    <Placemark>
-      <name><![CDATA[[Thú Y 24/7] Phòng khám Thú y K9 Veterinary Clinic]]></name>
-      <description><![CDATA[
-        <b>Địa chỉ:</b> 712 Lê Văn Lương, Phường Tân Phong, Quận 7, TP.HCM<br/>
-        <b>Hotline:</b> 028 3775 1829<br/>
-        <b>Google Maps:</b> <a href="https://www.google.com/maps/search/?api=1&query=10.739105,106.706939&query_place_id=Ph%C3%B2ng%20kh%C3%A1m%20Th%C3%BA%20y%20K9%20Veterinary%20Clinic%20712%20L%C3%AA%20V%C4%83n%20L%C6%B0%C6%A1ng%2C%20Ph%C6%B0%E1%BB%9Dng%20T%C3%A2n%20Phong%2C%20Qu%E1%BA%ADn%207%2C%20TP.HCM">Mở trên Google Maps</a>
-      ]]></description>
-      <Point>
-        <coordinates>106.706939,10.739105,0</coordinates>
-      </Point>
-    </Placemark>
-
-    <Placemark>
-      <name><![CDATA[[Thú Y 24/7] Bệnh viện Thú y New Pet Hospital]]></name>
-      <description><![CDATA[
-        <b>Địa chỉ:</b> 262 Lý Thường Kiệt, Phường 14, Quận 10, TP.HCM<br/>
-        <b>Hotline:</b> 028 6269 3399<br/>
-        <b>Google Maps:</b> <a href="https://www.google.com/maps/search/?api=1&query=10.775551,106.657413&query_place_id=B%E1%BB%87nh%20vi%E1%BB%87n%20Th%C3%BA%20y%20New%20Pet%20Hospital%20262%20L%C3%BD%20Th%C6%B0%E1%BB%9Dng%20Ki%E1%BB%87t%2C%20Ph%C6%B0%E1%BB%9Dng%2014%2C%20Qu%E1%BA%ADn%2010%2C%20TP.HCM">Mở trên Google Maps</a>
-      ]]></description>
-      <Point>
-        <coordinates>106.657413,10.775551,0</coordinates>
-      </Point>
-    </Placemark>
-
-    <Placemark>
-      <name><![CDATA[[Thú Y 24/7] Trạm Chẩn đoán & Điều trị Thú y TP.HCM]]></name>
-      <description><![CDATA[
-        <b>Địa chỉ:</b> 151 Lý Thường Kiệt, Phường 7, Quận 11, TP.HCM<br/>
-        <b>Hotline:</b> 028 3855 6340<br/>
-        <b>Google Maps:</b> <a href="https://www.google.com/maps/search/?api=1&query=10.761282,106.66041&query_place_id=Tr%E1%BA%A1m%20Ch%E1%BA%A9n%20%C4%91o%C3%A1n%20%26%20%C4%90i%E1%BB%81u%20tr%E1%BB%8B%20Th%C3%BA%20y%20TP.HCM%20151%20L%C3%BD%20Th%C6%B0%E1%BB%9Dng%20Ki%E1%BB%87t%2C%20Ph%C6%B0%E1%BB%9Dng%207%2C%20Qu%E1%BA%ADn%2011%2C%20TP.HCM">Mở trên Google Maps</a>
-      ]]></description>
-      <Point>
-        <coordinates>106.66041,10.761282,0</coordinates>
-      </Point>
+      <name>Trạm Chẩn đoán &amp; Điều trị Thú y TP.HCM</name>
+      <description>151 Lý Thường Kiệt, Phường 7, Quận 11, TP.HCM
+028 3855 6340</description>
+      <Point><coordinates>106.66041,10.761282,0</coordinates></Point>
     </Placemark>
   </Document>
 </kml>

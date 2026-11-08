@@ -1,4 +1,3 @@
-import { maskPhoneNumber } from './security';
 import {
   DomSpot,
   MemorySnap,
@@ -6,30 +5,13 @@ import {
   SpotType,
   SpotVisibility,
   UserSession,
-  deterministicAccountIdFromPhone,
   isValidVietnamesePhone,
-  normalizePhoneDigits,
 } from './types';
 
 export const AUTH_STORAGE_KEY = 'dom_nho_permanent_auth';
-export const DEVICE_TOKEN_KEY = 'dom_nho_device_secret_token';
-const ACCOUNTS_REGISTRY_KEY = 'dom_nho_accounts_registry_v1';
 const IDB_DB_NAME = 'DomNhoPermanentVault';
 const IDB_STORE_NAME = 'auth_store';
 const REALTIME_CHANNEL_NAME = 'dom_nho_realtime_community_v1';
-
-interface StoredAccountRecord {
-  id: string;
-  displayName: string;
-  normalizedPhone: string;
-  rawPhone: string;
-  maskedPhone: string;
-  pinHash: string;
-  deviceSecretToken: string;
-  coupleRoomCode: string;
-  patrolModeActive: boolean;
-  createdAt: string;
-}
 
 export const supabase = null;
 
@@ -38,37 +20,6 @@ const UUID_REGEX =
 
 export function isValidUuid(val: string | undefined | null): boolean {
   return Boolean(val && UUID_REGEX.test(val));
-}
-
-async function computePinHash(
-  normalizedPhone: string,
-  pinCode: string
-): Promise<string> {
-  const payload = `domnho_auth_v1:${normalizedPhone}:${pinCode}`;
-  if (typeof window !== 'undefined' && window.crypto?.subtle) {
-    const encoded = new TextEncoder().encode(payload);
-    const digest = await window.crypto.subtle.digest('SHA-256', encoded);
-    return Array.from(new Uint8Array(digest))
-      .map((b) => b.toString(16).padStart(2, '0'))
-      .join('');
-  }
-  let h1 = 0xdeadbeef ^ payload.length;
-  let h2 = 0x41c6ce57 ^ payload.length;
-  for (let i = 0; i < payload.length; i++) {
-    const ch = payload.charCodeAt(i);
-    h1 = Math.imul(h1 ^ ch, 2654435761);
-    h2 = Math.imul(h2 ^ ch, 1597334677);
-  }
-  h1 =
-    Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^
-    Math.imul(h2 ^ (h2 >>> 13), 3266489909);
-  h2 =
-    Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^
-    Math.imul(h1 ^ (h1 >>> 13), 3266489909);
-  return (
-    (h2 >>> 0).toString(16).padStart(8, '0') +
-    (h1 >>> 0).toString(16).padStart(8, '0')
-  );
 }
 
 function deriveCoupleRoomCode(seed: string): string {
@@ -86,27 +37,12 @@ function deriveCoupleRoomCode(seed: string): string {
   return `DN-${code}`;
 }
 
-function loadLocalAccountsRegistry(): Record<string, StoredAccountRecord> {
-  if (typeof window === 'undefined') return {};
-  try {
-    const raw = window.localStorage.getItem(ACCOUNTS_REGISTRY_KEY);
-    if (!raw) return {};
-    const parsed = JSON.parse(raw);
-    return parsed && typeof parsed === 'object' ? parsed : {};
-  } catch {
-    return {};
-  }
-}
-
-function saveLocalAccountRecord(record: StoredAccountRecord): void {
-  if (typeof window === 'undefined') return;
-  try {
-    const registry = loadLocalAccountsRegistry();
-    registry[record.normalizedPhone] = record;
-    window.localStorage.setItem(ACCOUNTS_REGISTRY_KEY, JSON.stringify(registry));
-  } catch {
-    // Ignore storage quota errors
-  }
+function sanitizeClientSession(session: UserSession): UserSession {
+  const safeSession = { ...session } as UserSession & Record<string, unknown>;
+  delete safeSession.pinCode;
+  delete safeSession.deviceSecretToken;
+  delete safeSession.rawPhone;
+  return safeSession;
 }
 
 function saveToIndexedDb(session: UserSession): void {
@@ -159,7 +95,10 @@ export async function restoreFromIndexedDb(): Promise<UserSession | null> {
         const db = req.result;
         const tx = db.transaction(IDB_STORE_NAME, 'readonly');
         const getReq = tx.objectStore(IDB_STORE_NAME).get(AUTH_STORAGE_KEY);
-        getReq.onsuccess = () => resolve((getReq.result as UserSession) || null);
+        getReq.onsuccess = () => {
+          const result = getReq.result as UserSession | undefined;
+          resolve(result ? sanitizeClientSession(result) : null);
+        };
         getReq.onerror = () => resolve(null);
       };
       req.onerror = () => resolve(null);
@@ -171,46 +110,66 @@ export async function restoreFromIndexedDb(): Promise<UserSession | null> {
 
 export function persistPermanentSession(session: UserSession): void {
   if (typeof window === 'undefined') return;
-  const serialized = JSON.stringify(session);
+  const safeSession = sanitizeClientSession(session);
+  const serialized = JSON.stringify(safeSession);
   window.localStorage.setItem(AUTH_STORAGE_KEY, serialized);
-  window.localStorage.setItem(DEVICE_TOKEN_KEY, session.deviceSecretToken);
-  document.cookie = `${DEVICE_TOKEN_KEY}=${encodeURIComponent(
-    session.deviceSecretToken
-  )}; path=/; max-age=315360000; SameSite=Lax`;
-  saveToIndexedDb(session);
+  window.localStorage.removeItem('dom_nho_device_secret_token');
+  window.localStorage.removeItem('dom_nho_accounts_registry_v1');
+  saveToIndexedDb(safeSession);
 }
 
 export function clearPermanentSession(): void {
   if (typeof window === 'undefined') return;
   window.localStorage.removeItem(AUTH_STORAGE_KEY);
-  window.localStorage.removeItem(DEVICE_TOKEN_KEY);
-  document.cookie = `${DEVICE_TOKEN_KEY}=; path=/; max-age=0; SameSite=Lax`;
+  window.localStorage.removeItem('dom_nho_device_secret_token');
+  window.localStorage.removeItem('dom_nho_accounts_registry_v1');
   removeFromIndexedDb();
+  fetch('/api/auth', { method: 'DELETE' }).catch(() => null);
 }
 
 export async function loadPermanentSession(): Promise<UserSession | null> {
   if (typeof window === 'undefined') return null;
+  let cachedSession: UserSession | null = null;
   try {
-    let session: UserSession | null = null;
     const raw = window.localStorage.getItem(AUTH_STORAGE_KEY);
     if (raw) {
-      session = JSON.parse(raw) as UserSession;
+      cachedSession = sanitizeClientSession(JSON.parse(raw) as UserSession);
     } else {
       const fromIdb = await restoreFromIndexedDb();
       if (fromIdb) {
         window.localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(fromIdb));
-        session = fromIdb;
+        cachedSession = fromIdb;
       }
     }
+  } catch {
+    cachedSession = null;
+  }
 
-    if (!session || !session.displayName || !session.rawPhone) {
+  try {
+    const response = await fetch('/api/auth', {
+      method: 'GET',
+      cache: 'no-store',
+    });
+    const data = await response.json().catch(() => null);
+    if (response.ok && data?.ok && data.account) {
+      const verified = sanitizeClientSession(data.account as UserSession);
+      persistPermanentSession(verified);
+      return verified;
+    }
+    if ((response.ok && data?.ok && !data.account) || response.status === 401) {
+      window.localStorage.removeItem(AUTH_STORAGE_KEY);
+      removeFromIndexedDb();
       return null;
     }
-
-    return session;
   } catch {
-    return null;
+    // Offline mode can show the last safe profile, but server mutations still require the HttpOnly cookie.
   }
+
+  if (cachedSession?.displayName && cachedSession.id) {
+    persistPermanentSession(cachedSession);
+    return cachedSession;
+  }
+  return null;
 }
 
 /**
@@ -227,8 +186,6 @@ export async function registerZeroVerificationUser(params: {
   const cleanName = (params.displayName || '').trim();
   const cleanPin = (params.pinCode || '').trim();
   const cleanPhone = (params.rawPhone || '').trim();
-  const normalizedPhone = normalizePhoneDigits(cleanPhone);
-
   if (!isValidVietnamesePhone(cleanPhone)) {
     throw new Error(
       'Số điện thoại không hợp lệ. Vui lòng nhập số điện thoại Việt Nam gồm 10 chữ số (bắt đầu bằng 03, 05, 07, 08, 09 hoặc +84).'
@@ -245,118 +202,34 @@ export async function registerZeroVerificationUser(params: {
     );
   }
 
-  const pinHash = await computePinHash(normalizedPhone, cleanPin);
-  const accountDeviceToken = `dom_phone_${normalizedPhone}`;
-  const maskedPhone = maskPhoneNumber(cleanPhone);
-  const registry = loadLocalAccountsRegistry();
-  const localExisting = registry[normalizedPhone];
-
-  let profileId =
-    localExisting?.id || deterministicAccountIdFromPhone(normalizedPhone);
-  let finalDisplayName = cleanName || localExisting?.displayName || '';
-  let patrolModeActive = localExisting?.patrolModeActive ?? true;
-  let isShadowbanned = false;
-  let createdAt = localExisting?.createdAt || new Date().toISOString();
-  let coupleRoomCode =
-    localExisting?.coupleRoomCode || deriveCoupleRoomCode(profileId);
-  let verifiedFromRemote = false;
-
-  if (typeof window !== 'undefined') {
-    let apiErrorToThrow: Error | null = null;
-    try {
-      const authRes = await fetch('/api/auth', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          id: profileId,
-          displayName: finalDisplayName || cleanName,
-          rawPhone: cleanPhone,
-          pinCode: cleanPin,
-          mode,
-          allowSyncExisting: false,
-        }),
-      });
-      const authData = await authRes.json().catch(() => null);
-      if (!authRes.ok || !authData?.ok) {
-        apiErrorToThrow = new Error(
-          String(
-            authData?.error ||
-              'Không thể xác thực tài khoản. Vui lòng kiểm tra thông tin và thử lại.'
-          )
-        );
-      } else if (authData.account) {
-        verifiedFromRemote = true;
-        profileId = authData.account.id;
-        finalDisplayName = authData.account.displayName || finalDisplayName;
-        patrolModeActive = Boolean(authData.account.patrolModeActive);
-        isShadowbanned = Boolean(authData.account.isShadowbanned);
-        createdAt = authData.account.createdAt || createdAt;
-        coupleRoomCode = authData.account.coupleRoomCode || coupleRoomCode;
-      }
-    } catch {
-      // Nếu mất mạng hoàn toàn thì kiểm tra bộ nhớ tài khoản cục bộ bên dưới
-    }
-    if (apiErrorToThrow) {
-      throw apiErrorToThrow;
-    }
+  let authRes: Response;
+  try {
+    authRes = await fetch('/api/auth', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        displayName: cleanName,
+        rawPhone: cleanPhone,
+        pinCode: cleanPin,
+        mode,
+      }),
+    });
+  } catch {
+    throw new Error(
+      'Không thể kết nối máy chủ xác thực. Tài khoản chưa được thay đổi.'
+    );
+  }
+  const authData = await authRes.json().catch(() => null);
+  if (!authRes.ok || !authData?.ok || !authData.account) {
+    throw new Error(
+      String(
+        authData?.error ||
+          'Không thể xác thực tài khoản. Vui lòng kiểm tra thông tin và thử lại.'
+      )
+    );
   }
 
-  if (!verifiedFromRemote) {
-    if (localExisting) {
-      if (mode === 'register') {
-        throw new Error(
-          'Số điện thoại này đã được đăng ký tài khoản. Vui lòng chuyển sang tab "Đăng nhập" và nhập mã PIN của bạn.'
-        );
-      }
-      if (localExisting.pinHash !== pinHash) {
-        throw new Error(
-          'Số điện thoại này đã có tài khoản nhưng mã PIN không chính xác.'
-        );
-      }
-      finalDisplayName = localExisting.displayName;
-      profileId = localExisting.id;
-    } else {
-      if (mode === 'login') {
-        throw new Error(
-          'Số điện thoại này chưa được đăng ký tài khoản. Vui lòng chuyển sang tab "Đăng ký mới" và nhập Tên gọi của bạn.'
-        );
-      }
-      if (cleanName.length < 2) {
-        throw new Error(
-          'Vui lòng nhập Tên gọi / Biệt danh (tối thiểu 2 ký tự) để đăng ký.'
-        );
-      }
-      finalDisplayName = cleanName;
-    }
-  }
-
-  saveLocalAccountRecord({
-    id: profileId,
-    displayName: finalDisplayName,
-    normalizedPhone,
-    rawPhone: cleanPhone,
-    maskedPhone,
-    pinHash,
-    deviceSecretToken: accountDeviceToken,
-    coupleRoomCode,
-    patrolModeActive,
-    createdAt,
-  });
-
-  const session: UserSession = {
-    id: profileId,
-    displayName: finalDisplayName,
-    pinCode: cleanPin,
-    rawPhone: cleanPhone,
-    maskedPhone,
-    deviceSecretToken: accountDeviceToken,
-    coupleRoomCode,
-    patrolModeActive,
-    dailyPostCount: 0,
-    lastPostDate: new Date().toISOString().slice(0, 10),
-    isShadowbanned,
-    createdAt,
-  };
+  const session = sanitizeClientSession(authData.account as UserSession);
 
   persistPermanentSession(session);
   return session;
@@ -629,8 +502,6 @@ export async function syncPatrolModeInSupabase(
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        userId: session.id,
-        rawPhone: session.rawPhone,
         patrolModeActive,
       }),
     });
@@ -652,8 +523,6 @@ export async function linkCouplePartnerInSupabase(
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          userId: session.id,
-          rawPhone: session.rawPhone,
           partnerName: partnerName.trim(),
           coupleRoomCode: roomCode,
         }),

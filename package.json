@@ -11,6 +11,6 @@
     "build": "npm --prefix apps/web-pwa run build",
     "start": "npm --prefix apps/web-pwa run start",
     "lint": "npm --prefix apps/web-pwa run lint",
-    "crawler": "node services/crawler-worker/live_crawler.mjs"
+    "crawler": "npm --prefix apps/web-pwa run crawler"
   }
 }

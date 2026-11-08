@@ -598,7 +598,7 @@ export default function CameraQuickModal({
           backdropFilter: 'blur(8px)',
           WebkitBackdropFilter: 'blur(8px)',
         }}
-        className="fixed inset-0 z-[110] bg-[#FAF7F1] sm:bg-[#142820]/50 sm:backdrop-blur-md flex items-stretch sm:items-center justify-center sm:p-4"
+        className="fixed inset-0 z-[110] bg-[#FAF7F1] sm:bg-ink/50 sm:backdrop-blur-md flex items-stretch sm:items-center justify-center sm:p-4"
       >
         <motion.div
           initial={{ y: 14, opacity: 0 }}
@@ -606,7 +606,7 @@ export default function CameraQuickModal({
           exit={{ y: 14, opacity: 0 }}
           transition={{ duration: 0.18 }}
           onClick={(e) => e.stopPropagation()}
-          className="w-full h-[100dvh] max-h-[100dvh] sm:h-auto sm:max-h-[92dvh] sm:max-w-[620px] bg-[#FAF7F1] rounded-none sm:rounded-2xl shadow-2xl border-0 sm:border sm:border-[#DDDCD4] overflow-hidden flex flex-col text-[#142820]"
+          className="w-full h-[100dvh] max-h-[100dvh] sm:h-auto sm:max-h-[92dvh] sm:max-w-[620px] bg-[#FAF7F1] rounded-none sm:rounded-2xl shadow-2xl border-0 sm:border sm:border-[#DDDCD4] overflow-hidden flex flex-col text-ink"
         >
           {/* Header cố định */}
           <div className="shrink-0 px-4 sm:px-5 pt-[max(12px,env(safe-area-inset-top,0px))] pb-3 sm:py-4 border-b border-[#DDDCD4] flex items-center justify-between gap-3 bg-white">
@@ -614,18 +614,18 @@ export default function CameraQuickModal({
               <button
                 type="button"
                 onClick={onClose}
-                className="sm:hidden w-9 h-9 -ml-1 rounded-[10px] bg-[#FAF7F1] border border-[#DDDCD4] text-[#142820] flex items-center justify-center shrink-0"
+                className="sm:hidden w-9 h-9 -ml-1 rounded-[10px] bg-[#FAF7F1] border border-[#DDDCD4] text-ink flex items-center justify-center shrink-0"
                 aria-label="Quay lại"
               >
                 <ArrowLeft className="w-4 h-4" />
               </button>
               <div className="min-w-0">
-                <h3 className="text-base sm:text-lg font-extrabold text-[#142820] truncate">
+                <h3 className="text-base sm:text-lg font-extrabold text-ink truncate">
                   {editingSpot
                     ? 'Chỉnh sửa bài đăng'
                     : 'Đăng tin cứu hộ & tìm thú lạc'}
                 </h3>
-                <p className="text-xs text-[#52605A] truncate">
+                <p className="text-xs text-ink-secondary truncate">
                   {editingSpot
                     ? 'Cập nhật hình ảnh, thông tin nhận diện và vị trí bài viết'
                     : 'Điền thông tin hoặc chọn gợi ý nhanh bên dưới'}
@@ -636,7 +636,7 @@ export default function CameraQuickModal({
             <button
               type="button"
               onClick={onClose}
-              className="w-9 h-9 sm:w-10 sm:h-10 rounded-[10px] bg-[#FAF7F1] border border-[#DDDCD4] text-[#142820] flex items-center justify-center hover:bg-[#F1EFE8] transition-colors shrink-0"
+              className="w-9 h-9 sm:w-10 sm:h-10 rounded-[10px] bg-[#FAF7F1] border border-[#DDDCD4] text-ink flex items-center justify-center hover:bg-[#F1EFE8] transition-colors shrink-0"
               aria-label="Đóng"
             >
               <X className="w-4 h-4" />
@@ -653,7 +653,7 @@ export default function CameraQuickModal({
             <section className="p-4 rounded-2xl bg-white border border-[#E4E1D8] space-y-3.5 shadow-sm">
               <div>
                 <div className="flex items-center justify-between mb-2">
-                  <label className="text-sm font-extrabold text-[#142820]">
+                  <label className="text-sm font-extrabold text-ink">
                     1. Hình ảnh thực tế ({images.length}/10)
                   </label>
                   {images.length > 0 && (
@@ -661,7 +661,7 @@ export default function CameraQuickModal({
                       type="button"
                       onClick={() => analyzeWithAi()}
                       disabled={aiAnalyzing}
-                      className="text-xs font-bold text-[#0E513B] hover:underline inline-flex items-center gap-1 disabled:opacity-50"
+                      className="text-xs font-bold text-brand hover:underline inline-flex items-center gap-1 disabled:opacity-50"
                     >
                       <Sparkles className="w-3.5 h-3.5" />
                       <span>
@@ -684,7 +684,7 @@ export default function CameraQuickModal({
                           className="w-full h-full object-cover"
                         />
                         {idx === 0 && (
-                          <span className="absolute bottom-1 left-1 px-1.5 py-0.5 rounded text-[9px] font-bold bg-[#0E513B] text-white">
+                          <span className="absolute bottom-1 left-1 px-1.5 py-0.5 rounded text-[9px] font-bold bg-brand text-white">
                             Ảnh chính
                           </span>
                         )}
@@ -703,7 +703,7 @@ export default function CameraQuickModal({
                       <button
                         type="button"
                         onClick={() => fileInputRef.current?.click()}
-                        className="w-20 h-20 rounded-xl border-2 border-dashed border-[#DDDCD4] hover:border-[#0E513B] flex flex-col items-center justify-center text-[#0E513B] transition-colors shrink-0 bg-[#FAF7F1]"
+                        className="w-20 h-20 rounded-xl border-2 border-dashed border-[#DDDCD4] hover:border-brand flex flex-col items-center justify-center text-brand transition-colors shrink-0 bg-[#FAF7F1]"
                       >
                         <Plus className="w-5 h-5 mb-0.5" />
                         <span className="text-[11px] font-bold">Thêm ảnh</span>
@@ -724,7 +724,7 @@ export default function CameraQuickModal({
                         <button
                           type="button"
                           onClick={captureFromLiveCamera}
-                          className="absolute bottom-2.5 left-1/2 -translate-x-1/2 px-4 py-2 rounded-full bg-[#0E513B] text-white text-xs font-bold shadow-lg flex items-center gap-2"
+                          className="absolute bottom-2.5 left-1/2 -translate-x-1/2 px-4 py-2 rounded-full bg-brand text-white text-xs font-bold shadow-lg flex items-center gap-2"
                         >
                           <Camera className="w-4 h-4" />
                           <span>Chụp ảnh này</span>
@@ -732,21 +732,21 @@ export default function CameraQuickModal({
                       </div>
                     ) : (
                       <div className="space-y-2.5">
-                        <div className="w-10 h-10 rounded-full bg-[#E8EFE6] text-[#0E513B] flex items-center justify-center mx-auto">
+                        <div className="w-10 h-10 rounded-full bg-brand-soft text-brand flex items-center justify-center mx-auto">
                           <Upload className="w-5 h-5" />
                         </div>
                         <div>
-                          <p className="text-xs sm:text-sm font-bold text-[#142820]">
+                          <p className="text-xs sm:text-sm font-bold text-ink">
                             Tải lên hoặc chụp ảnh thực tế của bé
                           </p>
-                          <p className="text-xs text-[#52605A] mt-0.5">
+                          <p className="text-xs text-ink-secondary mt-0.5">
                             Hệ thống tự động gợi ý đặc điểm và đối chiếu tin quanh bạn
                           </p>
                         </div>
                         <button
                           type="button"
                           onClick={() => fileInputRef.current?.click()}
-                          className="h-10 px-4 rounded-xl bg-[#0E513B] hover:bg-[#0A412F] text-white text-xs sm:text-sm font-bold inline-flex items-center gap-1.5 shadow-sm transition-colors"
+                          className="h-10 px-4 rounded-xl bg-brand hover:bg-brand-hover text-white text-xs sm:text-sm font-bold inline-flex items-center gap-1.5 shadow-sm transition-colors"
                         >
                           <ImagePlus className="w-4 h-4" />
                           <span>Chọn ảnh từ thiết bị</span>
@@ -766,7 +766,7 @@ export default function CameraQuickModal({
                 />
 
                 {aiStatusText && (
-                  <p className="text-xs font-medium text-[#0E513B] mt-2.5 flex items-center gap-1.5 bg-[#E8EFE6]/70 px-3 py-2 rounded-xl">
+                  <p className="text-xs font-medium text-brand mt-2.5 flex items-center gap-1.5 bg-brand-soft/70 px-3 py-2 rounded-xl">
                     <span>{aiStatusText}</span>
                   </p>
                 )}
@@ -774,10 +774,10 @@ export default function CameraQuickModal({
                 {images.length > 0 && suggestedMatches.length > 0 && (
                   <div className="mt-2.5 p-3 rounded-xl bg-[#FAF7F1] border border-[#DDDCD4] space-y-2">
                     <div className="flex items-center justify-between gap-2">
-                      <p className="text-xs font-bold text-[#142820]">
+                      <p className="text-xs font-bold text-ink">
                         Bài viết có đặc điểm tương đồng ({suggestedMatches.length})
                       </p>
-                      <span className="text-[11px] text-[#52605A]">
+                      <span className="text-[11px] text-ink-secondary">
                         Kiểm tra trước khi đăng
                       </span>
                     </div>
@@ -801,14 +801,14 @@ export default function CameraQuickModal({
                           />
                           <div className="min-w-0 flex-1">
                             <div className="flex items-center gap-1.5 mb-0.5">
-                              <span className="px-1.5 py-0.5 rounded bg-[#0E513B] text-white text-[10px] font-bold">
+                              <span className="px-1.5 py-0.5 rounded bg-brand text-white text-[10px] font-bold">
                                 Trùng {m.matchPercent}%
                               </span>
-                              <span className="text-[10px] text-[#52605A] truncate">
+                              <span className="text-[10px] text-ink-secondary truncate">
                                 {m.spot.areaLabel}
                               </span>
                             </div>
-                            <p className="text-xs font-bold text-[#142820] line-clamp-1">
+                            <p className="text-xs font-bold text-ink line-clamp-1">
                               {m.spot.title}
                             </p>
                           </div>
@@ -816,7 +816,7 @@ export default function CameraQuickModal({
                             <button
                               type="button"
                               onClick={() => onSelectMatchedSpot(m.spot)}
-                              className="h-8 px-2.5 rounded-lg bg-[#E8EFE6] hover:bg-[#0E513B] text-[#0E513B] hover:text-white text-[11px] font-bold shrink-0 inline-flex items-center gap-1 transition-colors"
+                              className="h-8 px-2.5 rounded-lg bg-brand-soft hover:bg-brand text-brand hover:text-white text-[11px] font-bold shrink-0 inline-flex items-center gap-1 transition-colors"
                             >
                               <span>Xem</span>
                               <ExternalLink className="w-3 h-3" />
@@ -830,7 +830,7 @@ export default function CameraQuickModal({
               </div>
 
               <div className="pt-2 border-t border-[#F1EFE8]">
-                <label className="text-xs font-bold text-[#52605A] block mb-2">
+                <label className="text-xs font-bold text-ink-secondary block mb-2">
                   Mục đích bài đăng
                 </label>
                 <div className="grid grid-cols-3 gap-2">
@@ -840,7 +840,7 @@ export default function CameraQuickModal({
                     className={`h-11 px-2 rounded-xl text-xs sm:text-sm font-bold transition-all border flex items-center justify-center gap-1.5 ${
                       spotType === 'RED_SOS'
                         ? 'bg-[#FFF0E5] text-[#AF421F] border-[#AF421F] shadow-sm'
-                        : 'bg-[#FAF7F1] text-[#142820] border-[#DDDCD4]'
+                        : 'bg-[#FAF7F1] text-ink border-[#DDDCD4]'
                     }`}
                   >
                     <LifeBuoy className="w-4 h-4 text-[#AF421F] shrink-0" />
@@ -853,7 +853,7 @@ export default function CameraQuickModal({
                     className={`h-11 px-2 rounded-xl text-xs sm:text-sm font-bold transition-all border flex items-center justify-center gap-1.5 ${
                       spotType === 'ORANGE_SIGHT'
                         ? 'bg-[#FFF3D8] text-[#80570D] border-[#80570D] shadow-sm'
-                        : 'bg-[#FAF7F1] text-[#142820] border-[#DDDCD4]'
+                        : 'bg-[#FAF7F1] text-ink border-[#DDDCD4]'
                     }`}
                   >
                     <Search className="w-4 h-4 text-[#80570D] shrink-0" />
@@ -865,11 +865,11 @@ export default function CameraQuickModal({
                     onClick={() => setSpotType('YELLOW_ADOPT')}
                     className={`h-11 px-2 rounded-xl text-xs sm:text-sm font-bold transition-all border flex items-center justify-center gap-1.5 ${
                       spotType === 'YELLOW_ADOPT'
-                        ? 'bg-[#E8EFE6] text-[#0E513B] border-[#0E513B] shadow-sm'
-                        : 'bg-[#FAF7F1] text-[#142820] border-[#DDDCD4]'
+                        ? 'bg-brand-soft text-brand border-brand shadow-sm'
+                        : 'bg-[#FAF7F1] text-ink border-[#DDDCD4]'
                     }`}
                   >
-                    <Heart className="w-4 h-4 text-[#0E513B] shrink-0" />
+                    <Heart className="w-4 h-4 text-brand shrink-0" />
                     <span className="truncate">Nhận nuôi</span>
                   </button>
                 </div>
@@ -879,10 +879,10 @@ export default function CameraQuickModal({
             {/* THẺ 2: THÔNG TIN THÚ CƯNG */}
             <section className="p-4 rounded-2xl bg-white border border-[#E4E1D8] space-y-3.5 shadow-sm">
               <div className="flex items-center justify-between gap-2">
-                <label className="text-sm font-extrabold text-[#142820]">
+                <label className="text-sm font-extrabold text-ink">
                   2. Thông tin thú cưng
                 </label>
-                <span className="text-xs text-[#52605A]">
+                <span className="text-xs text-ink-secondary">
                   Tự gõ hoặc chạm gợi ý
                 </span>
               </div>
@@ -893,8 +893,8 @@ export default function CameraQuickModal({
                   onClick={() => handleSelectSpecies('cat')}
                   className={`h-10 rounded-[9px] text-xs sm:text-sm font-bold transition-colors ${
                     species === 'cat'
-                      ? 'bg-[#0E513B] text-white shadow-sm'
-                      : 'text-[#52605A] hover:text-[#142820]'
+                      ? 'bg-brand text-white shadow-sm'
+                      : 'text-ink-secondary hover:text-ink'
                   }`}
                 >
                   Mèo
@@ -904,8 +904,8 @@ export default function CameraQuickModal({
                   onClick={() => handleSelectSpecies('dog')}
                   className={`h-10 rounded-[9px] text-xs sm:text-sm font-bold transition-colors ${
                     species === 'dog'
-                      ? 'bg-[#0E513B] text-white shadow-sm'
-                      : 'text-[#52605A] hover:text-[#142820]'
+                      ? 'bg-brand text-white shadow-sm'
+                      : 'text-ink-secondary hover:text-ink'
                   }`}
                 >
                   Chó
@@ -915,8 +915,8 @@ export default function CameraQuickModal({
                   onClick={() => handleSelectSpecies('other')}
                   className={`h-10 rounded-[9px] text-xs sm:text-sm font-bold transition-colors ${
                     species === 'other'
-                      ? 'bg-[#0E513B] text-white shadow-sm'
-                      : 'text-[#52605A] hover:text-[#142820]'
+                      ? 'bg-brand text-white shadow-sm'
+                      : 'text-ink-secondary hover:text-ink'
                   }`}
                 >
                   Loài khác
@@ -925,7 +925,7 @@ export default function CameraQuickModal({
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                 <div className="space-y-1.5">
-                  <label className="block text-xs font-bold text-[#142820]">
+                  <label className="block text-xs font-bold text-ink">
                     {species === 'other' ? 'Tên loài / Giống' : 'Giống thú cưng'}
                   </label>
                   <input
@@ -939,7 +939,7 @@ export default function CameraQuickModal({
                         ? 'Nhập giống (VD: Poodle, Chó ta...)'
                         : 'Nhập tên loài (VD: Chim, Thỏ...)'
                     }
-                    className="w-full h-11 px-3.5 rounded-xl bg-[#FAF7F1] border border-[#DDDCD4] text-xs sm:text-sm font-medium text-[#142820] placeholder:text-[#7A857F] focus:bg-white focus:outline-none focus:border-[#0E513B]"
+                    className="w-full h-11 px-3.5 rounded-xl bg-[#FAF7F1] border border-[#DDDCD4] text-xs sm:text-sm font-medium text-ink placeholder:text-[#7A857F] focus:bg-white focus:outline-none focus:border-brand"
                   />
                   <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pt-0.5">
                     {currentBreedPresets.slice(0, 6).map((item) => (
@@ -949,8 +949,8 @@ export default function CameraQuickModal({
                         onClick={() => setBreed(item)}
                         className={`h-7 px-2.5 rounded-lg text-[11px] font-semibold border whitespace-nowrap shrink-0 transition-colors ${
                           breed === item
-                            ? 'bg-[#0E513B] text-white border-[#0E513B]'
-                            : 'bg-[#FAF7F1] text-[#52605A] border-[#E4E1D8] hover:border-[#0E513B]'
+                            ? 'bg-brand text-white border-brand'
+                            : 'bg-[#FAF7F1] text-ink-secondary border-[#E4E1D8] hover:border-brand'
                         }`}
                       >
                         {item}
@@ -960,7 +960,7 @@ export default function CameraQuickModal({
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="block text-xs font-bold text-[#142820]">
+                  <label className="block text-xs font-bold text-ink">
                     Màu lông / Ngoại hình
                   </label>
                   <input
@@ -968,7 +968,7 @@ export default function CameraQuickModal({
                     value={coatColor}
                     onChange={(e) => setCoatColor(e.target.value)}
                     placeholder="Nhập màu lông (VD: Vàng trắng, Tam thể...)"
-                    className="w-full h-11 px-3.5 rounded-xl bg-[#FAF7F1] border border-[#DDDCD4] text-xs sm:text-sm font-medium text-[#142820] placeholder:text-[#7A857F] focus:bg-white focus:outline-none focus:border-[#0E513B]"
+                    className="w-full h-11 px-3.5 rounded-xl bg-[#FAF7F1] border border-[#DDDCD4] text-xs sm:text-sm font-medium text-ink placeholder:text-[#7A857F] focus:bg-white focus:outline-none focus:border-brand"
                   />
                   <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pt-0.5">
                     {COAT_COLOR_PRESETS.slice(0, 6).map((color) => (
@@ -978,8 +978,8 @@ export default function CameraQuickModal({
                         onClick={() => setCoatColor(color)}
                         className={`h-7 px-2.5 rounded-lg text-[11px] font-semibold border whitespace-nowrap shrink-0 transition-colors ${
                           coatColor === color
-                            ? 'bg-[#0E513B] text-white border-[#0E513B]'
-                            : 'bg-[#FAF7F1] text-[#52605A] border-[#E4E1D8] hover:border-[#0E513B]'
+                            ? 'bg-brand text-white border-brand'
+                            : 'bg-[#FAF7F1] text-ink-secondary border-[#E4E1D8] hover:border-brand'
                         }`}
                       >
                         {color}
@@ -993,13 +993,13 @@ export default function CameraQuickModal({
             {/* THẺ 3: ĐẶC ĐIỂM NHẬN DIỆN */}
             <section className="p-4 rounded-2xl bg-white border border-[#E4E1D8] space-y-3 shadow-sm">
               <div className="flex items-center justify-between gap-2">
-                <label className="text-sm font-extrabold text-[#142820]">
+                <label className="text-sm font-extrabold text-ink">
                   3. Đặc điểm nhận diện ({selectedTraits.length})
                 </label>
                 <button
                   type="button"
                   onClick={() => setShowMoreTraits((v) => !v)}
-                  className="text-xs font-bold text-[#0E513B] hover:underline inline-flex items-center gap-1"
+                  className="text-xs font-bold text-brand hover:underline inline-flex items-center gap-1"
                 >
                   <span>
                     {showMoreTraits
@@ -1025,8 +1025,8 @@ export default function CameraQuickModal({
                         onClick={() => toggleTrait(trait)}
                         className={`h-8 px-3 rounded-full text-xs font-semibold transition-all border inline-flex items-center gap-1.5 ${
                           active
-                            ? 'bg-[#0E513B] text-white border-[#0E513B]'
-                            : 'bg-[#FAF7F1] text-[#142820] border-[#DDDCD4] hover:border-[#0E513B]'
+                            ? 'bg-brand text-white border-brand'
+                            : 'bg-[#FAF7F1] text-ink border-[#DDDCD4] hover:border-brand'
                         }`}
                       >
                         <span>{trait}</span>
@@ -1045,8 +1045,8 @@ export default function CameraQuickModal({
                         onClick={() => setActiveTraitGroup(group.id)}
                         className={`flex-1 py-1.5 px-2 rounded-md text-[11px] font-bold transition-colors ${
                           activeTraitGroup === group.id
-                            ? 'bg-[#E8EFE6] text-[#0E513B]'
-                            : 'text-[#52605A] hover:text-[#142820]'
+                            ? 'bg-brand-soft text-brand'
+                            : 'text-ink-secondary hover:text-ink'
                         }`}
                       >
                         {group.label}
@@ -1064,8 +1064,8 @@ export default function CameraQuickModal({
                           onClick={() => toggleTrait(trait)}
                           className={`h-8 px-3 rounded-full text-xs font-semibold transition-all border ${
                             active
-                              ? 'bg-[#0E513B] text-white border-[#0E513B]'
-                              : 'bg-white text-[#142820] border-[#DDDCD4] hover:border-[#0E513B]'
+                              ? 'bg-brand text-white border-brand'
+                              : 'bg-white text-ink border-[#DDDCD4] hover:border-brand'
                           }`}
                         >
                           {trait}
@@ -1088,12 +1088,12 @@ export default function CameraQuickModal({
                     }
                   }}
                   placeholder="Tự nhập đặc điểm khác (VD: Đeo chuông đỏ, chân tập tễnh...)"
-                  className="flex-1 h-10 px-3.5 rounded-xl bg-[#FAF7F1] border border-[#DDDCD4] text-xs sm:text-sm font-medium text-[#142820] placeholder:text-[#7A857F] focus:bg-white focus:outline-none focus:border-[#0E513B]"
+                  className="flex-1 h-10 px-3.5 rounded-xl bg-[#FAF7F1] border border-[#DDDCD4] text-xs sm:text-sm font-medium text-ink placeholder:text-[#7A857F] focus:bg-white focus:outline-none focus:border-brand"
                 />
                 <button
                   type="button"
                   onClick={handleAddCustomTrait}
-                  className="h-10 px-3.5 rounded-xl bg-[#E8EFE6] hover:bg-[#0E513B] text-[#0E513B] hover:text-white text-xs font-bold inline-flex items-center gap-1 transition-colors shrink-0"
+                  className="h-10 px-3.5 rounded-xl bg-brand-soft hover:bg-brand text-brand hover:text-white text-xs font-bold inline-flex items-center gap-1 transition-colors shrink-0"
                 >
                   <Plus className="w-3.5 h-3.5" />
                   <span>Thêm</span>
@@ -1103,29 +1103,29 @@ export default function CameraQuickModal({
 
             {/* THẺ 4: VỊ TRÍ & NỘI DUNG MÔ TẢ */}
             <section className="p-4 rounded-2xl bg-white border border-[#E4E1D8] space-y-3.5 shadow-sm">
-              <label className="text-sm font-extrabold text-[#142820] block">
+              <label className="text-sm font-extrabold text-ink block">
                 4. Vị trí &amp; Nội dung chi tiết
               </label>
 
               <div className="space-y-1.5">
-                <label className="block text-xs font-bold text-[#142820]">
+                <label className="block text-xs font-bold text-ink">
                   Địa chỉ / Khu vực phát hiện
                 </label>
                 <div className="flex items-center gap-2">
                   <div className="relative flex-1">
-                    <MapPin className="w-4 h-4 text-[#0E513B] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    <MapPin className="w-4 h-4 text-brand absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                     <input
                       type="text"
                       value={customAddress}
                       onChange={(e) => setCustomAddress(e.target.value)}
                       placeholder="Nhập số nhà, tên đường, phường..."
-                      className="w-full h-11 pl-9 pr-3 rounded-xl bg-[#FAF7F1] border border-[#DDDCD4] text-xs sm:text-sm font-medium text-[#142820] placeholder:text-[#7A857F] focus:bg-white focus:outline-none focus:border-[#0E513B]"
+                      className="w-full h-11 pl-9 pr-3 rounded-xl bg-[#FAF7F1] border border-[#DDDCD4] text-xs sm:text-sm font-medium text-ink placeholder:text-[#7A857F] focus:bg-white focus:outline-none focus:border-brand"
                     />
                   </div>
                   <button
                     type="button"
                     onClick={() => setIsMapPickerOpen(true)}
-                    className="h-11 px-3.5 rounded-xl bg-[#E8EFE6] hover:bg-[#0E513B] text-[#0E513B] hover:text-white text-xs font-bold inline-flex items-center gap-1.5 shrink-0 transition-colors"
+                    className="h-11 px-3.5 rounded-xl bg-brand-soft hover:bg-brand text-brand hover:text-white text-xs font-bold inline-flex items-center gap-1.5 shrink-0 transition-colors"
                   >
                     <MapPin className="w-3.5 h-3.5" />
                     <span>Ghim bản đồ</span>
@@ -1133,8 +1133,8 @@ export default function CameraQuickModal({
                 </div>
 
                 {pinnedCoords && (
-                  <div className="flex items-center gap-1.5 text-[11px] font-medium text-[#0E513B] bg-[#E8EFE6]/70 px-3 py-1.5 rounded-lg">
-                    <Check className="w-3.5 h-3.5 text-[#0E513B]" />
+                  <div className="flex items-center gap-1.5 text-[11px] font-medium text-brand bg-brand-soft/70 px-3 py-1.5 rounded-lg">
+                    <Check className="w-3.5 h-3.5 text-brand" />
                     <span>
                       Đã ghim tọa độ: {pinnedCoords.lat.toFixed(5)},{' '}
                       {pinnedCoords.lng.toFixed(5)}
@@ -1144,7 +1144,7 @@ export default function CameraQuickModal({
               </div>
 
               <div className="space-y-1.5">
-                <label className="block text-xs font-bold text-[#142820]">
+                <label className="block text-xs font-bold text-ink">
                   Tiêu đề bài viết (tùy chọn)
                 </label>
                 <input
@@ -1152,12 +1152,12 @@ export default function CameraQuickModal({
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
                   placeholder="Để trống hệ thống sẽ tự tạo tiêu đề ngắn gọn..."
-                  className="w-full h-11 px-3.5 rounded-xl bg-[#FAF7F1] border border-[#DDDCD4] text-xs sm:text-sm font-medium text-[#142820] placeholder:text-[#7A857F] focus:bg-white focus:outline-none focus:border-[#0E513B]"
+                  className="w-full h-11 px-3.5 rounded-xl bg-[#FAF7F1] border border-[#DDDCD4] text-xs sm:text-sm font-medium text-ink placeholder:text-[#7A857F] focus:bg-white focus:outline-none focus:border-brand"
                 />
               </div>
 
               <div className="space-y-1.5">
-                <label className="block text-xs font-bold text-[#142820]">
+                <label className="block text-xs font-bold text-ink">
                   Mô tả hoàn cảnh
                 </label>
                 <textarea
@@ -1165,7 +1165,7 @@ export default function CameraQuickModal({
                   onChange={(e) => setStory(e.target.value)}
                   rows={3}
                   placeholder="Mô tả tình trạng của bé, thời điểm phát hiện và điều cần hỗ trợ..."
-                  className="w-full p-3 rounded-xl bg-[#FAF7F1] border border-[#DDDCD4] text-xs sm:text-sm font-medium text-[#142820] placeholder:text-[#7A857F] focus:bg-white focus:outline-none focus:border-[#0E513B] resize-none"
+                  className="w-full p-3 rounded-xl bg-[#FAF7F1] border border-[#DDDCD4] text-xs sm:text-sm font-medium text-ink placeholder:text-[#7A857F] focus:bg-white focus:outline-none focus:border-brand resize-none"
                 />
               </div>
             </section>
@@ -1176,14 +1176,14 @@ export default function CameraQuickModal({
             <button
               type="button"
               onClick={onClose}
-              className="h-11 px-5 rounded-xl border border-[#DDDCD4] text-xs sm:text-sm font-bold text-[#142820] hover:bg-[#F1EFE8] transition-colors"
+              className="h-11 px-5 rounded-xl border border-[#DDDCD4] text-xs sm:text-sm font-bold text-ink hover:bg-[#F1EFE8] transition-colors"
             >
               Hủy bỏ
             </button>
             <button
               type="submit"
               form="dom-nho-create-post-form"
-              className="flex-1 h-11 rounded-xl bg-[#0E513B] hover:bg-[#0A412F] text-white text-xs sm:text-sm font-bold flex items-center justify-center gap-2 shadow-sm transition-all"
+              className="flex-1 h-11 rounded-xl bg-brand hover:bg-brand-hover text-white text-xs sm:text-sm font-bold flex items-center justify-center gap-2 shadow-sm transition-all"
             >
               <CheckCircle2 className="w-4 h-4 shrink-0" />
               <span>

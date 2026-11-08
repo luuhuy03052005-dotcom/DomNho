@@ -118,9 +118,9 @@ export default function TopStatusAndThemeBar({
         }}
       >
         <div className="flex items-center gap-2.5 shrink-0">
-          <img
-            src="/logo-dom-nho.png"
-            alt="Đốm Nhỏ"
+          <button
+            type="button"
+            aria-label="Đốm Nhỏ: về bản đồ chính"
             onClick={() => {
               onChangeViewMode('map');
               onChangeRegionFilter('ALL');
@@ -128,11 +128,19 @@ export default function TopStatusAndThemeBar({
               onChangeCategoryFilter('ALL');
               onChangeOriginFilter('ALL');
             }}
-            className="h-10 sm:h-11 w-auto object-contain cursor-pointer select-none transition-transform hover:scale-105 active:scale-95"
-            style={{
-              filter: 'drop-shadow(0 2px 4px rgba(19, 62, 53, 0.15))',
-            }}
-          />
+            className="shrink-0 rounded-md transition-transform hover:scale-105 active:scale-95"
+          >
+            <img
+              src="/logo-dom-nho.png"
+              alt=""
+              width="44"
+              height="44"
+              className="h-10 sm:h-11 w-auto object-contain select-none"
+              style={{
+                filter: 'drop-shadow(0 2px 4px rgba(19, 62, 53, 0.15))',
+              }}
+            />
+          </button>
 
           <div
             className="flex items-center p-0.5 rounded-full bg-black/[0.05] border border-black/5"
@@ -196,7 +204,7 @@ export default function TopStatusAndThemeBar({
           <button
             type="button"
             onClick={onOpenNearbySearchModal}
-            className="h-9 px-3 rounded-full shadow-sm flex items-center gap-1.5 text-xs font-bold bg-[#133E35] text-white transition-all active:scale-95"
+            className="h-9 px-3 rounded-full shadow-sm flex items-center gap-1.5 text-xs font-bold bg-brand text-white transition-all active:scale-95"
             title="Xem các ca cứu hộ và tìm bé lạc gần bạn"
           >
             <Compass className="w-3.5 h-3.5 text-[#FAF7F2] shrink-0" />
@@ -244,7 +252,7 @@ export default function TopStatusAndThemeBar({
           >
             <RefreshCw
               className={`w-3.5 h-3.5 ${
-                isCrawlingLive ? 'animate-spin text-[#D2673B]' : 'text-[#133E35]'
+                isCrawlingLive ? 'animate-spin text-[#D2673B]' : 'text-brand'
               }`}
             />
           </button>
@@ -363,21 +371,21 @@ export default function TopStatusAndThemeBar({
               }}
             >
               <div className="flex items-center justify-between pb-1 border-b border-black/5">
-                <h3 className="text-sm font-bold flex items-center gap-2 text-[#133E35]">
+                <h3 className="text-sm font-bold flex items-center gap-2 text-brand">
                   <SlidersHorizontal className="w-4 h-4" />
                   Bộ Lọc Dữ Liệu
                 </h3>
                 <button
                   type="button"
                   onClick={() => setFilterModalOpen(false)}
-                  className="w-8 h-8 rounded-full flex items-center justify-center bg-black/5 text-[#133E35]"
+                  className="w-8 h-8 rounded-full flex items-center justify-center bg-black/5 text-brand"
                 >
                   <X className="w-4 h-4" />
                 </button>
               </div>
 
               <div>
-                <p className="text-xs font-bold text-[#133E35] mb-2">
+                <p className="text-xs font-bold text-brand mb-2">
                   1. Chọn Khu Vực
                 </p>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
@@ -407,7 +415,7 @@ export default function TopStatusAndThemeBar({
               </div>
 
               <div>
-                <p className="text-xs font-bold text-[#133E35] mb-2">
+                <p className="text-xs font-bold text-brand mb-2">
                   2. Chọn Nhu Cầu Bài Viết
                 </p>
                 <div className="grid grid-cols-2 gap-2">
@@ -512,7 +520,7 @@ export default function TopStatusAndThemeBar({
                   <button
                     type="button"
                     onClick={() => setFilterModalOpen(false)}
-                    className="px-5 py-2 rounded-full text-xs font-bold bg-[#133E35] text-white"
+                    className="px-5 py-2 rounded-full text-xs font-bold bg-brand text-white"
                   >
                     Áp dụng
                   </button>

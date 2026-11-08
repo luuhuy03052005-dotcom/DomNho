@@ -1,4 +1,4 @@
-import crawledData from './crawled-data.json';
+import crawledData from '../../public/crawled-feed.json';
 import {
   DomSpot,
   MemorySnap,

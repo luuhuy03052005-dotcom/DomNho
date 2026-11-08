@@ -19,9 +19,7 @@ Tài liệu này mô tả chi tiết cách hệ thống **Đốm Nhỏ** đượ
 Mở file [`src/lib/themes.ts`](file:///c:/Users/luuhu/OneDrive/Desktop/Project/Đốm%20nhỏ/apps/web-pwa/src/lib/themes.ts) và bổ sung cấu hình vào đối tượng `DOM_THEMES`. Mọi thành phần giao diện (Nền ứng dụng, Kính mờ Frosted Milk Glass của Bottom Sheet, 3 Popup và Bộ lọc màu Bản đồ) sẽ tự động nhận diện mà không cần sửa code từng component.
 
 ### 2.2. Thêm Nguồn Cào Dữ Liệu Mới Cho Bot Crawler
-Mở thư mục [`services/crawler-worker/scrapers/`](file:///c:/Users/luuhu/OneDrive/Desktop/Project/Đốm%20nhỏ/services/crawler-worker/scrapers/social_rescue_scraper.py):
-- Tạo thêm class kế thừa hoặc trả về danh sách `RawSocialPost`.
-- Phễu lọc 3 tầng (`RuleBasedFilter` -> `ContentDeduplicator` SimHash/pHash -> `GeminiSpotExtractor` -> `GeoFuzzerGeocoder`) trong [`main_cron.py`](file:///c:/Users/luuhu/OneDrive/Desktop/Project/Đốm%20nhỏ/services/crawler-worker/main_cron.py) sẽ tự động xử lý, che số điện thoại và làm mờ tọa độ trước khi đẩy lên bản đồ.
+Mở `services/crawl4ai-worker/crawler_engine.py` để bổ sung truy vấn hoặc thay đổi quy tắc chuẩn hóa. Worker dùng Crawl4AI + Chromium cho cả trang tìm kiếm và trang bài viết; `apps/web-pwa/src/lib/crawl4ai-crawler.ts` chỉ chịu trách nhiệm gọi worker, kiểm tra kết quả và chuyển dữ liệu sang API hiện tại.
 
 ### 2.3. Tích Hợp Thanh Toán Cho Gói "Truyền Lửa Khẩn Cấp" (VietQR / PayOS / Momo)
 Trong [`ProfileMemoryModal.tsx`](file:///c:/Users/luuhu/OneDrive/Desktop/Project/Đốm%20nhỏ/apps/web-pwa/src/components/modals/ProfileMemoryModal.tsx), hàm `onActivateEmergencyBoost(spotId)` đã được tách sẵn. Bạn chỉ cần gắn Webhook VietQR / PayOS để cập nhật trường `is_emergency_boosted = true` và `emergency_boost_until = NOW() + INTERVAL '7 days'` trong bảng `public.dom_nho_posts`.

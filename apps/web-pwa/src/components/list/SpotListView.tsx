@@ -234,7 +234,7 @@ export default function SpotListView({
                 <button
                   type="button"
                   onClick={onOpenCrawlHub}
-                  className="px-3.5 py-2.5 rounded-full text-xs font-bold bg-[#133E35] text-white shadow-md flex items-center gap-1.5 active:scale-95 transition-transform"
+                  className="px-3.5 py-2.5 rounded-full text-xs font-bold bg-brand text-white shadow-md flex items-center gap-1.5 active:scale-95 transition-transform"
                 >
                   <RefreshCw className="w-3.5 h-3.5" />
                   <span>Cập nhật tin mới</span>
@@ -260,7 +260,7 @@ export default function SpotListView({
               className="flex-1 flex items-center gap-2 px-3.5 py-2.5 rounded-2xl border border-black/5"
               style={{ backgroundColor: theme.pillBg }}
             >
-              <Search className="w-4 h-4 opacity-60 shrink-0 text-[#133E35]" />
+              <Search className="w-4 h-4 opacity-60 shrink-0 text-brand" />
               <input
                 type="text"
                 value={searchQuery}
@@ -378,7 +378,7 @@ export default function SpotListView({
 
           <div className="flex items-center justify-between text-xs pt-0.5 px-1" style={{ color: theme.mutedTextHex }}>
             <span className="font-medium">
-              Tìm thấy <strong className="text-[#133E35] font-bold">{displayedSpots.length}</strong> bài viết
+              Tìm thấy <strong className="text-brand font-bold">{displayedSpots.length}</strong> bài viết
               {sortBy === 'NEAREST' ? ' • Gần vị trí của bạn hiển thị trước' : ''}
             </span>
             {(searchQuery || regionFilter !== 'ALL' || originFilter !== 'ALL' || platformFilter !== 'ALL') && (
@@ -480,7 +480,7 @@ export default function SpotListView({
                 <button
                   type="button"
                   onClick={onOpenCrawlHub}
-                  className="px-4 py-2 rounded-full text-xs font-bold text-white bg-[#133E35] flex items-center gap-1.5"
+                  className="px-4 py-2 rounded-full text-xs font-bold text-white bg-brand flex items-center gap-1.5"
                 >
                   <RefreshCw className="w-3.5 h-3.5" />
                   <span>Cập nhật tin mới</span>
@@ -571,7 +571,7 @@ export default function SpotListView({
                               <span>{formatDistanceVi(distMeters)}</span>
                             </span>
                           ) : (
-                            <span className="px-2.5 py-1 rounded-full text-[11px] font-bold bg-[#133E35] text-white shadow-sm flex items-center gap-1 shrink-0">
+                            <span className="px-2.5 py-1 rounded-full text-[11px] font-bold bg-brand text-white shadow-sm flex items-center gap-1 shrink-0">
                               <MapPin className="w-3 h-3" />
                               <span>{spot.areaLabel}</span>
                             </span>
@@ -688,7 +688,7 @@ export default function SpotListView({
                                       {formatDistanceVi(distMeters)}
                                     </span>
                                   )}
-                                  <span className="text-xs font-bold truncate text-[#133E35]">
+                                  <span className="text-xs font-bold truncate text-brand">
                                     {spot.formattedAddress || spot.areaLabel}
                                   </span>
                                 </div>
@@ -701,7 +701,7 @@ export default function SpotListView({
                               </>
                             ) : (
                               <>
-                                <p className="text-xs font-bold text-[#133E35]">
+                                <p className="text-xs font-bold text-brand">
                                   Khu vực: {spot.areaLabel || 'Chưa rõ địa chỉ'}
                                 </p>
                                 <p

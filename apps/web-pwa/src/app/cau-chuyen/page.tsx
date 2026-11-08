@@ -21,7 +21,7 @@ export default function CauChuyenRoutePage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#FAF7F1] text-[#142820] flex flex-col font-sans">
+    <div className="min-h-screen bg-[#FAF7F1] text-ink flex flex-col font-sans">
       <DomNhoHeader
         activeTab="stories"
         onChangeTab={handleNavigateTab}
@@ -35,7 +35,6 @@ export default function CauChuyenRoutePage() {
 
       <main className="flex-1 w-full">
         <StoryPageView
-          onBackToExplore={() => router.push('/')}
           onOpenMap={() => router.push('/?tab=map')}
         />
       </main>

@@ -22,6 +22,12 @@ import {
   updateSpotInMongo,
 } from '@/lib/mongodb';
 import {
+  productionRequiresMongo,
+  rejectUntrustedOrigin,
+  resolveAuthenticatedAccount,
+  unauthorizedResponse,
+} from '@/lib/server-auth';
+import {
   activateEmergencyBoostInServerStore,
   addSightingInServerStore,
   boostSpotInServerStore,
@@ -46,6 +52,16 @@ import {
 
 export const dynamic = 'force-dynamic';
 
+async function ownsSpot(spotId: string, accountId: string): Promise<boolean> {
+  if (!spotId || !accountId) return false;
+  const [mongoSpots, serverSpots] = await Promise.all([
+    fetchCommunitySpotsFromMongo(accountId).catch(() => [] as DomSpot[]),
+    Promise.resolve(listCommunitySpotsFromServerStore(accountId)),
+  ]);
+  const spot = [...mongoSpots, ...serverSpots].find((item) => item.id === spotId);
+  return Boolean(spot && spot.authorId === accountId);
+}
+
 /**
  * GET /api/spots
  * Trả về danh sách bài đăng cộng đồng thời gian thực từ MongoDB Atlas + Server Community Store kết hợp với bài viết đã xác thực.
@@ -53,12 +69,13 @@ export const dynamic = 'force-dynamic';
  */
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
+  const account = await resolveAuthenticatedAccount(request);
   const lat = Number(searchParams.get('lat') || 0);
   const lng = Number(searchParams.get('lng') || 0);
   const radiusMeters = Number(searchParams.get('radius') || 0);
   const filterType = (searchParams.get('type') || 'ALL') as SpotType | 'ALL';
-  const viewerId = searchParams.get('viewerId') || null;
-  const coupleCode = searchParams.get('coupleCode') || '';
+  const viewerId = account?.id || null;
+  const coupleCode = account?.coupleRoomCode || '';
   const includeMemories = searchParams.get('includeMemories') === '1';
 
   const [mongoSpots, mongoDeletedIds, mongoMemories] = await Promise.all([
@@ -179,12 +196,21 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
+    const originError = rejectUntrustedOrigin(request);
+    if (originError) return originError;
+    const account = await resolveAuthenticatedAccount(request);
+    if (!account) return unauthorizedResponse();
+    if (productionRequiresMongo()) {
+      return NextResponse.json(
+        { ok: false, error: 'Kho dữ liệu tài khoản chưa sẵn sàng.' },
+        { status: 503 }
+      );
+    }
     const body = await request.json();
 
-    const authorId = String(body.authorId || '').trim();
-    const authorName = String(body.authorName || '').trim();
-    const rawPhone = String(body.rawPhone || '').trim();
-    const pinCode = String(body.pinCode || '').trim();
+    const authorId = account.id;
+    const authorName = account.displayName;
+    const rawPhone = account.rawPhone;
     const title = String(body.title || '').trim();
     const story = String(body.story || '').trim();
     const breed = String(body.breed || '').trim();
@@ -259,10 +285,9 @@ export async function POST(request: NextRequest) {
         authorId,
         authorName,
         rawPhone,
-        pinCode,
         spotType,
         visibility,
-        coupleRoomCode: body.coupleRoomCode || undefined,
+        coupleRoomCode: account.coupleRoomCode || undefined,
         title,
         story,
         species,
@@ -282,16 +307,15 @@ export async function POST(request: NextRequest) {
       remainingToday = createdMongo.remainingToday;
 
       // Đồng bộ bản sao vào Server Store để truy xuất tốc độ cao
-      try {
+      if (!process.env.VERCEL) try {
         createSpotInServerStore({
           id: finalSpot.id,
           authorId: finalSpot.authorId,
           authorName,
           rawPhone,
-          pinCode,
           spotType,
           visibility,
-          coupleRoomCode: body.coupleRoomCode || undefined,
+          coupleRoomCode: account.coupleRoomCode || undefined,
           title,
           story,
           species,
@@ -317,15 +341,15 @@ export async function POST(request: NextRequest) {
       if (msg.includes('3 bài/ngày')) {
         return NextResponse.json({ ok: false, error: msg }, { status: 429 });
       }
+      if (process.env.VERCEL) throw dbErr;
 
       const createdServer = createSpotInServerStore({
         authorId,
         authorName,
         rawPhone,
-        pinCode,
         spotType,
         visibility,
-        coupleRoomCode: body.coupleRoomCode || undefined,
+        coupleRoomCode: account.coupleRoomCode || undefined,
         title,
         story,
         species,
@@ -405,37 +429,35 @@ export async function POST(request: NextRequest) {
  */
 export async function PATCH(request: NextRequest) {
   try {
+    const originError = rejectUntrustedOrigin(request);
+    if (originError) return originError;
     const body = await request.json();
     const action = String(body.action || '');
 
-    if (action === 'SYNC_SPOT') {
-      if (body.spot && typeof body.spot === 'object') {
-        syncIncomingPeerSpotInServerStore(body.spot as DomSpot);
-      }
-      return NextResponse.json({ ok: true });
+    if (action === 'SYNC_SPOT' || action === 'SYNC_DELETE_SPOT') {
+      return NextResponse.json(
+        { ok: false, error: 'Kênh đồng bộ cũ đã bị vô hiệu hóa để bảo vệ dữ liệu.' },
+        { status: 410 }
+      );
     }
 
-    if (action === 'SYNC_DELETE_SPOT') {
-      const spotId = String(body.spotId || '').trim();
-      if (spotId) {
-        deleteSpotInServerStore({ spotId, skipOwnershipCheck: true });
-        await deleteSpotInMongo({
-          spotId,
-          skipOwnershipCheck: true,
-        }).catch(() => false);
-      }
-      return NextResponse.json({ ok: true, spotId });
+    const account =
+      action === 'BOOST_LIGHT'
+        ? null
+        : await resolveAuthenticatedAccount(request);
+    if (action !== 'BOOST_LIGHT' && !account) return unauthorizedResponse();
+    if (action !== 'BOOST_LIGHT' && productionRequiresMongo()) {
+      return NextResponse.json(
+        { ok: false, error: 'Kho dữ liệu tài khoản chưa sẵn sàng.' },
+        { status: 503 }
+      );
     }
 
     if (action === 'UPDATE_SPOT') {
       const spotId = String(body.spotId || '').trim();
-      const authorId = String(
-        body.authorId || body.requesterId || ''
-      ).trim();
-      const authorName = String(body.authorName || '').trim();
-      const rawPhone = String(
-        body.rawPhone || body.requesterPhone || ''
-      ).trim();
+      const authorId = account!.id;
+      const authorName = account!.displayName;
+      const rawPhone = account!.rawPhone;
       const title = String(body.title || '').trim();
       const story = String(body.story || '').trim();
       const breed = String(body.breed || '').trim();
@@ -456,6 +478,12 @@ export async function PATCH(request: NextRequest) {
         return NextResponse.json(
           { ok: false, error: 'Thiếu mã bài đăng cần chỉnh sửa.' },
           { status: 400 }
+        );
+      }
+      if (!(await ownsSpot(spotId, authorId))) {
+        return NextResponse.json(
+          { ok: false, error: 'Bạn không có quyền chỉnh sửa bài đăng này.' },
+          { status: 403 }
         );
       }
       if (!title) {
@@ -496,8 +524,11 @@ export async function PATCH(request: NextRequest) {
           areaLabel,
           formattedAddress,
           allowFoster,
-        }).catch(() => null),
-        Promise.resolve(
+        }).catch((error) => {
+          if (process.env.VERCEL) throw error;
+          return null;
+        }),
+        process.env.VERCEL ? Promise.resolve(null) : Promise.resolve(
           updateSpotInServerStore({
             spotId,
             authorId,
@@ -522,6 +553,12 @@ export async function PATCH(request: NextRequest) {
       ]);
 
       const finalUpdated = mongoUpdated || srvUpdated;
+      if (!finalUpdated) {
+        return NextResponse.json(
+          { ok: false, error: 'Không tìm thấy bài đăng để cập nhật.' },
+          { status: 404 }
+        );
+      }
       if (finalUpdated) {
         syncIncomingPeerSpotInServerStore(finalUpdated);
       }
@@ -534,12 +571,8 @@ export async function PATCH(request: NextRequest) {
 
     if (action === 'DELETE_SPOT') {
       const spotId = String(body.spotId || '').trim();
-      const authorId = String(
-        body.authorId || body.requesterId || ''
-      ).trim();
-      const rawPhone = String(
-        body.rawPhone || body.requesterPhone || ''
-      ).trim();
+      const authorId = account!.id;
+      const rawPhone = account!.rawPhone;
 
       if (!spotId) {
         return NextResponse.json(
@@ -547,18 +580,29 @@ export async function PATCH(request: NextRequest) {
           { status: 400 }
         );
       }
+      if (!(await ownsSpot(spotId, authorId))) {
+        return NextResponse.json(
+          { ok: false, error: 'Bạn không có quyền xóa bài đăng này.' },
+          { status: 403 }
+        );
+      }
 
-      deleteSpotInServerStore({
-        spotId,
-        authorId,
-        rawPhone,
-      });
+      if (!process.env.VERCEL) {
+        deleteSpotInServerStore({
+          spotId,
+          authorId,
+          rawPhone,
+        });
+      }
 
       await deleteSpotInMongo({
         spotId,
         authorId,
         rawPhone,
-      }).catch(() => false);
+      }).catch((error) => {
+        if (process.env.VERCEL) throw error;
+        return false;
+      });
 
       return NextResponse.json({
         ok: true,
@@ -570,8 +614,13 @@ export async function PATCH(request: NextRequest) {
       const spotId = String(body.spotId || '');
       const delta = Number(body.delta || 20);
       const [mongoRes, srvRes] = await Promise.all([
-        boostSpotLightInMongo(spotId, delta).catch(() => null),
-        Promise.resolve(boostSpotInServerStore(spotId, delta)),
+        boostSpotLightInMongo(spotId, delta).catch((error) => {
+          if (process.env.VERCEL) throw error;
+          return null;
+        }),
+        process.env.VERCEL
+          ? Promise.resolve(null)
+          : Promise.resolve(boostSpotInServerStore(spotId, delta)),
       ]);
       const result = mongoRes || srvRes;
       return NextResponse.json({
@@ -584,33 +633,52 @@ export async function PATCH(request: NextRequest) {
 
     if (action === 'ADD_SIGHTING') {
       const spotId = String(body.spotId || '');
-      const srvSighting = addSightingInServerStore({
-        spotId,
-        reporterName: String(body.reporterName || '').trim(),
-        imageUrl: String(body.imageUrl || ''),
-        note: String(body.note || '').trim(),
-        emotionTag: String(body.emotionTag || '').trim(),
-        lat: Number(body.lat || 0),
-        lng: Number(body.lng || 0),
-        originLat: Number(body.originLat || 0),
-        originLng: Number(body.originLng || 0),
-      });
+      const note = String(body.note || '').trim();
+      const imageUrl = String(body.imageUrl || '');
+      const lat = Number(body.lat);
+      const lng = Number(body.lng);
+      if (!spotId || note.length < 3 || !imageUrl) {
+        return NextResponse.json(
+          { ok: false, error: 'Báo cáo cần có bài đăng, ảnh và mô tả hợp lệ.' },
+          { status: 400 }
+        );
+      }
+      if (!Number.isFinite(lat) || !Number.isFinite(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+        return NextResponse.json(
+          { ok: false, error: 'Tọa độ báo cáo không hợp lệ.' },
+          { status: 400 }
+        );
+      }
+      const srvSighting = process.env.VERCEL
+        ? null
+        : addSightingInServerStore({
+            spotId,
+            reporterName: account!.displayName,
+            imageUrl,
+            note,
+            emotionTag: String(body.emotionTag || '').trim(),
+            lat,
+            lng,
+            originLat: Number(body.originLat || 0),
+            originLng: Number(body.originLng || 0),
+          });
 
       const mongoSighting = await addSpotSightingInMongo({
         spotId,
-        reporterId: body.reporterId ? String(body.reporterId) : undefined,
-        reporterName: String(body.reporterName || '').trim(),
-        reporterPhone: body.reporterPhone
-          ? String(body.reporterPhone)
-          : undefined,
-        imageUrl: String(body.imageUrl || ''),
-        note: String(body.note || '').trim(),
+        reporterId: account!.id,
+        reporterName: account!.displayName,
+        reporterPhone: account!.rawPhone,
+        imageUrl,
+        note,
         emotionTag: String(body.emotionTag || '').trim(),
-        lat: Number(body.lat || 0),
-        lng: Number(body.lng || 0),
+        lat,
+        lng,
         originLat: Number(body.originLat || 0),
         originLng: Number(body.originLng || 0),
-      }).catch(() => null);
+      }).catch((error) => {
+        if (process.env.VERCEL) throw error;
+        return null;
+      });
 
       return NextResponse.json({
         ok: true,
@@ -620,6 +688,13 @@ export async function PATCH(request: NextRequest) {
 
     if (action === 'UNLOCK_CONTACT') {
       const spotId = String(body.spotId || '');
+      const message = String(body.message || '').trim();
+      if (!spotId || message.length < 5 || message.length > 1000) {
+        return NextResponse.json(
+          { ok: false, error: 'Vui lòng gửi lời nhắn hợp lệ trước khi xem liên hệ.' },
+          { status: 400 }
+        );
+      }
       const reqType =
         body.requestType === 'ADOPT_REQUEST' ||
         body.requestType === 'FOSTER_OFFER'
@@ -629,22 +704,25 @@ export async function PATCH(request: NextRequest) {
       const [mongoUnlocked, srvUnlocked] = await Promise.all([
         unlockSpotContactInMongo({
           spotId,
-          requesterId: String(body.requesterId || ''),
-          requesterName: String(body.requesterName || '').trim(),
-          requesterPhone: String(body.requesterPhone || '').trim(),
+          requesterId: account!.id,
+          requesterName: account!.displayName,
+          requesterPhone: account!.rawPhone,
           requestType: reqType,
-          message: String(body.message || '').trim(),
+          message,
           proofImageUrl: body.proofImageUrl
             ? String(body.proofImageUrl)
             : undefined,
-        }).catch(() => null),
-        Promise.resolve(
+        }).catch((error) => {
+          if (process.env.VERCEL) throw error;
+          return null;
+        }),
+        process.env.VERCEL ? Promise.resolve(null) : Promise.resolve(
           unlockContactInServerStore({
             spotId,
-            requesterId: String(body.requesterId || ''),
-            requesterName: String(body.requesterName || '').trim(),
+            requesterId: account!.id,
+            requesterName: account!.displayName,
             requestType: reqType,
-            message: String(body.message || '').trim(),
+            message,
             proofImageUrl: body.proofImageUrl
               ? String(body.proofImageUrl)
               : undefined,
@@ -653,11 +731,18 @@ export async function PATCH(request: NextRequest) {
       ]);
 
       const rawPhone =
-        mongoUnlocked?.rawPhone || srvUnlocked.rawPhone || '';
+        mongoUnlocked?.rawPhone || srvUnlocked?.rawPhone || '';
       const maskedPhone =
-        mongoUnlocked?.maskedPhone || srvUnlocked.maskedPhone || '';
+        mongoUnlocked?.maskedPhone || srvUnlocked?.maskedPhone || '';
       const zaloLink =
-        mongoUnlocked?.zaloLink || srvUnlocked.zaloLink || '';
+        mongoUnlocked?.zaloLink || srvUnlocked?.zaloLink || '';
+
+      if (!rawPhone) {
+        return NextResponse.json(
+          { ok: false, error: 'Không tìm thấy thông tin liên hệ của bài đăng.' },
+          { status: 404 }
+        );
+      }
 
       return NextResponse.json({
         ok: true,
@@ -669,10 +754,19 @@ export async function PATCH(request: NextRequest) {
 
     if (action === 'RESOLVE_PEACE') {
       const spotId = String(body.spotId || '');
-      const srvOk = resolveSpotToPeaceInServerStore(spotId);
-      const mongoOk = await resolveSpotToPeaceInMongo(spotId).catch(
-        () => false
-      );
+      if (!(await ownsSpot(spotId, account!.id))) {
+        return NextResponse.json(
+          { ok: false, error: 'Bạn không có quyền đóng bài đăng này.' },
+          { status: 403 }
+        );
+      }
+      const srvOk = process.env.VERCEL
+        ? false
+        : resolveSpotToPeaceInServerStore(spotId);
+      const mongoOk = await resolveSpotToPeaceInMongo(spotId).catch((error) => {
+        if (process.env.VERCEL) throw error;
+        return false;
+      });
       return NextResponse.json({
         ok: mongoOk || srvOk,
         spotId,
@@ -681,10 +775,19 @@ export async function PATCH(request: NextRequest) {
 
     if (action === 'EMERGENCY_BOOST') {
       const spotId = String(body.spotId || '');
-      const srvOk = activateEmergencyBoostInServerStore(spotId);
-      const mongoOk = await activateEmergencyBoostInMongo(spotId).catch(
-        () => false
-      );
+      if (!(await ownsSpot(spotId, account!.id))) {
+        return NextResponse.json(
+          { ok: false, error: 'Bạn không có quyền kích hoạt bài đăng này.' },
+          { status: 403 }
+        );
+      }
+      const srvOk = process.env.VERCEL
+        ? false
+        : activateEmergencyBoostInServerStore(spotId);
+      const mongoOk = await activateEmergencyBoostInMongo(spotId).catch((error) => {
+        if (process.env.VERCEL) throw error;
+        return false;
+      });
       return NextResponse.json({
         ok: mongoOk || srvOk,
         spotId,
@@ -692,24 +795,33 @@ export async function PATCH(request: NextRequest) {
     }
 
     if (action === 'ADD_MEMORY_SNAP') {
-      const srvSnap = createMemorySnapInServerStore({
-        postId: body.postId ? String(body.postId) : undefined,
-        petName: String(body.petName || '').trim(),
-        weekNumber: Number(body.weekNumber || 1),
-        imageUrl: String(body.imageUrl || ''),
-        caption: String(body.caption || '').trim(),
-        moodTag: String(body.moodTag || '').trim(),
-        weightKg: body.weightKg ? Number(body.weightKg) : undefined,
-        rescuerName: body.authorName ? String(body.authorName) : undefined,
-        lat: body.lat ? Number(body.lat) : undefined,
-        lng: body.lng ? Number(body.lng) : undefined,
-      });
+      const postId = body.postId ? String(body.postId) : undefined;
+      if (postId && !(await ownsSpot(postId, account!.id))) {
+        return NextResponse.json(
+          { ok: false, error: 'Bạn không có quyền thêm nhật ký cho bài đăng này.' },
+          { status: 403 }
+        );
+      }
+      const srvSnap = process.env.VERCEL
+        ? null
+        : createMemorySnapInServerStore({
+            postId,
+            petName: String(body.petName || '').trim(),
+            weekNumber: Number(body.weekNumber || 1),
+            imageUrl: String(body.imageUrl || ''),
+            caption: String(body.caption || '').trim(),
+            moodTag: String(body.moodTag || '').trim(),
+            weightKg: body.weightKg ? Number(body.weightKg) : undefined,
+            rescuerName: account!.displayName,
+            lat: body.lat ? Number(body.lat) : undefined,
+            lng: body.lng ? Number(body.lng) : undefined,
+          });
 
       const mongoSnap = await createMemorySnapInMongo({
-        postId: body.postId ? String(body.postId) : undefined,
-        authorId: body.authorId ? String(body.authorId) : undefined,
-        authorName: body.authorName ? String(body.authorName) : undefined,
-        authorPhone: body.authorPhone ? String(body.authorPhone) : undefined,
+        postId,
+        authorId: account!.id,
+        authorName: account!.displayName,
+        authorPhone: account!.rawPhone,
         petName: String(body.petName || '').trim(),
         weekNumber: Number(body.weekNumber || 1),
         imageUrl: String(body.imageUrl || ''),
@@ -718,7 +830,10 @@ export async function PATCH(request: NextRequest) {
         weightKg: body.weightKg ? Number(body.weightKg) : undefined,
         lat: body.lat ? Number(body.lat) : undefined,
         lng: body.lng ? Number(body.lng) : undefined,
-      }).catch(() => null);
+      }).catch((error) => {
+        if (process.env.VERCEL) throw error;
+        return null;
+      });
 
       return NextResponse.json({
         ok: true,
@@ -743,23 +858,23 @@ export async function PATCH(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
+    const originError = rejectUntrustedOrigin(request);
+    if (originError) return originError;
+    const account = await resolveAuthenticatedAccount(request);
+    if (!account) return unauthorizedResponse();
+    if (productionRequiresMongo()) {
+      return NextResponse.json(
+        { ok: false, error: 'Kho dữ liệu tài khoản chưa sẵn sàng.' },
+        { status: 503 }
+      );
+    }
     const { searchParams } = new URL(request.url);
     const body = await request.json().catch(() => ({}));
     const spotId = String(
       body.spotId || searchParams.get('spotId') || ''
     ).trim();
-    const authorId = String(
-      body.authorId ||
-        body.requesterId ||
-        searchParams.get('authorId') ||
-        ''
-    ).trim();
-    const rawPhone = String(
-      body.rawPhone ||
-        body.requesterPhone ||
-        searchParams.get('rawPhone') ||
-        ''
-    ).trim();
+    const authorId = account.id;
+    const rawPhone = account.rawPhone;
 
     if (!spotId) {
       return NextResponse.json(
@@ -767,17 +882,28 @@ export async function DELETE(request: NextRequest) {
         { status: 400 }
       );
     }
+    if (!(await ownsSpot(spotId, authorId))) {
+      return NextResponse.json(
+        { ok: false, error: 'Bạn không có quyền xóa bài đăng này.' },
+        { status: 403 }
+      );
+    }
 
-    deleteSpotInServerStore({
-      spotId,
-      authorId,
-      rawPhone,
-    });
+    if (!process.env.VERCEL) {
+      deleteSpotInServerStore({
+        spotId,
+        authorId,
+        rawPhone,
+      });
+    }
     await deleteSpotInMongo({
       spotId,
       authorId,
       rawPhone,
-    }).catch(() => false);
+    }).catch((error) => {
+      if (process.env.VERCEL) throw error;
+      return false;
+    });
 
     return NextResponse.json({
       ok: true,

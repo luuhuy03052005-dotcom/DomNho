@@ -34,10 +34,10 @@ Phân hệ 1: Động cơ Crawl & AI Chuẩn Hóa (The Automated Engine)
 
 Giải quyết bài toán "Phòng trống" (Cold-start) khi mới ra mắt mà chưa có người dùng đăng bài:
 1. Thu thập tự động (Scraper Worker): Chạy định kỳ mỗi 30–60 phút trên các hội nhóm cứu hộ, tìm chó mèo lạc để lấy bài viết và hình ảnh mới nhất.
-2. Phễu lọc 3 tầng (Optimization Pipeline):
-	• Tầng 1 (Rule-based): Loại bỏ bài bán hàng, phối giống, spam từ khóa thương mại.
-	• Tầng 2 (Deduplication): Băm nội dung (SimHash) và hình ảnh (pHash) để chặn các bài đăng trùng lặp ở nhiều nhóm.
-	• Tầng 3 (LLM Structuring): Dùng Gemini 2.5 Flash API bóc tách văn bản tự do thành cấu trúc JSON chuẩn (Loài, Màu lông, Đặc điểm, Địa chỉ chữ) và chuyển đổi địa chỉ thành tọa độ GPS (Lat/Lng).
+2. Crawl4AI + Chromium:
+	• Worker Python dùng Crawl4AI mở trang tìm kiếm, render trang động và chuẩn hóa dữ liệu thành `DomSpot`.
+	• Bộ lọc tin cậy loại bài thương mại, bài thiếu ảnh/nguồn/ngày đăng và không tự suy đoán địa chỉ.
+	• ArcGIS Geocoding chỉ chuyển địa chỉ cụ thể, hợp lệ thành tọa độ GPS.
 
 Phân hệ 2: Bản đồ Radar Tương Tác & Kết Nối (The Live Map)
 
@@ -69,7 +69,7 @@ Map Engine	MapLibre GL JS + OpenFreeMap / Protomaps	Render hàng ngàn đốm s�
 Backend & DB	Supabase (PostgreSQL + PostGIS + Realtime)	Lưu trữ dữ liệu, dùng PostGIS để truy vấn bán kính địa lý trong vài mili-giây, dùng Supabase Realtime để đồng bộ đốm sáng mới ngay lập tức.
 Storage (Ảnh)	Cloudflare R2 + Nén ảnh Client-side (browser-image-compression)	Ép ảnh chụp từ điện thoại xuống chuẩn .webp (< 150KB) trước khi tải lên. Cloudflare R2 miễn phí 100% băng thông tải ảnh ra (Egress free).
 Notification	Web Push API (VAPID Keys) / Firebase Cloud Messaging	Gửi thông báo đẩy ra màn hình khóa iOS (16.4+) và Android khi có thú lạc gần vị trí hoặc đến lịch chụp ảnh kỷ niệm hàng tuần.
-Crawler & AI	Python (Playwright) + imagehash + Gemini 2.5 Flash API + Nominatim API	Chạy ngầm cào dữ liệu, lọc ảnh trùng bằng pHash, trích xuất JSON bằng Gemini Flash với chi phí cực thấp và chuyển đổi địa chỉ sang tọa độ GPS.
+Crawler & AI	Crawl4AI 0.9.5 + Chromium, ArcGIS Geocoding	Tìm kiếm đa nguồn, render trang, chuẩn hóa dữ liệu và chuyển địa chỉ hợp lệ sang tọa độ GPS.
 
 
 5. CẤU TRÚC THƯ MỤC DỰ ÁN (MONOREPO STRUCTURE)
@@ -91,17 +91,11 @@ dom-nho-project/
 │           │   ├── camera-modal/    # Giao diện chụp ảnh 1 chạm (POV) không viền
 │           │   └── ios-prompt/      # Màn hình hướng dẫn "Thêm vào MH chính" cho iPhone
 │           ├── hooks/               # Custom hooks: useGeolocation, usePushNotification
-│           └── lib/                 # Cấu hình Supabase Client, hàm nén ảnh .webp
-│
-├── services/
-│   └── crawler-worker/              # Hệ thống Bot cào dữ liệu tự động (Python)
-│       ├── scrapers/                # Script Playwright lấy bài từ Group / Mạng xã hội
-│       ├── processors/
-│       │   ├── deduplicator.py      # Lọc trùng văn bản (SimHash) & hình ảnh (pHash)
-│       │   ├── gemini_extractor.py  # Gọi Gemini 2.5 Flash bóc tách JSON
-│       │   └── geocoder.py          # Chuyển địa chỉ chữ sang tọa độ (Lat, Lng)
-│       ├── main_cron.py             # File chạy định kỳ mỗi 30 phút đẩy vào Supabase
-│       └── requirements.txt
+│           ├── lib/
+│           │   ├── crawl4ai-crawler.ts # Client kết nối Crawl4AI worker
+│           │   └── location-services.ts # ArcGIS geocode + Google Maps links
+│           └── scripts/
+│               └── run-crawl4ai.ts # Crawler batch xuất JSON/KML
 │
 └── supabase/
     └── migrations/
@@ -118,7 +112,7 @@ Hãy thận trọng khi sử dụng mã.
 	• Tích hợp mở Camera trực tiếp trên trình duyệt, lấy tọa độ GPS thực tế của điện thoại, tự động nén ảnh sang .webp và lưu lên Cloudflare R2 / Supabase Storage.
 	• Thiết lập file manifest.json, màn hình chặn hướng dẫn người dùng iPhone bấm "Thêm vào Màn hình chính" và tích hợp gửi thông báo đẩy (Web Push).
 • Giai đoạn 3: Kích hoạt Động cơ Bot Crawl & Khớp Lệnh (Tuần 3)
-	• Viết script Python cào dữ liệu từ 5 hội nhóm cứu hộ/tìm thú lạc lớn nhất, chạy qua phễu lọc Gemini API và bơm tự động 200–500 đốm sáng thực tế lên bản đồ.
+	• Cấu hình lịch chạy Crawl4AI định kỳ, kiểm duyệt dữ liệu và chỉ đưa các đốm có nguồn/ảnh/ngày đăng hợp lệ lên bản đồ.
 	• Kích hoạt thuật toán tự động so khớp khi có người chụp ảnh "Đốm Cam" gần khu vực có "Đốm Đỏ".
 • Giai đoạn 4: Không Gian Kỷ Niệm & Vận Hành Bền Vững (Tuần 4)
 	• Hoàn thiện tính năng "Chạm Ảnh Mỗi Tuần" (nhắc nhở chụp ảnh cập nhật thú cưng sau khi nhận nuôi và ghép thành dòng thời gian hoài niệm cho cặp đôi/người nuôi).

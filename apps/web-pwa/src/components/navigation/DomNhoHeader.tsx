@@ -50,7 +50,7 @@ export default function DomNhoHeader({
 
   return (
     <header
-      className={`sticky top-0 z-30 w-full bg-[#F5F6F2]/95 backdrop-blur-md border-b border-[#DDE2DC] ${className}`}
+      className={`sticky top-0 z-30 w-full bg-surface-muted/95 backdrop-blur-md border-b border-border ${className}`}
     >
       <div className="max-w-[1320px] mx-auto px-3.5 sm:px-6 lg:px-8 min-h-[56px] sm:min-h-[64px] py-1.5 flex items-center justify-between gap-2 sm:gap-4">
         <div className="flex items-center justify-start shrink-0">
@@ -74,14 +74,14 @@ export default function DomNhoHeader({
                 onClick={() => onChangeTab(tab.id)}
                 className={`min-h-[42px] px-3.5 py-2 rounded-[10px] text-sm font-bold transition-colors flex items-center gap-2 whitespace-nowrap ${
                   active
-                    ? 'bg-[#E4EDDD] text-[#123F35]'
-                    : 'text-[#15251F] hover:bg-white/80'
+                    ? 'bg-brand-soft text-brand'
+                    : 'text-ink hover:bg-surface/80'
                 }`}
                 aria-current={active ? 'page' : undefined}
               >
                 <Icon
                   className={`w-4 h-4 shrink-0 ${
-                    active ? 'text-[#123F35]' : 'text-[#52605A]'
+                    active ? 'text-brand' : 'text-ink-secondary'
                   }`}
                 />
                 <span>{tab.label}</span>
@@ -89,8 +89,8 @@ export default function DomNhoHeader({
                   <span
                     className={`px-1.5 py-0.5 rounded-full text-[11px] font-bold leading-none ${
                       active
-                        ? 'bg-[#123F35] text-white'
-                        : 'bg-[#E4EDDD] text-[#123F35]'
+                        ? 'bg-brand text-white'
+                        : 'bg-brand-soft text-brand'
                     }`}
                   >
                     {tab.count}
@@ -105,20 +105,20 @@ export default function DomNhoHeader({
           <button
             type="button"
             onClick={onOpenLocationPicker}
-            className="hidden md:flex items-center gap-1.5 min-h-[42px] px-3 rounded-[10px] bg-white border border-[#DDE2DC] text-xs font-semibold text-[#15251F] hover:border-[#123F35] transition-colors max-w-[200px]"
+            className="hidden md:flex items-center gap-1.5 min-h-[42px] px-3 rounded-btn bg-surface border border-border text-xs font-semibold text-ink hover:border-brand transition-colors max-w-[200px]"
             title="Đổi khu vực hoặc ghim vị trí trên bản đồ"
           >
-            <MapPin className="w-3.5 h-3.5 text-[#123F35] shrink-0" />
+            <MapPin className="w-3.5 h-3.5 text-brand shrink-0" />
             <span className="truncate">
               {locationLabel || 'Thủ Đức, TP.HCM'}
             </span>
-            <ChevronDown className="w-3.5 h-3.5 text-[#52605A] shrink-0" />
+            <ChevronDown className="w-3.5 h-3.5 text-ink-secondary shrink-0" />
           </button>
 
           <button
             type="button"
             onClick={onOpenCreatePost}
-            className="min-h-[42px] px-3.5 sm:px-4 rounded-[10px] bg-[#123F35] hover:bg-[#0C3028] text-white text-xs sm:text-sm font-bold flex items-center gap-1.5 transition-colors shadow-sm whitespace-nowrap"
+            className="min-h-[42px] px-3.5 sm:px-4 rounded-btn bg-brand hover:bg-brand-hover text-white text-xs sm:text-sm font-bold flex items-center gap-1.5 transition-colors shadow-sm whitespace-nowrap"
           >
             <Plus className="w-4 h-4 shrink-0" />
             <span>Đăng tin</span>
@@ -127,7 +127,7 @@ export default function DomNhoHeader({
           <button
             type="button"
             onClick={onOpenProfile}
-            className="hidden md:flex min-h-[42px] min-w-[42px] px-2.5 rounded-[10px] bg-[#E4EDDD] hover:bg-[#d5e3cb] border border-[#DDE2DC] text-xs font-semibold text-[#123F35] items-center justify-center gap-1.5 transition-colors"
+            className="hidden md:flex min-h-[42px] min-w-[42px] px-2.5 rounded-btn bg-brand-soft hover:bg-brand-soft/75 border border-border text-xs font-semibold text-brand items-center justify-center gap-1.5 transition-colors"
             title={
               userSession
                 ? `Tài khoản: ${userSession.displayName}`
@@ -135,7 +135,7 @@ export default function DomNhoHeader({
             }
             aria-label="Tài khoản"
           >
-            <User className="w-4 h-4 text-[#123F35] shrink-0" />
+            <User className="w-4 h-4 text-brand shrink-0" />
             {userSession && (
               <span className="hidden xl:inline max-w-[96px] truncate font-bold">
                 {userSession.displayName}

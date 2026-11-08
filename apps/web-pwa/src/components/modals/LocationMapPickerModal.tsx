@@ -362,10 +362,10 @@ export default function LocationMapPickerModal({
               <MapPin className="w-4 h-4" />
             </div>
             <div className="min-w-0">
-              <h3 className="text-sm sm:text-base font-extrabold text-[#142820] truncate">
+              <h3 className="text-sm sm:text-base font-extrabold text-ink truncate">
                 Ghim vị trí trên bản đồ
               </h3>
-              <p className="text-[11px] sm:text-xs text-[#52605A] truncate">
+              <p className="text-[11px] sm:text-xs text-ink-secondary truncate">
                 Di chuyển bản đồ để đặt mốc ghim ở giữa vào đúng vị trí cần chọn
               </p>
             </div>
@@ -374,7 +374,7 @@ export default function LocationMapPickerModal({
           <button
             type="button"
             onClick={onClose}
-            className="min-w-[40px] min-h-[40px] rounded-[10px] bg-white border border-[#DDDCD4] text-[#142820] flex items-center justify-center hover:bg-[#F1EFE8] transition-colors shrink-0"
+            className="min-w-[40px] min-h-[40px] rounded-[10px] bg-white border border-[#DDDCD4] text-ink flex items-center justify-center hover:bg-[#F1EFE8] transition-colors shrink-0"
             aria-label="Đóng"
           >
             <X className="w-4 h-4" />
@@ -384,19 +384,19 @@ export default function LocationMapPickerModal({
         <div className="shrink-0 p-3 bg-white border-b border-[#DDDCD4] relative z-20">
           <form onSubmit={handleSearch} className="flex items-center gap-2">
             <div className="relative flex-1 min-w-0">
-              <Search className="w-4 h-4 text-[#52605A] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <Search className="w-4 h-4 text-ink-secondary absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Tìm tên đường, ngõ hẻm, địa điểm hoặc dán tọa độ..."
-                className="w-full h-10 pl-9 pr-3 rounded-[10px] border border-[#DDDCD4] text-xs font-semibold text-[#142820] placeholder:text-[#52605A]/70 focus:outline-none focus:border-[#0E513B]"
+                className="w-full h-10 pl-9 pr-3 rounded-[10px] border border-[#DDDCD4] text-xs font-semibold text-ink placeholder:text-ink-secondary/70 focus:outline-none focus:border-brand"
               />
             </div>
             <button
               type="submit"
               disabled={isSearching}
-              className="h-10 px-3.5 rounded-[10px] bg-[#0E513B] text-white text-xs font-bold hover:bg-[#0A412F] transition-colors shrink-0 flex items-center gap-1.5"
+              className="h-10 px-3.5 rounded-[10px] bg-brand text-white text-xs font-bold hover:bg-brand-hover transition-colors shrink-0 flex items-center gap-1.5"
             >
               {isSearching ? (
                 <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -407,7 +407,7 @@ export default function LocationMapPickerModal({
             <button
               type="button"
               onClick={handleUseCurrentGps}
-              className="h-10 px-3 rounded-[10px] bg-white border border-[#DDDCD4] text-[#0E513B] text-xs font-bold hover:bg-[#E8EFE6] transition-colors shrink-0 flex items-center gap-1.5"
+              className="h-10 px-3 rounded-[10px] bg-white border border-[#DDDCD4] text-brand text-xs font-bold hover:bg-brand-soft transition-colors shrink-0 flex items-center gap-1.5"
               title="Đến vị trí GPS hiện tại của tôi"
             >
               <Crosshair className="w-3.5 h-3.5" />
@@ -422,9 +422,9 @@ export default function LocationMapPickerModal({
                   key={`${cand.address}-${idx}`}
                   type="button"
                   onClick={() => flyToCoords(cand.lat, cand.lng, cand.address)}
-                  className="w-full text-left p-2.5 text-xs font-medium text-[#142820] hover:bg-[#FAF7F1] flex items-start gap-2"
+                  className="w-full text-left p-2.5 text-xs font-medium text-ink hover:bg-[#FAF7F1] flex items-start gap-2"
                 >
-                  <MapPin className="w-3.5 h-3.5 text-[#0E513B] mt-0.5 shrink-0" />
+                  <MapPin className="w-3.5 h-3.5 text-brand mt-0.5 shrink-0" />
                   <span className="line-clamp-2">{cand.address}</span>
                 </button>
               ))}
@@ -441,7 +441,7 @@ export default function LocationMapPickerModal({
           >
             <div className="relative w-0 h-0">
               <span
-                className={`absolute left-0 top-0 -translate-x-1/2 -translate-y-1/2 w-3.5 h-3.5 rounded-full bg-[#142820]/30 border-2 border-white shadow-sm transition-transform duration-150 ${
+                className={`absolute left-0 top-0 -translate-x-1/2 -translate-y-1/2 w-3.5 h-3.5 rounded-full bg-ink/30 border-2 border-white shadow-sm transition-transform duration-150 ${
                   isMovingMap ? 'scale-125' : 'scale-90'
                 }`}
               />
@@ -477,7 +477,7 @@ export default function LocationMapPickerModal({
 
           <div
             ref={coordsBadgeRef}
-            className="absolute top-3 right-3 z-10 bg-white/95 px-2.5 py-1 rounded-full text-[11px] font-bold text-[#142820] shadow-sm border border-[#DDDCD4] pointer-events-none"
+            className="absolute top-3 right-3 z-10 bg-white/95 px-2.5 py-1 rounded-full text-[11px] font-bold text-ink shadow-sm border border-[#DDDCD4] pointer-events-none"
           >
             {currentCoords.lat.toFixed(5)}, {currentCoords.lng.toFixed(5)}
           </div>
@@ -486,7 +486,7 @@ export default function LocationMapPickerModal({
             <button
               type="button"
               onClick={() => mapInstanceRef.current?.zoomIn({ duration: 200 })}
-              className="w-10 h-10 rounded-[10px] bg-white/95 border border-[#DDDCD4] text-[#142820] hover:border-[#0E513B] flex items-center justify-center shadow-sm transition-colors"
+              className="w-10 h-10 rounded-[10px] bg-white/95 border border-[#DDDCD4] text-ink hover:border-brand flex items-center justify-center shadow-sm transition-colors"
               aria-label="Phóng to bản đồ"
               title="Phóng to"
             >
@@ -495,7 +495,7 @@ export default function LocationMapPickerModal({
             <button
               type="button"
               onClick={() => mapInstanceRef.current?.zoomOut({ duration: 200 })}
-              className="w-10 h-10 rounded-[10px] bg-white/95 border border-[#DDDCD4] text-[#142820] hover:border-[#0E513B] flex items-center justify-center shadow-sm transition-colors"
+              className="w-10 h-10 rounded-[10px] bg-white/95 border border-[#DDDCD4] text-ink hover:border-brand flex items-center justify-center shadow-sm transition-colors"
               aria-label="Thu nhỏ bản đồ"
               title="Thu nhỏ"
             >
@@ -506,7 +506,7 @@ export default function LocationMapPickerModal({
 
         <div className="shrink-0 p-3.5 sm:p-4 pb-[max(14px,env(safe-area-inset-bottom,14px))] bg-white border-t border-[#DDDCD4] flex flex-col sm:flex-row sm:items-center justify-between gap-3 z-20">
           <div className="w-full sm:flex-1 min-w-0 flex items-start gap-2.5">
-            <div className="w-8 h-8 rounded-full bg-[#E8EFE6] text-[#0E513B] flex items-center justify-center shrink-0 mt-0.5">
+            <div className="w-8 h-8 rounded-full bg-brand-soft text-brand flex items-center justify-center shrink-0 mt-0.5">
               {isGeocoding ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
               ) : (
@@ -514,10 +514,10 @@ export default function LocationMapPickerModal({
               )}
             </div>
             <div className="min-w-0 flex-1">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-[#52605A] block">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-ink-secondary block">
                 Địa chỉ được xác định từ ghim:
               </span>
-              <p className="text-xs font-bold text-[#142820] line-clamp-2 h-8 flex items-center break-words">
+              <p className="text-xs font-bold text-ink line-clamp-2 h-8 flex items-center break-words">
                 {resolvedAddress}
               </p>
             </div>
@@ -527,14 +527,14 @@ export default function LocationMapPickerModal({
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 sm:flex-none min-h-[44px] px-4 rounded-[10px] border border-[#DDDCD4] text-xs font-bold text-[#142820] hover:bg-[#F1EFE8] transition-colors"
+              className="flex-1 sm:flex-none min-h-[44px] px-4 rounded-[10px] border border-[#DDDCD4] text-xs font-bold text-ink hover:bg-[#F1EFE8] transition-colors"
             >
               Hủy
             </button>
             <button
               type="button"
               onClick={handleConfirm}
-              className="flex-1 sm:flex-none min-h-[44px] px-5 rounded-[10px] bg-[#0E513B] hover:bg-[#0A412F] text-white text-xs font-bold flex items-center justify-center gap-2 shadow-sm transition-colors"
+              className="flex-1 sm:flex-none min-h-[44px] px-5 rounded-[10px] bg-brand hover:bg-brand-hover text-white text-xs font-bold flex items-center justify-center gap-2 shadow-sm transition-colors"
             >
               <Check className="w-4 h-4 shrink-0" />
               <span>Xác nhận vị trí này</span>

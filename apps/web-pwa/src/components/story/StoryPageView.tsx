@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import Link from 'next/link';
 import {
   ArrowRight,
   Compass,
@@ -12,7 +13,6 @@ import {
 } from 'lucide-react';
 
 interface StoryPageViewProps {
-  onBackToExplore: () => void;
   onOpenMap: () => void;
 }
 
@@ -398,11 +398,10 @@ function InlinePawAccent() {
 }
 
 export default function StoryPageView({
-  onBackToExplore,
   onOpenMap,
 }: StoryPageViewProps) {
   return (
-    <div className="w-full min-h-screen bg-[#FAF7F1] text-[#142820] pb-12 md:pb-16">
+    <div className="w-full min-h-screen bg-[#FAF7F1] text-ink pb-12 md:pb-16">
       <div className="max-w-[1080px] mx-auto px-4 sm:px-6 lg:px-8 pt-6 sm:pt-10 lg:pt-14 space-y-12 sm:space-y-16">
         <section className="grid grid-cols-1 md:grid-cols-12 gap-6 lg:gap-10 items-center">
           <div className="md:col-span-7 space-y-3.5 sm:space-y-4">
@@ -416,7 +415,7 @@ export default function StoryPageView({
               />
             </div>
 
-            <h1 className="text-[28px] sm:text-[36px] lg:text-[40px] font-extrabold text-[#142820] leading-[1.18] tracking-tight">
+            <h1 className="text-[28px] sm:text-[36px] lg:text-[40px] font-extrabold text-ink leading-[1.18] tracking-tight">
               Mỗi bé, một cơ hội.
             </h1>
 
@@ -439,7 +438,7 @@ export default function StoryPageView({
             <div className="md:col-span-4 flex items-center justify-between md:flex-col md:items-start gap-3">
               <div className="flex items-center gap-2">
                 <InlinePawAccent />
-                <h2 className="text-xl sm:text-2xl font-bold text-[#142820] leading-snug">
+                <h2 className="text-xl sm:text-2xl font-bold text-ink leading-snug">
                   Tin cần giúp có thể trôi rất nhanh.
                 </h2>
               </div>
@@ -463,12 +462,12 @@ export default function StoryPageView({
             </div>
           </section>
 
-          <section className="rounded-2xl bg-[#E8EFE6] px-5 py-7 sm:px-8 sm:py-10">
+          <section className="rounded-2xl bg-brand-soft px-5 py-7 sm:px-8 sm:py-10">
             <div className="grid grid-cols-1 md:grid-cols-12 gap-4 sm:gap-8 items-center">
               <div className="md:col-span-4 flex items-center justify-between md:flex-col md:items-start gap-3">
                 <div className="flex items-center gap-2">
                   <InlinePawAccent />
-                  <h2 className="text-xl sm:text-2xl font-bold text-[#142820] leading-snug">
+                  <h2 className="text-xl sm:text-2xl font-bold text-ink leading-snug">
                     Vì sao gọi là Đốm Nhỏ?
                   </h2>
                 </div>
@@ -477,7 +476,7 @@ export default function StoryPageView({
                 </div>
               </div>
 
-              <div className="md:col-span-8 space-y-3.5 text-base leading-[1.65] text-[#142820] max-w-[62ch]">
+              <div className="md:col-span-8 space-y-3.5 text-base leading-[1.65] text-ink max-w-[62ch]">
                 <p>
                   Tên gọi <strong>Đốm Nhỏ</strong> xuất phát từ những điểm đánh
                   dấu trên bản đồ. Mỗi điểm nhỏ đại diện cho một bé chó, mèo
@@ -497,7 +496,7 @@ export default function StoryPageView({
             <div className="md:col-span-4 flex items-center justify-between md:flex-col md:items-start gap-3">
               <div className="flex items-center gap-2">
                 <InlinePawAccent />
-                <h2 className="text-xl sm:text-2xl font-bold text-[#142820] leading-snug">
+                <h2 className="text-xl sm:text-2xl font-bold text-ink leading-snug">
                   Khi biết chuyện ở gần mình.
                 </h2>
               </div>
@@ -519,17 +518,17 @@ export default function StoryPageView({
         </div>
 
         <section className="pt-4 sm:pt-6 border-t border-[#DDDCD4] space-y-5">
-          <h2 className="text-lg sm:text-xl font-bold text-[#142820]">
+          <h2 className="text-lg sm:text-xl font-bold text-ink">
             Nguyên tắc hoạt động của chúng mình
           </h2>
 
           <div className="space-y-4 max-w-[65ch]">
             <div className="flex items-start gap-3.5">
-              <div className="w-9 h-9 rounded-[10px] bg-[#E8EFE6] text-[#0E513B] flex items-center justify-center shrink-0 mt-0.5">
+              <div className="w-9 h-9 rounded-[10px] bg-brand-soft text-brand flex items-center justify-center shrink-0 mt-0.5">
                 <FileCheck2 className="w-4 h-4" />
               </div>
               <p className="text-base leading-[1.6] text-[#23352D]">
-                <strong className="text-[#142820]">
+                <strong className="text-ink">
                   Thông tin thực tế, có nguồn rõ ràng:
                 </strong>{' '}
                 Chỉ tổng hợp bài viết từ các trạm cứu hộ, báo chí kèm liên kết
@@ -542,7 +541,7 @@ export default function StoryPageView({
                 <MapPin className="w-4 h-4" />
               </div>
               <p className="text-base leading-[1.6] text-[#23352D]">
-                <strong className="text-[#142820]">
+                <strong className="text-ink">
                   Ưu tiên khoảng cách gần:
                 </strong>{' '}
                 Hiển thị khu vực và khoảng cách từ vị trí của bạn đến điểm cần
@@ -551,11 +550,11 @@ export default function StoryPageView({
             </div>
 
             <div className="flex items-start gap-3.5">
-              <div className="w-9 h-9 rounded-[10px] bg-[#F1EFE8] text-[#142820] flex items-center justify-center shrink-0 mt-0.5">
-                <Sparkles className="w-4 h-4 text-[#0E513B]" />
+              <div className="w-9 h-9 rounded-[10px] bg-[#F1EFE8] text-ink flex items-center justify-center shrink-0 mt-0.5">
+                <Sparkles className="w-4 h-4 text-brand" />
               </div>
               <p className="text-base leading-[1.6] text-[#23352D]">
-                <strong className="text-[#142820]">
+                <strong className="text-ink">
                   Đơn giản, dễ sử dụng:
                 </strong>{' '}
                 Ai cũng có thể tra cứu theo khu vực, tìm kiếm bằng ảnh hoặc đăng
@@ -568,15 +567,15 @@ export default function StoryPageView({
 
         <section className="p-5 sm:p-6 rounded-2xl bg-white border border-[#E2E5DC] flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="space-y-1">
-            <h2 className="text-base sm:text-lg font-extrabold text-[#15251F] flex items-center gap-2">
-              <Mail className="w-5 h-5 text-[#123F35] shrink-0" />
+            <h2 className="text-base sm:text-lg font-extrabold text-ink flex items-center gap-2">
+              <Mail className="w-5 h-5 text-brand shrink-0" />
               <span>Liên hệ &amp; Đóng góp ý kiến</span>
             </h2>
-            <p className="text-sm text-[#53635B] leading-relaxed">
+            <p className="text-sm text-ink-secondary leading-relaxed">
               Mọi ý kiến đóng góp, phản hồi gửi về email:{' '}
               <a
                 href="mailto:luuhuy05032005h@gmail.com?subject=G%C3%B3p%20%C3%BD%20%26%20Ph%E1%BA%A3n%20h%E1%BB%93i%20cho%20%C4%90%E1%BB%91m%20Nh%E1%BB%8F"
-                className="font-extrabold text-[#123F35] hover:underline break-all"
+                className="font-extrabold text-brand hover:underline break-all"
               >
                 luuhuy05032005h@gmail.com
               </a>
@@ -585,7 +584,7 @@ export default function StoryPageView({
 
           <a
             href="mailto:luuhuy05032005h@gmail.com?subject=G%C3%B3p%20%C3%BD%20%26%20Ph%E1%BA%A3n%20h%E1%BB%93i%20cho%20%C4%90%E1%BB%91m%20Nh%E1%BB%8F"
-            className="min-h-[42px] px-4 rounded-[10px] bg-[#123F35] hover:bg-[#0D3129] text-white text-xs sm:text-sm font-bold inline-flex items-center justify-center gap-2 shrink-0 transition-colors"
+            className="min-h-[42px] px-4 rounded-[10px] bg-brand hover:bg-brand-hover text-white text-xs sm:text-sm font-bold inline-flex items-center justify-center gap-2 shrink-0 transition-colors"
           >
             <Mail className="w-4 h-4 shrink-0" />
             <span>Gửi email phản hồi</span>
@@ -594,10 +593,10 @@ export default function StoryPageView({
 
         <section className="pt-6 sm:pt-8 border-t border-[#DDDCD4] flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="space-y-1">
-            <h2 className="text-xl sm:text-2xl font-bold text-[#142820]">
+            <h2 className="text-xl sm:text-2xl font-bold text-ink">
               Bạn có thể bắt đầu từ một tin gần mình.
             </h2>
-            <p className="text-sm sm:text-base text-[#52605A]">
+            <p className="text-sm sm:text-base text-ink-secondary">
               Chọn xem trên bản đồ hoặc duyệt danh sách các bài viết quanh khu
               vực của bạn.
             </p>
@@ -607,21 +606,20 @@ export default function StoryPageView({
             <button
               type="button"
               onClick={onOpenMap}
-              className="min-h-[48px] px-5 rounded-[10px] bg-[#0E513B] hover:bg-[#0A412F] text-white text-sm sm:text-base font-bold inline-flex items-center justify-center gap-2 transition-colors shadow-sm"
+              className="min-h-[48px] px-5 rounded-[10px] bg-brand hover:bg-brand-hover text-white text-sm sm:text-base font-bold inline-flex items-center justify-center gap-2 transition-colors shadow-sm"
             >
               <MapIcon className="w-4 h-4 shrink-0" />
               <span>Mở bản đồ</span>
               <ArrowRight className="w-4 h-4 shrink-0" />
             </button>
 
-            <button
-              type="button"
-              onClick={onBackToExplore}
-              className="min-h-[48px] px-5 rounded-[10px] bg-white hover:bg-[#F1EFE8] text-[#142820] border border-[#DDDCD4] text-sm sm:text-base font-bold inline-flex items-center justify-center gap-2 transition-colors"
+            <Link
+              href="/"
+              className="min-h-[48px] px-5 rounded-[10px] bg-white hover:bg-[#F1EFE8] text-ink border border-[#DDDCD4] text-sm sm:text-base font-bold inline-flex items-center justify-center gap-2 transition-colors"
             >
-              <Compass className="w-4 h-4 text-[#0E513B] shrink-0" />
+              <Compass className="w-4 h-4 text-brand shrink-0" />
               <span>Xem tin quanh bạn</span>
-            </button>
+            </Link>
           </div>
         </section>
       </div>

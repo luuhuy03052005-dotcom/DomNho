@@ -393,7 +393,7 @@ export default function ExploreView({
   };
 
   return (
-    <div className="w-full min-h-screen bg-[#F5F6F2] pb-12 text-[#15251F]">
+    <div className="w-full min-h-screen bg-[#F5F6F2] pb-12 text-ink">
       <input
         ref={visualInputRef}
         type="file"
@@ -406,10 +406,10 @@ export default function ExploreView({
         {/* Desktop Toolbar Row (matches desktop-explore.png) */}
         <div className="hidden lg:flex items-center justify-between gap-6">
           <div className="min-w-0">
-            <h1 className="text-[28px] xl:text-[32px] font-extrabold text-[#15251F] leading-tight">
-              {isSavedView ? 'Bài viết đã lưu' : 'Tin quanh bạn'}
+            <h1 className="text-[28px] xl:text-[32px] font-extrabold text-ink leading-tight">
+              {isSavedView ? 'Bài viết đã lưu' : 'Tin cứu trợ, tìm thú lạc quanh bạn'}
             </h1>
-            <p className="text-sm text-[#52605A] mt-0.5">
+            <p className="text-sm text-ink-secondary mt-0.5">
               {isSavedView
                 ? 'Những trường hợp bạn đã đánh dấu để theo dõi và hỗ trợ.'
                 : 'Cứu trợ, tìm thú lạc và nhận nuôi'}
@@ -418,19 +418,19 @@ export default function ExploreView({
 
           <div className="flex items-center gap-2.5 flex-1 max-w-[680px] justify-end">
             <div className="relative flex-1 min-w-0">
-              <Search className="w-4 h-4 text-[#52605A] absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <Search className="w-4 h-4 text-ink-secondary absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Tìm tên, đặc điểm, khu vực..."
-                className="w-full h-[44px] pl-10 pr-8 rounded-[10px] bg-white border border-[#DDE2DC] text-sm text-[#15251F] placeholder-[#52605A] focus:border-[#123F35] outline-none transition-colors"
+                className="w-full h-[44px] pl-10 pr-8 rounded-[10px] bg-white border border-[#DDE2DC] text-sm text-ink placeholder-ink-secondary focus:border-brand outline-none transition-colors"
               />
               {searchQuery && (
                 <button
                   type="button"
                   onClick={() => setSearchQuery('')}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-[#F5F6F2] text-xs flex items-center justify-center text-[#15251F]"
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-[#F5F6F2] text-xs flex items-center justify-center text-ink"
                   aria-label="Xóa tìm kiếm"
                 >
                   ✕
@@ -444,15 +444,15 @@ export default function ExploreView({
               disabled={visualAnalyzing}
               className={`min-h-[44px] px-3.5 rounded-[10px] border text-xs font-bold flex items-center gap-1.5 shrink-0 transition-colors ${
                 visualSearchImage
-                  ? 'bg-[#E4EDDD] border-[#123F35] text-[#123F35]'
-                  : 'bg-white border-[#DDE2DC] hover:border-[#123F35] text-[#15251F]'
+                  ? 'bg-brand-soft border-brand text-brand'
+                  : 'bg-white border-[#DDE2DC] hover:border-brand text-ink'
               }`}
               title="Tải ảnh thú cưng lên để AI đối chiếu bài viết tương đồng"
             >
               {visualAnalyzing ? (
-                <Loader2 className="w-4 h-4 animate-spin text-[#123F35] shrink-0" />
+                <Loader2 className="w-4 h-4 animate-spin text-brand shrink-0" />
               ) : (
-                <Camera className="w-4 h-4 text-[#123F35] shrink-0" />
+                <Camera className="w-4 h-4 text-brand shrink-0" />
               )}
               <span>{visualAnalyzing ? 'Đang quét...' : 'Tìm bằng ảnh'}</span>
             </button>
@@ -460,12 +460,12 @@ export default function ExploreView({
             <button
               type="button"
               onClick={onOpenFilterModal}
-              className="min-h-[44px] px-4 rounded-[10px] bg-white hover:bg-[#E4EDDD]/50 border border-[#DDE2DC] hover:border-[#123F35] text-[#15251F] text-sm font-bold flex items-center gap-2 shrink-0 transition-colors"
+              className="min-h-[44px] px-4 rounded-[10px] bg-white hover:bg-brand-soft/50 border border-[#DDE2DC] hover:border-brand text-ink text-sm font-bold flex items-center gap-2 shrink-0 transition-colors"
             >
-              <SlidersHorizontal className="w-4 h-4 text-[#15251F] shrink-0" />
+              <SlidersHorizontal className="w-4 h-4 text-ink shrink-0" />
               <span>Bộ lọc</span>
               {activeFiltersCount > 0 && (
-                <span className="px-1.5 py-0.5 rounded-full bg-[#123F35] text-white text-[11px] font-bold leading-none">
+                <span className="px-1.5 py-0.5 rounded-full bg-brand text-white text-[11px] font-bold leading-none">
                   {activeFiltersCount}
                 </span>
               )}
@@ -480,15 +480,15 @@ export default function ExploreView({
             <button
               type="button"
               onClick={onOpenLocationPicker}
-              className="flex-1 min-w-0 min-h-[44px] px-3.5 rounded-[10px] bg-white border border-[#DDE2DC] text-xs sm:text-sm font-bold text-[#15251F] flex items-center justify-between gap-2"
+              className="flex-1 min-w-0 min-h-[44px] px-3.5 rounded-[10px] bg-white border border-[#DDE2DC] text-xs sm:text-sm font-bold text-ink flex items-center justify-between gap-2"
             >
               <span className="flex items-center gap-2 min-w-0">
-                <MapPin className="w-4 h-4 text-[#123F35] shrink-0" />
+                <MapPin className="w-4 h-4 text-brand shrink-0" />
                 <span className="truncate">
                   {locationLabel || 'Thủ Đức, TP.HCM'}
                 </span>
               </span>
-              <ChevronDown className="w-4 h-4 text-[#52605A] shrink-0" />
+              <ChevronDown className="w-4 h-4 text-ink-secondary shrink-0" />
             </button>
 
             <button
@@ -499,28 +499,28 @@ export default function ExploreView({
               }}
               aria-label="Định vị GPS hiện tại của tôi"
               title="Định vị GPS hiện tại của tôi"
-              className="min-w-[44px] min-h-[44px] rounded-[10px] bg-white border border-[#DDE2DC] hover:border-[#123F35] text-[#15251F] flex items-center justify-center shrink-0"
+              className="min-w-[44px] min-h-[44px] rounded-[10px] bg-white border border-[#DDE2DC] hover:border-brand text-ink flex items-center justify-center shrink-0"
             >
-              <Crosshair className="w-4 h-4 text-[#123F35]" />
+              <Crosshair className="w-4 h-4 text-brand" />
             </button>
           </div>
 
           {/* Row 2: Search Input + Camera AI Search + Filter Modal Button */}
           <div className="flex items-center gap-2">
             <div className="relative flex-1 min-w-0">
-              <Search className="w-4 h-4 text-[#52605A] absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <Search className="w-4 h-4 text-ink-secondary absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Tìm tên, đặc điểm, khu vực..."
-                className="w-full min-h-[44px] pl-10 pr-8 rounded-[10px] bg-white border border-[#DDE2DC] text-sm text-[#15251F] placeholder-[#52605A] focus:border-[#123F35] outline-none"
+                className="w-full min-h-[44px] pl-10 pr-8 rounded-[10px] bg-white border border-[#DDE2DC] text-sm text-ink placeholder-ink-secondary focus:border-brand outline-none"
               />
               {searchQuery && (
                 <button
                   type="button"
                   onClick={() => setSearchQuery('')}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-[#F5F6F2] text-xs flex items-center justify-center text-[#15251F]"
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-[#F5F6F2] text-xs flex items-center justify-center text-ink"
                   aria-label="Xóa tìm kiếm"
                 >
                   ✕
@@ -536,14 +536,14 @@ export default function ExploreView({
               title="Tìm bằng ảnh"
               className={`min-w-[44px] min-h-[44px] px-2.5 rounded-[10px] border flex items-center justify-center gap-1 shrink-0 transition-colors ${
                 visualSearchImage
-                  ? 'bg-[#E4EDDD] border-[#123F35] text-[#123F35]'
-                  : 'bg-white border-[#DDE2DC] text-[#15251F]'
+                  ? 'bg-brand-soft border-brand text-brand'
+                  : 'bg-white border-[#DDE2DC] text-ink'
               }`}
             >
               {visualAnalyzing ? (
-                <Loader2 className="w-4 h-4 animate-spin text-[#123F35]" />
+                <Loader2 className="w-4 h-4 animate-spin text-brand" />
               ) : (
-                <Camera className="w-4 h-4 text-[#123F35]" />
+                <Camera className="w-4 h-4 text-brand" />
               )}
             </button>
 
@@ -552,11 +552,11 @@ export default function ExploreView({
               onClick={onOpenFilterModal}
               aria-label="Mở bộ lọc"
               title="Bộ lọc"
-              className="relative min-w-[44px] min-h-[44px] px-2.5 rounded-[10px] bg-white border border-[#DDE2DC] text-[#15251F] flex items-center justify-center shrink-0"
+              className="relative min-w-[44px] min-h-[44px] px-2.5 rounded-[10px] bg-white border border-[#DDE2DC] text-ink flex items-center justify-center shrink-0"
             >
               <SlidersHorizontal className="w-4 h-4" />
               {activeFiltersCount > 0 && (
-                <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-[#123F35] text-white text-[10px] font-bold flex items-center justify-center">
+                <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-brand text-white text-[10px] font-bold flex items-center justify-center">
                   {activeFiltersCount}
                 </span>
               )}
@@ -582,8 +582,8 @@ export default function ExploreView({
                   aria-pressed={active}
                   className={`flex-1 min-h-[38px] px-2.5 py-1.5 rounded-[8px] text-xs font-bold whitespace-nowrap transition-colors ${
                     active
-                      ? 'bg-[#E4EDDD] text-[#123F35]'
-                      : 'text-[#15251F] hover:bg-[#F5F6F2]'
+                      ? 'bg-brand-soft text-brand'
+                      : 'text-ink hover:bg-[#F5F6F2]'
                   }`}
                 >
                   {item.label}
@@ -594,29 +594,29 @@ export default function ExploreView({
 
           {/* Row 4: Mobile Heading + Sort Dropdown */}
           <div className="flex items-center justify-between gap-2 pt-1">
-            <h1 className="text-xl font-extrabold text-[#15251F]">
-              {isSavedView ? 'Bài viết đã lưu' : 'Tin quanh bạn'}
-            </h1>
+            <div role="heading" aria-level={1} className="text-xl font-extrabold text-ink">
+              {isSavedView ? 'Bài viết đã lưu' : 'Tin cứu trợ, tìm thú lạc quanh bạn'}
+            </div>
 
             <div className="relative shrink-0">
               <select
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value as SortOption)}
-                className="min-h-[38px] pl-3 pr-7 rounded-[8px] bg-transparent text-xs font-bold text-[#15251F] appearance-none cursor-pointer outline-none"
+                className="min-h-[38px] pl-3 pr-7 rounded-[8px] bg-transparent text-xs font-bold text-ink appearance-none cursor-pointer outline-none"
                 aria-label="Sắp xếp kết quả"
               >
                 <option value="NEAREST">Gần nhất</option>
                 <option value="NEWEST">Mới nhất</option>
                 <option value="URGENT">Ưu tiên SOS</option>
               </select>
-              <ChevronDown className="w-3.5 h-3.5 text-[#52605A] pointer-events-none absolute right-1.5 top-1/2 -translate-y-1/2" />
+              <ChevronDown className="w-3.5 h-3.5 text-ink-secondary pointer-events-none absolute right-1.5 top-1/2 -translate-y-1/2" />
             </div>
           </div>
         </div>
 
         {/* Visual Search Active Banner */}
         {visualSearchImage && (
-          <div className="p-3.5 rounded-[12px] bg-white border border-[#123F35] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="p-3.5 rounded-[12px] bg-white border border-brand flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div className="flex items-center gap-3 min-w-0">
               <img
                 src={visualSearchImage}
@@ -624,7 +624,7 @@ export default function ExploreView({
                 className="w-14 h-14 rounded-[8px] object-cover border border-[#DDE2DC] shrink-0"
               />
               <div className="min-w-0 space-y-1">
-                <p className="text-xs sm:text-sm font-bold text-[#15251F]">
+                <p className="text-xs sm:text-sm font-bold text-ink">
                   {visualAnalyzing
                     ? 'Đang phân tích hình ảnh và lọc bài viết trùng khớp...'
                     : visualError
@@ -642,7 +642,7 @@ export default function ExploreView({
                       {visualAnalysis.traits.map((t) => (
                         <span
                           key={t}
-                          className="px-2 py-0.5 rounded bg-[#E4EDDD] text-[#123F35] text-[11px] font-semibold"
+                          className="px-2 py-0.5 rounded bg-brand-soft text-brand text-[11px] font-semibold"
                         >
                           {t}
                         </span>
@@ -656,7 +656,7 @@ export default function ExploreView({
               <button
                 type="button"
                 onClick={() => visualInputRef.current?.click()}
-                className="min-h-[38px] px-3 rounded-[10px] border border-[#DDE2DC] bg-[#F5F6F2] hover:bg-[#E4EDDD]/50 text-xs font-semibold text-[#15251F]"
+                className="min-h-[38px] px-3 rounded-[10px] border border-[#DDE2DC] bg-[#F5F6F2] hover:bg-brand-soft/50 text-xs font-semibold text-ink"
               >
                 Đổi ảnh khác
               </button>
@@ -677,7 +677,7 @@ export default function ExploreView({
           {/* Column 1: Left Filter Sidebar (Desktop) */}
           <aside className="hidden lg:flex flex-col bg-white rounded-[12px] border border-[#DDE2DC] p-4 space-y-5 sticky top-20 shadow-[0_2px_10px_rgba(21,37,31,0.03)]">
             <div className="space-y-2">
-              <h2 className="text-sm font-extrabold text-[#15251F] px-1">
+              <h2 className="text-sm font-extrabold text-ink px-1">
                 Loại tin
               </h2>
               <div className="space-y-1">
@@ -687,11 +687,11 @@ export default function ExploreView({
                   aria-pressed={category === 'ALL'}
                   className={`w-full min-h-[42px] px-3 rounded-[10px] text-sm font-bold flex items-center gap-2.5 transition-colors ${
                     category === 'ALL'
-                      ? 'bg-[#E4EDDD] text-[#123F35]'
-                      : 'text-[#15251F] hover:bg-[#F5F6F2]'
+                      ? 'bg-brand-soft text-brand'
+                      : 'text-ink hover:bg-[#F5F6F2]'
                   }`}
                 >
-                  <LayoutGrid className="w-4 h-4 text-[#123F35] shrink-0" />
+                  <LayoutGrid className="w-4 h-4 text-brand shrink-0" />
                   <span>Tất cả</span>
                 </button>
 
@@ -701,8 +701,8 @@ export default function ExploreView({
                   aria-pressed={category === 'RESCUE'}
                   className={`w-full min-h-[42px] px-3 rounded-[10px] text-sm font-bold flex items-center gap-2.5 transition-colors ${
                     category === 'RESCUE'
-                      ? 'bg-[#E4EDDD] text-[#123F35]'
-                      : 'text-[#15251F] hover:bg-[#F5F6F2]'
+                      ? 'bg-brand-soft text-brand'
+                      : 'text-ink hover:bg-[#F5F6F2]'
                   }`}
                 >
                   <LifeBuoy className="w-4 h-4 text-[#A83D20] shrink-0" />
@@ -715,8 +715,8 @@ export default function ExploreView({
                   aria-pressed={category === 'LOST'}
                   className={`w-full min-h-[42px] px-3 rounded-[10px] text-sm font-bold flex items-center gap-2.5 transition-colors ${
                     category === 'LOST'
-                      ? 'bg-[#E4EDDD] text-[#123F35]'
-                      : 'text-[#15251F] hover:bg-[#F5F6F2]'
+                      ? 'bg-brand-soft text-brand'
+                      : 'text-ink hover:bg-[#F5F6F2]'
                   }`}
                 >
                   <PawCategoryIcon className="w-4 h-4 text-[#D4942A] shrink-0" />
@@ -729,8 +729,8 @@ export default function ExploreView({
                   aria-pressed={category === 'ADOPT'}
                   className={`w-full min-h-[42px] px-3 rounded-[10px] text-sm font-bold flex items-center gap-2.5 transition-colors ${
                     category === 'ADOPT'
-                      ? 'bg-[#E4EDDD] text-[#123F35]'
-                      : 'text-[#15251F] hover:bg-[#F5F6F2]'
+                      ? 'bg-brand-soft text-brand'
+                      : 'text-ink hover:bg-[#F5F6F2]'
                   }`}
                 >
                   <Home className="w-4 h-4 text-[#275B3A] shrink-0" />
@@ -740,7 +740,7 @@ export default function ExploreView({
             </div>
 
             <div className="pt-4 border-t border-[#DDE2DC] space-y-2.5">
-              <h2 className="text-sm font-extrabold text-[#15251F] px-1">
+              <h2 className="text-sm font-extrabold text-ink px-1">
                 Nguồn tin
               </h2>
               <div className="space-y-1.5">
@@ -748,13 +748,13 @@ export default function ExploreView({
                   type="button"
                   onClick={() => toggleOriginCheckbox('USER_POST')}
                   aria-pressed={originFilter === 'USER_POST'}
-                  className="w-full min-h-[38px] px-2 rounded-[8px] hover:bg-[#F5F6F2] flex items-center gap-2.5 text-sm font-medium text-[#15251F] text-left"
+                  className="w-full min-h-[38px] px-2 rounded-[8px] hover:bg-[#F5F6F2] flex items-center gap-2.5 text-sm font-medium text-ink text-left"
                 >
                   <span
                     className={`w-4 h-4 rounded-[4px] border flex items-center justify-center shrink-0 transition-colors ${
                       originFilter === 'USER_POST'
-                        ? 'bg-[#123F35] border-[#123F35] text-white'
-                        : 'bg-white border-[#52605A]/50'
+                        ? 'bg-brand border-brand text-white'
+                        : 'bg-white border-ink-secondary/50'
                     }`}
                   >
                     {originFilter === 'USER_POST' && (
@@ -768,13 +768,13 @@ export default function ExploreView({
                   type="button"
                   onClick={() => toggleOriginCheckbox('EXTERNAL')}
                   aria-pressed={originFilter === 'EXTERNAL'}
-                  className="w-full min-h-[38px] px-2 rounded-[8px] hover:bg-[#F5F6F2] flex items-center gap-2.5 text-sm font-medium text-[#15251F] text-left"
+                  className="w-full min-h-[38px] px-2 rounded-[8px] hover:bg-[#F5F6F2] flex items-center gap-2.5 text-sm font-medium text-ink text-left"
                 >
                   <span
                     className={`w-4 h-4 rounded-[4px] border flex items-center justify-center shrink-0 transition-colors ${
                       originFilter === 'EXTERNAL'
-                        ? 'bg-[#123F35] border-[#123F35] text-white'
-                        : 'bg-white border-[#52605A]/50'
+                        ? 'bg-brand border-brand text-white'
+                        : 'bg-white border-ink-secondary/50'
                     }`}
                   >
                     {originFilter === 'EXTERNAL' && (
@@ -787,30 +787,30 @@ export default function ExploreView({
             </div>
 
             <div className="pt-4 border-t border-[#DDE2DC] space-y-2.5">
-              <h2 className="text-sm font-extrabold text-[#15251F] px-1">
+              <h2 className="text-sm font-extrabold text-ink px-1">
                 Khu vực
               </h2>
               <button
                 type="button"
                 onClick={onOpenLocationPicker}
-                className="w-full min-h-[42px] px-3 rounded-[10px] bg-white hover:bg-[#F5F6F2] border border-[#DDE2DC] text-xs font-semibold text-[#15251F] flex items-center justify-between gap-2 transition-colors"
+                className="w-full min-h-[42px] px-3 rounded-[10px] bg-white hover:bg-[#F5F6F2] border border-[#DDE2DC] text-xs font-semibold text-ink flex items-center justify-between gap-2 transition-colors"
               >
                 <span className="flex items-center gap-1.5 min-w-0">
-                  <MapPin className="w-3.5 h-3.5 text-[#123F35] shrink-0" />
+                  <MapPin className="w-3.5 h-3.5 text-brand shrink-0" />
                   <span className="truncate">
                     {locationLabel || 'Thủ Đức, TP.HCM'}
                   </span>
                 </span>
-                <ChevronDown className="w-3.5 h-3.5 text-[#52605A] shrink-0" />
+                <ChevronDown className="w-3.5 h-3.5 text-ink-secondary shrink-0" />
               </button>
             </div>
 
             <button
               type="button"
               onClick={resetAllFilters}
-              className="w-full min-h-[42px] px-3 rounded-[10px] bg-white hover:bg-[#F5F6F2] border border-[#DDE2DC] text-xs font-bold text-[#15251F] flex items-center justify-center gap-2 transition-colors"
+              className="w-full min-h-[42px] px-3 rounded-[10px] bg-white hover:bg-[#F5F6F2] border border-[#DDE2DC] text-xs font-bold text-ink flex items-center justify-center gap-2 transition-colors"
             >
-              <RotateCcw className="w-3.5 h-3.5 text-[#52605A]" />
+              <RotateCcw className="w-3.5 h-3.5 text-ink-secondary" />
               <span>Xóa bộ lọc</span>
             </button>
           </aside>
@@ -820,26 +820,26 @@ export default function ExploreView({
             {/* Desktop Sort & Status Bar */}
             <div className="hidden lg:flex items-center justify-between px-4 py-2.5 rounded-[12px] bg-white border border-[#DDE2DC]">
               <div className="flex items-center gap-2">
-                <span className="text-sm font-medium text-[#52605A]">
+                <span className="text-sm font-medium text-ink-secondary">
                   Sắp xếp:
                 </span>
                 <div className="relative">
                   <select
                     value={sortBy}
                     onChange={(e) => setSortBy(e.target.value as SortOption)}
-                    className="min-h-[34px] pr-6 bg-transparent text-sm font-extrabold text-[#15251F] appearance-none cursor-pointer outline-none"
+                    className="min-h-[34px] pr-6 bg-transparent text-sm font-extrabold text-ink appearance-none cursor-pointer outline-none"
                     aria-label="Sắp xếp bài viết"
                   >
                     <option value="NEAREST">Gần nhất</option>
                     <option value="NEWEST">Mới nhất</option>
                     <option value="URGENT">Ưu tiên SOS</option>
                   </select>
-                  <ChevronDown className="w-4 h-4 text-[#15251F] pointer-events-none absolute right-0 top-1/2 -translate-y-1/2" />
+                  <ChevronDown className="w-4 h-4 text-ink pointer-events-none absolute right-0 top-1/2 -translate-y-1/2" />
                 </div>
               </div>
 
               <div className="flex items-center gap-3">
-                <span className="text-xs font-semibold text-[#52605A]">
+                <span className="text-xs font-semibold text-ink-secondary">
                   Hiển thị {filteredSpots.length} bài viết
                 </span>
                 {onTriggerUpdate && (
@@ -847,7 +847,7 @@ export default function ExploreView({
                     type="button"
                     onClick={onTriggerUpdate}
                     disabled={isUpdating}
-                    className="min-h-[34px] px-3 rounded-[8px] bg-[#F5F6F2] hover:bg-[#E4EDDD] text-xs font-bold text-[#123F35] inline-flex items-center gap-1.5 transition-colors disabled:opacity-60"
+                    className="min-h-[34px] px-3 rounded-[8px] bg-[#F5F6F2] hover:bg-brand-soft text-xs font-bold text-brand inline-flex items-center gap-1.5 transition-colors disabled:opacity-60"
                   >
                     <RotateCcw
                       className={`w-3.5 h-3.5 ${
@@ -862,14 +862,14 @@ export default function ExploreView({
 
             {filteredSpots.length === 0 ? (
               <div className="p-8 sm:p-10 text-center rounded-[12px] bg-white border border-[#DDE2DC] space-y-3">
-                <p className="text-base font-bold text-[#15251F]">
+                <p className="text-base font-bold text-ink">
                   {visualSearchImage
                     ? 'Không tìm thấy bài viết nào có hình ảnh trùng khớp'
                     : isSavedView
                     ? 'Bạn chưa lưu bài viết nào'
                     : 'Không tìm thấy bài viết nào phù hợp'}
                 </p>
-                <p className="text-xs sm:text-sm text-[#52605A]">
+                <p className="text-xs sm:text-sm text-ink-secondary">
                   {visualSearchImage
                     ? 'Hệ thống chỉ lọc những bài viết cùng loài và có đặc điểm ngoại hình tương đồng với ảnh bạn tải lên.'
                     : isSavedView
@@ -887,7 +887,7 @@ export default function ExploreView({
                       resetAllFilters();
                     }
                   }}
-                  className="min-h-[42px] px-4 py-2 rounded-[10px] bg-[#123F35] text-white text-xs sm:text-sm font-bold inline-flex items-center gap-1.5"
+                  className="min-h-[42px] px-4 py-2 rounded-[10px] bg-brand text-white text-xs sm:text-sm font-bold inline-flex items-center gap-1.5"
                 >
                   <RotateCcw className="w-3.5 h-3.5" />
                   <span>
@@ -925,7 +925,7 @@ export default function ExploreView({
               </div>
             )}
 
-            <p className="lg:hidden flex items-center gap-1.5 text-xs text-[#52605A] pt-1 px-1">
+            <p className="lg:hidden flex items-center gap-1.5 text-xs text-ink-secondary pt-1 px-1">
               <Info className="w-3.5 h-3.5 shrink-0" />
               <span>Hiển thị theo khu vực bạn chọn ({locationLabel}).</span>
             </p>
@@ -942,7 +942,7 @@ export default function ExploreView({
 
             {/* Action Guide Card (matches desktop-explore.png "Bạn có thể giúp bằng cách nào?") */}
             <div className="bg-white rounded-[12px] border border-[#DDE2DC] p-4 space-y-2.5 shadow-[0_2px_10px_rgba(21,37,31,0.04)]">
-              <h3 className="text-base font-extrabold text-[#15251F]">
+              <h3 className="text-base font-extrabold text-ink">
                 Bạn có thể giúp bằng cách nào?
               </h3>
 
@@ -950,41 +950,41 @@ export default function ExploreView({
                 <button
                   type="button"
                   onClick={handleQuickReportSighting}
-                  className="w-full min-h-[44px] py-2.5 flex items-center justify-between gap-3 text-left text-sm font-semibold text-[#15251F] hover:text-[#123F35] transition-colors group"
+                  className="w-full min-h-[44px] py-2.5 flex items-center justify-between gap-3 text-left text-sm font-semibold text-ink hover:text-brand transition-colors group"
                 >
                   <span className="flex items-center gap-2.5">
-                    <MapPin className="w-4 h-4 text-[#123F35] shrink-0" />
+                    <MapPin className="w-4 h-4 text-brand shrink-0" />
                     <span>Báo nơi nhìn thấy</span>
                   </span>
-                  <ChevronRight className="w-4 h-4 text-[#52605A] group-hover:translate-x-0.5 transition-transform shrink-0" />
+                  <ChevronRight className="w-4 h-4 text-ink-secondary group-hover:translate-x-0.5 transition-transform shrink-0" />
                 </button>
 
                 <button
                   type="button"
                   onClick={handleQuickContactPoster}
-                  className="w-full min-h-[44px] py-2.5 flex items-center justify-between gap-3 text-left text-sm font-semibold text-[#15251F] hover:text-[#123F35] transition-colors group"
+                  className="w-full min-h-[44px] py-2.5 flex items-center justify-between gap-3 text-left text-sm font-semibold text-ink hover:text-brand transition-colors group"
                 >
                   <span className="flex items-center gap-2.5">
-                    <Phone className="w-4 h-4 text-[#123F35] shrink-0" />
+                    <Phone className="w-4 h-4 text-brand shrink-0" />
                     <span>Liên hệ người đăng</span>
                   </span>
-                  <ChevronRight className="w-4 h-4 text-[#52605A] group-hover:translate-x-0.5 transition-transform shrink-0" />
+                  <ChevronRight className="w-4 h-4 text-ink-secondary group-hover:translate-x-0.5 transition-transform shrink-0" />
                 </button>
 
                 <button
                   type="button"
                   onClick={handleSharePage}
-                  className="w-full min-h-[44px] py-2.5 flex items-center justify-between gap-3 text-left text-sm font-semibold text-[#15251F] hover:text-[#123F35] transition-colors group"
+                  className="w-full min-h-[44px] py-2.5 flex items-center justify-between gap-3 text-left text-sm font-semibold text-ink hover:text-brand transition-colors group"
                 >
                   <span className="flex items-center gap-2.5">
-                    <Share2 className="w-4 h-4 text-[#123F35] shrink-0" />
+                    <Share2 className="w-4 h-4 text-brand shrink-0" />
                     <span>
                       {copiedShareLink
                         ? 'Đã sao chép liên kết chia sẻ!'
                         : 'Chia sẻ bài viết'}
                     </span>
                   </span>
-                  <ChevronRight className="w-4 h-4 text-[#52605A] group-hover:translate-x-0.5 transition-transform shrink-0" />
+                  <ChevronRight className="w-4 h-4 text-ink-secondary group-hover:translate-x-0.5 transition-transform shrink-0" />
                 </button>
               </div>
             </div>

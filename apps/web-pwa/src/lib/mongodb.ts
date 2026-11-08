@@ -7,7 +7,8 @@ import {
 } from '@/lib/security';
 import {
   ServerAccountRecord,
-  computeServerPinHash,
+  createServerPinCredentials,
+  isServerPinValid,
 } from '@/lib/server-community-store';
 import {
   DomSpot,
@@ -21,10 +22,14 @@ import {
   normalizePhoneDigits,
 } from '@/lib/types';
 
-const DEFAULT_MONGODB_URI =
-  'mongodb+srv://luuhuy05032005h_db_user:33772626asd@cluster0.htkjrkb.mongodb.net/dom_nho?retryWrites=true&w=majority';
-const MONGODB_URI = process.env.MONGODB_URI || DEFAULT_MONGODB_URI;
+const MONGODB_URI = process.env.MONGODB_URI?.trim();
 const MONGODB_DB_NAME = process.env.MONGODB_DB_NAME || 'dom_nho';
+const MONGODB_ENABLED =
+  process.env.MONGODB_ENABLED?.trim().toLowerCase() !== 'false';
+
+export function isMongoEnabled(): boolean {
+  return MONGODB_ENABLED && Boolean(MONGODB_URI);
+}
 
 declare global {
   // eslint-disable-next-line no-var
@@ -36,6 +41,18 @@ declare global {
 }
 
 function getMongoClientPromise(): Promise<MongoClient> {
+  if (!MONGODB_ENABLED) {
+    return Promise.reject(
+      new Error('MongoDB is disabled; using local fallback store')
+    );
+  }
+
+  if (!MONGODB_URI) {
+    return Promise.reject(
+      new Error('MONGODB_URI is not configured; using local fallback store')
+    );
+  }
+
   if (
     global.__domNhoMongoCooldownUntil &&
     Date.now() < global.__domNhoMongoCooldownUntil
@@ -51,7 +68,9 @@ function getMongoClientPromise(): Promise<MongoClient> {
     });
     global.__domNhoMongoClientPromise = client.connect().catch((err) => {
       global.__domNhoMongoClientPromise = undefined;
-      global.__domNhoMongoCooldownUntil = Date.now() + 60_000;
+      const errorCode = Number((err as { code?: number })?.code || 0);
+      global.__domNhoMongoCooldownUntil =
+        Date.now() + (errorCode === 8000 ? 5 * 60_000 : 60_000);
       throw err;
     });
   }
@@ -152,7 +171,6 @@ export async function authenticateOrRegisterInMongo(params: {
     throw new Error('Mã PIN bảo mật phải gồm từ 4 đến 6 chữ số.');
   }
 
-  const pinHash = computeServerPinHash(normalizedPhone, cleanPin);
   const today = new Date().toISOString().slice(0, 10);
   const nowIso = new Date().toISOString();
 
@@ -168,11 +186,17 @@ export async function authenticateOrRegisterInMongo(params: {
       );
     }
 
-    if (existing.pinHash !== pinHash) {
+    if (!isServerPinValid(existing, normalizedPhone, cleanPin)) {
       throw new Error(
         'Số điện thoại này đã có tài khoản nhưng mã PIN không chính xác.'
       );
     }
+
+    const upgradedCredentials =
+      existing.pinHashVersion === 'scrypt-v1' && existing.pinSalt
+        ? {}
+        : createServerPinCredentials(normalizedPhone, cleanPin);
+    const deviceSecretToken = crypto.randomBytes(32).toString('base64url');
 
     const updatedDisplayName =
       params.allowSyncExisting && cleanName.length >= 2
@@ -191,6 +215,8 @@ export async function authenticateOrRegisterInMongo(params: {
           dailyPostCount,
           spamAttempts,
           lastPostDate: today,
+          ...upgradedCredentials,
+          deviceSecretToken,
           updatedAt: nowIso,
         },
       }
@@ -202,6 +228,8 @@ export async function authenticateOrRegisterInMongo(params: {
       dailyPostCount,
       spamAttempts,
       lastPostDate: today,
+      ...upgradedCredentials,
+      deviceSecretToken,
       updatedAt: nowIso,
     };
   }
@@ -226,14 +254,15 @@ export async function authenticateOrRegisterInMongo(params: {
       ? params.id
       : deterministicAccountIdFromPhone(normalizedPhone);
 
+  const credentials = createServerPinCredentials(normalizedPhone, cleanPin);
   const newRecord: ServerAccountRecord = {
     id: profileId,
     displayName: cleanName,
     normalizedPhone,
     rawPhone: cleanPhone,
     maskedPhone: maskPhoneNumber(cleanPhone),
-    pinHash,
-    deviceSecretToken: `dom_phone_${normalizedPhone}`,
+    ...credentials,
+    deviceSecretToken: crypto.randomBytes(32).toString('base64url'),
     coupleRoomCode: deriveRoomCode(profileId),
     patrolModeActive: true,
     dailyPostCount: 0,
@@ -251,6 +280,16 @@ export async function authenticateOrRegisterInMongo(params: {
   );
 
   return newRecord;
+}
+
+export async function findAccountBySessionTokenInMongo(
+  sessionToken: string
+): Promise<ServerAccountRecord | null> {
+  if (!sessionToken || sessionToken.length < 32) return null;
+  const db = await getMongoDb();
+  return db
+    .collection<ServerAccountRecord>('accounts')
+    .findOne({ deviceSecretToken: sessionToken });
 }
 
 export async function updateAccountPreferencesInMongo(params: {
@@ -404,48 +443,10 @@ export async function createSpotInMongo(params: {
   const existingAccount = await accountsCol.findOne({ normalizedPhone });
   let account: ServerAccountRecord;
   if (!existingAccount) {
-    const profileId =
-      params.authorId &&
-      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
-        params.authorId
-      )
-        ? params.authorId
-        : deterministicAccountIdFromPhone(normalizedPhone);
-
-    account = {
-      id: profileId,
-      displayName: params.authorName.trim(),
-      normalizedPhone,
-      rawPhone: cleanPhone,
-      maskedPhone: maskPhoneNumber(cleanPhone),
-      pinHash: computeServerPinHash(normalizedPhone, params.pinCode || '0000'),
-      deviceSecretToken: `dom_phone_${normalizedPhone}`,
-      coupleRoomCode: deriveRoomCode(profileId),
-      patrolModeActive: true,
-      dailyPostCount: 0,
-      lastPostDate: today,
-      spamAttempts: 0,
-      isShadowbanned: false,
-      createdAt: nowIso,
-      updatedAt: nowIso,
-    };
-    await accountsCol.updateOne(
-      { normalizedPhone },
-      { $set: account },
-      { upsert: true }
-    );
+    throw new Error('Tài khoản không tồn tại hoặc phiên đăng nhập không hợp lệ.');
   } else {
     account = {
-      id: existingAccount.id,
-      displayName: existingAccount.displayName,
-      normalizedPhone: existingAccount.normalizedPhone,
-      rawPhone: existingAccount.rawPhone,
-      maskedPhone: existingAccount.maskedPhone,
-      pinHash: existingAccount.pinHash,
-      deviceSecretToken: existingAccount.deviceSecretToken,
-      coupleRoomCode: existingAccount.coupleRoomCode,
-      partnerName: existingAccount.partnerName,
-      patrolModeActive: existingAccount.patrolModeActive,
+      ...existingAccount,
       dailyPostCount:
         existingAccount.lastPostDate !== today
           ? 0
@@ -456,9 +457,11 @@ export async function createSpotInMongo(params: {
           ? 0
           : existingAccount.spamAttempts || 0,
       isShadowbanned: Boolean(existingAccount.isShadowbanned),
-      createdAt: existingAccount.createdAt,
       updatedAt: existingAccount.updatedAt,
     };
+  }
+  if (account.id !== params.authorId) {
+    throw new Error('Tài khoản không có quyền tạo bài đăng này.');
   }
 
   if (!params.skipRateLimit) {
@@ -834,6 +837,12 @@ export async function addSpotSightingInMongo(params: {
     'sightings'
   );
 
+  const rec = await postsCol.findOne({
+    id: params.spotId,
+    isDeleted: { $ne: true },
+  });
+  if (!rec) throw new Error('Không tìm thấy bài đăng để lưu báo cáo nhìn thấy.');
+
   const dist = calculateDistanceMeters(
     params.originLat,
     params.originLng,
@@ -855,26 +864,20 @@ export async function addSpotSightingInMongo(params: {
 
   await sightingsCol.insertOne({ ...item, spotId: params.spotId });
 
-  const rec = await postsCol.findOne({
-    id: params.spotId,
-    isDeleted: { $ne: true },
-  });
-  if (rec) {
-    const updatedSightings = [item, ...(rec.spot.sightings || [])];
-    const nextPower = Math.min(200, (rec.spot.lightPower || 100) + 25);
-    const nextBoost = (rec.spot.boostCount || 1) + 1;
-    await postsCol.updateOne(
-      { id: params.spotId },
-      {
-        $set: {
-          'spot.sightings': updatedSightings,
-          'spot.lightPower': nextPower,
-          'spot.boostCount': nextBoost,
-          updatedAt: new Date().toISOString(),
-        },
-      }
-    );
-  }
+  const updatedSightings = [item, ...(rec.spot.sightings || [])];
+  const nextPower = Math.min(200, (rec.spot.lightPower || 100) + 25);
+  const nextBoost = (rec.spot.boostCount || 1) + 1;
+  await postsCol.updateOne(
+    { id: params.spotId },
+    {
+      $set: {
+        'spot.sightings': updatedSightings,
+        'spot.lightPower': nextPower,
+        'spot.boostCount': nextBoost,
+        updatedAt: new Date().toISOString(),
+      },
+    }
+  );
 
   return item;
 }
@@ -896,6 +899,12 @@ export async function unlockSpotContactInMongo(params: {
   const postsCol = db.collection<MongoStoredPostDoc>('posts');
   const unlocksCol = db.collection('contact_unlocks');
 
+  const rec = await postsCol.findOne({
+    id: params.spotId,
+    isDeleted: { $ne: true },
+  });
+  if (!rec) throw new Error('Không tìm thấy bài đăng để mở thông tin liên hệ.');
+
   await unlocksCol.insertOne({
     id: `unlock-${Date.now()}`,
     spotId: params.spotId,
@@ -907,14 +916,6 @@ export async function unlockSpotContactInMongo(params: {
     proofImageUrl: params.proofImageUrl,
     createdAt: new Date().toISOString(),
   });
-
-  const rec = await postsCol.findOne({
-    id: params.spotId,
-    isDeleted: { $ne: true },
-  });
-  if (!rec) {
-    return { rawPhone: null, maskedPhone: null, zaloLink: null };
-  }
 
   if (
     params.requesterId &&

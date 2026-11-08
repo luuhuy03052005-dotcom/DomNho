@@ -9,6 +9,11 @@ import {
   listCommunitySpotsFromServerStore,
   listDeletedSpotIdsFromServerStore,
 } from '@/lib/server-community-store';
+import {
+  resolveAuthenticatedAccount,
+  rejectUntrustedOrigin,
+  unauthorizedResponse,
+} from '@/lib/server-auth';
 import { DomSpot, isSpotDeletedOrHidden } from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
@@ -20,6 +25,10 @@ export const dynamic = 'force-dynamic';
  */
 export async function POST(request: NextRequest) {
   try {
+    const originError = rejectUntrustedOrigin(request);
+    if (originError) return originError;
+    const account = await resolveAuthenticatedAccount(request);
+    if (!account) return unauthorizedResponse();
     const body = await request.json();
 
     const targetLat = Number(body.publicLat ?? body.lat ?? 0);
@@ -27,26 +36,32 @@ export async function POST(request: NextRequest) {
 
     const [mongoDeleted, mongoSpots] = await Promise.all([
       listDeletedSpotIdsFromMongo().catch(() => [] as string[]),
-      fetchCommunitySpotsFromMongo().catch(() => [] as DomSpot[]),
+      fetchCommunitySpotsFromMongo(account.id).catch(() => [] as DomSpot[]),
     ]);
     const deletedIds = new Set<string>([
       ...mongoDeleted,
       ...listDeletedSpotIdsFromServerStore(),
     ]);
-    const serverSpots = listCommunitySpotsFromServerStore();
+    const serverSpots = listCommunitySpotsFromServerStore(account.id);
     const seenIds = new Set<string>();
     const pool: DomSpot[] = [];
     for (const sp of [...mongoSpots, ...serverSpots, ...INITIAL_DOM_SPOTS]) {
       if (!sp?.id || seenIds.has(sp.id)) continue;
       if (isSpotDeletedOrHidden(sp, deletedIds)) continue;
+      if (
+        sp.visibility === 'PRIVATE_COUPLE' &&
+        sp.coupleRoomCode !== account.coupleRoomCode
+      ) {
+        continue;
+      }
       seenIds.add(sp.id);
       pool.push(sp);
     }
 
     const targetSpot: DomSpot = {
       id: String(body.id || ''),
-      authorId: String(body.authorId || ''),
-      authorName: String(body.authorName || ''),
+      authorId: account.id,
+      authorName: account.displayName,
       spotType: body.spotType === 'RED_SOS' ? 'RED_SOS' : 'ORANGE_SIGHT',
       status: 'ACTIVE',
       visibility: 'PUBLIC',
@@ -67,7 +82,7 @@ export async function POST(request: NextRequest) {
       lightPower: 100,
       boostCount: 1,
       allowFoster: false,
-      maskedPhone: String(body.maskedPhone || 'Chưa cung cấp SĐT'),
+      maskedPhone: account.maskedPhone,
       sourceType: 'USER_POST',
       hoursAgo: 0,
       createdAt: new Date().toISOString(),

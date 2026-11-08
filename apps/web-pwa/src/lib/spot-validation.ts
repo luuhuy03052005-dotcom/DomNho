@@ -54,6 +54,22 @@ export function getPostAgeDays(spot: DomSpot, now = Date.now()): number | null {
   return Math.floor((now - t) / 86_400_000);
 }
 
+/** Chuyển Markdown/link nhúng còn sót từ nguồn crawl thành văn bản thuần để hiển thị. */
+export function sanitizeCrawledStory(value: string | undefined | null): string {
+  if (!value) return '';
+  return value
+    .replace(
+      /!?\[((?:\\.|[^\]])*)\]\((?:\\.|[^)])*\)/g,
+      (_match, rawLabel: string) =>
+        ` ${rawLabel.replace(/\\([\[\]_*`])/g, '$1').trim()} `
+    )
+    .replace(/https?:\/\/\S+/gi, ' ')
+    .replace(/\bFollow\s+on\s+(?:Facebook|TikTok|Instagram|YouTube)\b/gi, ' ')
+    .replace(/\\([\[\]_*`])/g, '$1')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 /**
  * Kiểm tra chuỗi địa chỉ có đủ thông tin cụ thể (số nhà, tên đường, phường/xã, địa danh cụ thể) hay không.
  * Nếu chỉ ghi chung chung tên Tỉnh/Thành phố hoặc Quận/Huyện mà không có phường/đường/địa danh cụ thể -> trả về false để không gán tọa độ bừa bãi lên bản đồ.
@@ -122,6 +138,11 @@ export function filterTrustedSpots(spots: DomSpot[], now = Date.now()): DomSpot[
       const cleanImages = (s.images || []).filter((img) => !isForbiddenImageUrl(img));
       return {
         ...s,
+        story:
+          s.sourceType === 'USER_POST'
+            ? s.story
+            : sanitizeCrawledStory(s.story) ||
+              'Xem nội dung chi tiết tại bài viết gốc.',
         images: cleanImages.length > 0 ? cleanImages : s.images,
         hasExactLocation: exact,
       };

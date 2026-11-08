@@ -6,21 +6,21 @@
 :root {
   --canvas: #FAF7F1;
   --surface: #FFFFFF;
-  --surface-muted: #F1EFE8;
-  --ink: #142820;
+  --surface-muted: #F5F6F2;
+  --ink: #15251F;
   --ink-secondary: #52605A;
-  --brand: #0E513B;
-  --brand-hover: #0A412F;
-  --brand-soft: #E8EFE6;
+  --brand: #123F35;
+  --brand-hover: #0C3028;
+  --brand-soft: #E4EDDD;
   --rescue: #AF421F;
   --rescue-soft: #FFF0E5;
   --lost: #80570D;
   --lost-soft: #FFF3D8;
   --accent: #D8724D;
-  --border: #DDDCD4;
+  --border: #DDE2DC;
   --focus: #176CBA;
   --dom-bg: #FAF7F1;
-  --dom-text: #142820;
+  --dom-text: #15251F;
 }
 
 * {
@@ -41,7 +41,7 @@ body {
   min-height: 100dvh;
   background-color: var(--dom-bg);
   color: var(--dom-text);
-  font-family: 'Be Vietnam Pro', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue',
+  font-family: var(--font-dom-sans), -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue',
     Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
 }
@@ -56,7 +56,16 @@ body {
 }
 
 .font-serif-letter {
-  font-family: 'Lora', Georgia, Cambria, 'Times New Roman', serif;
+  font-family: var(--font-dom-serif), Georgia, Cambria, 'Times New Roman', serif;
+}
+
+:is(a, button, input, select, textarea, summary, [role='button'], [tabindex]):focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 3px;
+}
+
+button:disabled:focus-visible {
+  outline: none;
 }
 
 .letter-paper-surface {

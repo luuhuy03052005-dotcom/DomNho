@@ -12,9 +12,7 @@ import {
   rankSpotsByVisualSimilarity,
 } from '@/lib/visual-matcher';
 
-const GEMINI_KEY =
-  process.env.GEMINI_API_KEY ||
-  'AQ.Ab8RN6Ip0zG0UgwbGaZVQXA6LZ1MWT2It5NzlWHFmLDHFK904w';
+const GEMINI_KEY = process.env.GEMINI_API_KEY?.trim();
 const GEMINI_MODEL = 'gemini-2.5-flash';
 
 function postJson(
@@ -54,6 +52,12 @@ function postJson(
 
 export async function POST(request: NextRequest) {
   try {
+    if (!GEMINI_KEY) {
+      return NextResponse.json(
+        { ok: false, error: 'GEMINI_API_KEY chưa được cấu hình.' },
+        { status: 503 }
+      );
+    }
     const body = await request.json();
     const { imageDataUrl, candidateSpots, userCoords } = body;
 

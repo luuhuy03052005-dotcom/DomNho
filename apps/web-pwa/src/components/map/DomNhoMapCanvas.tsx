@@ -508,8 +508,8 @@ export default function DomNhoMapCanvas({
       <div ref={mapContainerRef} className="absolute inset-0 w-full h-full" />
 
       <div className="hidden md:block absolute left-4 bottom-4 z-20 bg-white/95 border border-[#DDDCD4] rounded-[12px] p-3 shadow-sm space-y-2 pointer-events-none select-none">
-        <div className="flex items-center gap-2.5 text-xs font-semibold text-[#142820]">
-          <span className="w-5 h-5 rounded-full bg-[#0E513B] flex items-center justify-center shrink-0">
+        <div className="flex items-center gap-2.5 text-xs font-semibold text-ink">
+          <span className="w-5 h-5 rounded-full bg-brand flex items-center justify-center shrink-0">
             <svg width="11" height="11" viewBox="0 0 24 24" fill="none">
               <path
                 d="M3 10.5L12 3L21 10.5V20H15V14H9V20H3V10.5Z"
@@ -520,7 +520,7 @@ export default function DomNhoMapCanvas({
           <span>Trạm &amp; Nhận nuôi</span>
         </div>
 
-        <div className="flex items-center gap-2.5 text-xs font-semibold text-[#142820]">
+        <div className="flex items-center gap-2.5 text-xs font-semibold text-ink">
           <span className="w-5 h-5 rounded-full bg-[#C84B24] flex items-center justify-center shrink-0">
             <svg width="11" height="11" viewBox="0 0 24 24" fill="none">
               <circle
@@ -541,7 +541,7 @@ export default function DomNhoMapCanvas({
           <span>Cứu trợ</span>
         </div>
 
-        <div className="flex items-center gap-2.5 text-xs font-semibold text-[#142820]">
+        <div className="flex items-center gap-2.5 text-xs font-semibold text-ink">
           <span className="w-5 h-5 rounded-full bg-[#D4942A] flex items-center justify-center shrink-0">
             <svg width="11" height="11" viewBox="0 0 24 24" fill="none">
               <circle cx="7" cy="8" r="2.2" fill="#FFFFFF" />
@@ -556,7 +556,7 @@ export default function DomNhoMapCanvas({
           <span>Thú lạc</span>
         </div>
 
-        <div className="flex items-center gap-2.5 text-xs font-semibold text-[#142820]">
+        <div className="flex items-center gap-2.5 text-xs font-semibold text-ink">
           <span className="w-5 h-5 rounded-full bg-[#8E44AD] flex items-center justify-center shrink-0">
             <svg width="11" height="11" viewBox="0 0 24 24" fill="none">
               <path
@@ -573,7 +573,7 @@ export default function DomNhoMapCanvas({
         <button
           type="button"
           onClick={handleZoomIn}
-          className="min-w-[44px] min-h-[44px] rounded-[10px] flex items-center justify-center shadow-sm border border-[#DDDCD4] bg-white/95 text-[#142820] hover:border-[#0E513B] transition-colors"
+          className="min-w-[44px] min-h-[44px] rounded-[10px] flex items-center justify-center shadow-sm border border-[#DDDCD4] bg-white/95 text-ink hover:border-brand transition-colors"
           title="Phóng to bản đồ"
           aria-label="Phóng to bản đồ"
         >
@@ -583,7 +583,7 @@ export default function DomNhoMapCanvas({
         <button
           type="button"
           onClick={handleZoomOut}
-          className="min-w-[44px] min-h-[44px] rounded-[10px] flex items-center justify-center shadow-sm border border-[#DDDCD4] bg-white/95 text-[#142820] hover:border-[#0E513B] transition-colors"
+          className="min-w-[44px] min-h-[44px] rounded-[10px] flex items-center justify-center shadow-sm border border-[#DDDCD4] bg-white/95 text-ink hover:border-brand transition-colors"
           title="Thu nhỏ bản đồ"
           aria-label="Thu nhỏ bản đồ"
         >
@@ -597,8 +597,8 @@ export default function DomNhoMapCanvas({
           }
           className={`min-w-[44px] min-h-[44px] rounded-[10px] flex items-center justify-center shadow-sm border transition-colors ${
             mapLayerMode === 'hybrid'
-              ? 'bg-[#0E513B] text-white border-[#0E513B]'
-              : 'bg-white/95 text-[#142820] border-[#DDDCD4] hover:border-[#0E513B]'
+              ? 'bg-brand text-white border-brand'
+              : 'bg-white/95 text-ink border-[#DDDCD4] hover:border-brand'
           }`}
           title="Đổi lớp bản đồ Đường phố / Vệ tinh"
           aria-label="Đổi lớp bản đồ"
@@ -609,7 +609,7 @@ export default function DomNhoMapCanvas({
         <button
           type="button"
           onClick={handleCenterOnUser}
-          className="min-w-[44px] min-h-[44px] rounded-[10px] flex items-center justify-center shadow-sm border border-[#DDDCD4] bg-white/95 text-[#142820] hover:border-[#0E513B] transition-colors"
+          className="min-w-[44px] min-h-[44px] rounded-[10px] flex items-center justify-center shadow-sm border border-[#DDDCD4] bg-white/95 text-ink hover:border-brand transition-colors"
           title="Vị trí của tôi"
           aria-label="Vị trí của tôi"
         >
@@ -617,7 +617,7 @@ export default function DomNhoMapCanvas({
         </button>
       </div>
 
-      <div className="absolute right-2.5 bottom-2 z-10 px-2.5 py-0.5 rounded-full bg-white/90 border border-[#DDDCD4] text-[10px] font-medium text-[#52605A] pointer-events-none select-none">
+      <div className="absolute right-2.5 bottom-2 z-10 px-2.5 py-0.5 rounded-full bg-white/90 border border-[#DDDCD4] text-[10px] font-medium text-ink-secondary pointer-events-none select-none">
         Dữ liệu bản đồ © Google Maps
       </div>
     </div>

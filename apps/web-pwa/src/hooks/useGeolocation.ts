@@ -115,13 +115,23 @@ export function useGeolocation(patrolModeActive: boolean) {
     [requestCurrentGps]
   );
 
-  // Tự động thử lấy vị trí GPS thực tế khi khởi động
+  // Chỉ cập nhật tự động khi người dùng đã cấp quyền trước đó.
   useEffect(() => {
-    requestCurrentGps();
+    if (typeof navigator === 'undefined' || !navigator.permissions?.query) return;
+    let active = true;
+    navigator.permissions
+      .query({ name: 'geolocation' })
+      .then((permission) => {
+        if (active && permission.state === 'granted') requestCurrentGps();
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
   }, [requestCurrentGps]);
 
   useEffect(() => {
-    if (!patrolModeActive) return;
+    if (!patrolModeActive || !coords.isRealGps) return;
     if (typeof window === 'undefined' || !('geolocation' in navigator)) return;
 
     const watchId = navigator.geolocation.watchPosition(
@@ -139,7 +149,7 @@ export function useGeolocation(patrolModeActive: boolean) {
     );
 
     return () => navigator.geolocation.clearWatch(watchId);
-  }, [patrolModeActive]);
+  }, [patrolModeActive, coords.isRealGps]);
 
   return {
     coords,

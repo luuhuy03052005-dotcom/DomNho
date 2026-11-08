@@ -223,25 +223,7 @@ export function isSpotOwnedByUser(
     return Boolean(spot.authorId && spot.authorId === sessionOrUserId);
   }
 
-  if (spot.authorId && spot.authorId === sessionOrUserId.id) {
-    return true;
-  }
-
-  if (sessionOrUserId.rawPhone) {
-    const detId = deterministicAccountIdFromPhone(sessionOrUserId.rawPhone);
-    if (spot.authorId && spot.authorId === detId) {
-      return true;
-    }
-    if (spot.rawPhoneSecret) {
-      const spotPhone = normalizePhoneDigits(spot.rawPhoneSecret);
-      const userPhone = normalizePhoneDigits(sessionOrUserId.rawPhone);
-      if (spotPhone.length >= 8 && spotPhone === userPhone) {
-        return true;
-      }
-    }
-  }
-
-  return false;
+  return Boolean(spot.authorId && spot.authorId === sessionOrUserId.id);
 }
 
 export interface SpotBadgeMeta {
@@ -517,7 +499,9 @@ export interface SpotVerificationInfo {
   httpStatus: number;
   imageHttpStatus: number;
   verifiedAt: string;
-  geminiModel: string;
+  provider?: string;
+  /** @deprecated Dùng provider cho dữ liệu crawl mới. Giữ lại để đọc feed cũ an toàn. */
+  geminiModel?: string;
   sourceDomain: string;
   canonicalUrl: string;
   imageCount: number;
@@ -589,7 +573,7 @@ export interface DomSpot {
   zaloLink?: string;
   isContactUnlockedForViewer?: boolean;
 
-  sourceType: 'USER_POST' | 'FB_CRAWLER';
+  sourceType: 'USER_POST' | 'CRAWL4AI' | 'FB_CRAWLER';
   sourcePlatform?: CrawlPlatform;
   sourceUrl?: string;
   isVerified?: boolean;
@@ -655,10 +639,7 @@ export interface SavedGoogleMapPlace {
 export interface UserSession {
   id: string;
   displayName: string;
-  pinCode: string;
-  rawPhone: string;
   maskedPhone: string;
-  deviceSecretToken: string;
   coupleRoomCode: string;
   partnerName?: string;
   patrolModeActive: boolean;

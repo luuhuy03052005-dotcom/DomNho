@@ -307,19 +307,19 @@ export default function SpotDetailModal({
       >
         <div
           onClick={(e) => e.stopPropagation()}
-          className="w-full h-[100dvh] sm:h-auto sm:max-h-[90dvh] sm:max-w-2xl bg-[#F5F6F2] text-[#15251F] sm:rounded-2xl sm:border sm:border-[#E2E5DC] shadow-2xl flex flex-col overflow-hidden"
+          className="w-full h-[100dvh] sm:h-auto sm:max-h-[90dvh] sm:max-w-2xl bg-[#F5F6F2] text-ink sm:rounded-2xl sm:border sm:border-[#E2E5DC] shadow-2xl flex flex-col overflow-hidden"
         >
           <header className="shrink-0 bg-[#F5F6F2] border-b border-[#E2E5DC] px-3 sm:px-5 py-2.5 pt-[max(10px,env(safe-area-inset-top,0px))] flex items-center justify-between gap-2">
             <button
               type="button"
               onClick={onClose}
-              className="min-w-[40px] min-h-[40px] rounded-[10px] bg-white border border-[#E2E5DC] text-[#15251F] hover:bg-[#ECEFE7] flex items-center justify-center transition-colors"
+              className="min-w-[40px] min-h-[40px] rounded-[10px] bg-white border border-[#E2E5DC] text-ink hover:bg-[#ECEFE7] flex items-center justify-center transition-colors"
               aria-label="Quay lại"
             >
               <ArrowLeft className="w-4 h-4 shrink-0" />
             </button>
 
-            <h2 className="text-base sm:text-lg font-extrabold text-[#15251F] truncate">
+            <h2 className="text-base sm:text-lg font-extrabold text-ink truncate">
               Chi tiết tin
             </h2>
 
@@ -332,12 +332,12 @@ export default function SpotDetailModal({
                   aria-label={isSaved ? 'Bỏ lưu bài viết' : 'Lưu bài viết'}
                   className={`min-w-[40px] min-h-[40px] rounded-[10px] border flex items-center justify-center transition-colors ${
                     isSaved
-                      ? 'bg-[#E4EDDD] border-[#123F35] text-[#123F35]'
-                      : 'bg-white border-[#E2E5DC] text-[#15251F] hover:border-[#123F35]'
+                      ? 'bg-brand-soft border-brand text-brand'
+                      : 'bg-white border-[#E2E5DC] text-ink hover:border-brand'
                   }`}
                 >
                   <Bookmark
-                    className={`w-4 h-4 ${isSaved ? 'fill-[#123F35]' : ''}`}
+                    className={`w-4 h-4 ${isSaved ? 'fill-brand' : ''}`}
                   />
                 </button>
               )}
@@ -345,7 +345,7 @@ export default function SpotDetailModal({
               <button
                 type="button"
                 onClick={onClose}
-                className="hidden sm:flex min-w-[40px] min-h-[40px] rounded-[10px] bg-white border border-[#E2E5DC] text-[#53635B] hover:text-[#15251F] hover:bg-[#ECEFE7] items-center justify-center transition-colors"
+                className="hidden sm:flex min-w-[40px] min-h-[40px] rounded-[10px] bg-white border border-[#E2E5DC] text-ink-secondary hover:text-ink hover:bg-[#ECEFE7] items-center justify-center transition-colors"
                 aria-label="Đóng chi tiết tin"
               >
                 <X className="w-4 h-4" />
@@ -385,13 +385,13 @@ export default function SpotDetailModal({
                           (i) => (i - 1 + safeImages.length) % safeImages.length
                         )
                       }
-                      className="w-8 h-8 rounded-[8px] bg-white border border-[#E2E5DC] hover:border-[#123F35] text-[#15251F] flex items-center justify-center transition-colors"
+                      className="w-8 h-8 rounded-[8px] bg-white border border-[#E2E5DC] hover:border-brand text-ink flex items-center justify-center transition-colors"
                       aria-label="Ảnh trước"
                     >
                       <ChevronLeft className="w-4 h-4" />
                     </button>
 
-                    <span className="px-2.5 py-1 text-xs font-bold text-[#53635B]">
+                    <span className="px-2.5 py-1 text-xs font-bold text-ink-secondary">
                       {imageIndex + 1} / {safeImages.length}
                     </span>
 
@@ -400,14 +400,14 @@ export default function SpotDetailModal({
                       onClick={() =>
                         setImageIndex((i) => (i + 1) % safeImages.length)
                       }
-                      className="w-8 h-8 rounded-[8px] bg-white border border-[#E2E5DC] hover:border-[#123F35] text-[#15251F] flex items-center justify-center transition-colors"
+                      className="w-8 h-8 rounded-[8px] bg-white border border-[#E2E5DC] hover:border-brand text-ink flex items-center justify-center transition-colors"
                       aria-label="Ảnh tiếp theo"
                     >
                       <ChevronRight className="w-4 h-4" />
                     </button>
                   </div>
                 ) : (
-                  <span className="text-xs font-semibold text-[#53635B]">
+                  <span className="text-xs font-semibold text-ink-secondary">
                     1 / 1
                   </span>
                 )}
@@ -415,9 +415,9 @@ export default function SpotDetailModal({
                 <button
                   type="button"
                   onClick={() => setIsLightboxOpen(true)}
-                  className="h-9 px-3 rounded-[10px] bg-white border border-[#E2E5DC] hover:border-[#123F35] text-xs font-bold text-[#15251F] inline-flex items-center gap-1.5 transition-colors"
+                  className="h-9 px-3 rounded-[10px] bg-white border border-[#E2E5DC] hover:border-brand text-xs font-bold text-ink inline-flex items-center gap-1.5 transition-colors"
                 >
-                  <ZoomIn className="w-3.5 h-3.5 text-[#123F35]" />
+                  <ZoomIn className="w-3.5 h-3.5 text-brand" />
                   <span>Xem ảnh</span>
                 </button>
               </div>
@@ -431,7 +431,7 @@ export default function SpotDetailModal({
                       onClick={() => setImageIndex(idx)}
                       className={`relative w-14 h-14 rounded-[10px] overflow-hidden shrink-0 border-2 transition-all ${
                         idx === imageIndex
-                          ? 'border-[#123F35] shadow-sm'
+                          ? 'border-brand shadow-sm'
                           : 'border-[#E2E5DC] opacity-70 hover:opacity-100'
                       }`}
                       aria-label={`Xem ảnh ${idx + 1}`}
@@ -472,8 +472,8 @@ export default function SpotDetailModal({
 
                 <div className="flex items-center gap-2 flex-wrap">
                   {hasExactCoords && (
-                    <span className="px-2.5 py-0.5 rounded-full bg-white border border-[#E2E5DC] text-xs font-bold text-[#15251F] inline-flex items-center gap-1">
-                      <MapPin className="w-3 h-3 text-[#123F35] shrink-0" />
+                    <span className="px-2.5 py-0.5 rounded-full bg-white border border-[#E2E5DC] text-xs font-bold text-ink inline-flex items-center gap-1">
+                      <MapPin className="w-3 h-3 text-brand shrink-0" />
                       <span>{formatDistanceVi(distanceMeters)}</span>
                     </span>
                   )}
@@ -490,15 +490,15 @@ export default function SpotDetailModal({
                 </div>
               </div>
 
-              <h1 className="text-xl sm:text-2xl font-extrabold text-[#15251F] leading-snug">
+              <h1 className="text-xl sm:text-2xl font-extrabold text-ink leading-snug">
                 {spot.title}
               </h1>
 
-              <p className="text-xs sm:text-sm text-[#53635B] flex flex-wrap items-center gap-1.5">
-                <MapPin className="w-3.5 h-3.5 text-[#53635B] shrink-0" />
+              <p className="text-xs sm:text-sm text-ink-secondary flex flex-wrap items-center gap-1.5">
+                <MapPin className="w-3.5 h-3.5 text-ink-secondary shrink-0" />
                 <span>{spot.formattedAddress || spot.areaLabel}</span>
                 <span>·</span>
-                <span className="font-semibold text-[#15251F]">
+                <span className="font-semibold text-ink">
                   {friendlySource}
                 </span>
               </p>
@@ -506,11 +506,11 @@ export default function SpotDetailModal({
 
             {/* Section 1: Đặc điểm nhận diện */}
             <div className="p-4 rounded-[14px] bg-white border border-[#E2E5DC] space-y-2.5">
-              <h3 className="text-sm font-extrabold text-[#15251F]">
+              <h3 className="text-sm font-extrabold text-ink">
                 Đặc điểm nhận diện
               </h3>
 
-              <p className="text-sm text-[#53635B] leading-relaxed whitespace-pre-line">
+              <p className="text-sm text-ink-secondary leading-relaxed whitespace-pre-line">
                 {spot.story}
               </p>
 
@@ -519,19 +519,19 @@ export default function SpotDetailModal({
                 (Array.isArray(spot.traits) && spot.traits.length > 0)) && (
                 <div className="flex flex-wrap gap-1.5 pt-2 border-t border-[#ECEFE7]">
                   {spot.breed && spot.breed !== 'Chưa rõ giống' && (
-                    <span className="px-2.5 py-1 rounded-md bg-[#ECEFE7] text-xs font-semibold text-[#15251F]">
+                    <span className="px-2.5 py-1 rounded-md bg-[#ECEFE7] text-xs font-semibold text-ink">
                       Giống: {spot.breed}
                     </span>
                   )}
                   {spot.coatColor && spot.coatColor !== 'Chưa rõ màu lông' && (
-                    <span className="px-2.5 py-1 rounded-md bg-[#ECEFE7] text-xs font-semibold text-[#15251F]">
+                    <span className="px-2.5 py-1 rounded-md bg-[#ECEFE7] text-xs font-semibold text-ink">
                       Màu lông: {spot.coatColor}
                     </span>
                   )}
                   {spot.traits?.map((trait) => (
                     <span
                       key={trait}
-                      className="px-2.5 py-1 rounded-md bg-[#E4EDDD] text-xs font-semibold text-[#123F35]"
+                      className="px-2.5 py-1 rounded-md bg-brand-soft text-xs font-semibold text-brand"
                     >
                       {trait}
                     </span>
@@ -542,10 +542,10 @@ export default function SpotDetailModal({
 
             {/* Section 2: Lần cuối nhìn thấy / Vị trí ghi nhận */}
             <div className="p-4 rounded-[14px] bg-white border border-[#E2E5DC] space-y-1.5">
-              <h3 className="text-sm font-extrabold text-[#15251F]">
+              <h3 className="text-sm font-extrabold text-ink">
                 Lần cuối nhìn thấy
               </h3>
-              <p className="text-sm text-[#53635B]">
+              <p className="text-sm text-ink-secondary">
                 {spot.formattedAddress || spot.areaLabel}
                 {publishedDateFormatted
                   ? ` · Ghi nhận ngày ${publishedDateFormatted}`
@@ -563,7 +563,7 @@ export default function SpotDetailModal({
               <button
                 type="button"
                 onClick={() => openSubPanelAndScroll('REPORT_SIGHTING')}
-                className="w-full min-h-[44px] px-4 rounded-[12px] bg-[#ECEFE7] hover:bg-[#E4EDDD] border border-[#E2E5DC] text-sm font-bold text-[#15251F] flex items-center justify-center gap-2 transition-colors"
+                className="w-full min-h-[44px] px-4 rounded-[12px] bg-[#ECEFE7] hover:bg-brand-soft border border-[#E2E5DC] text-sm font-bold text-ink flex items-center justify-center gap-2 transition-colors"
               >
                 <Camera className="w-4 h-4 text-[#C84E2B] shrink-0" />
                 <span>Tôi đã nhìn thấy bé</span>
@@ -573,9 +573,9 @@ export default function SpotDetailModal({
                 <button
                   type="button"
                   onClick={() => onFocusSpotOnMap(spot)}
-                  className="w-full min-h-[44px] px-4 rounded-[12px] bg-white hover:bg-[#ECEFE7] border border-[#E2E5DC] text-sm font-bold text-[#15251F] flex items-center justify-center gap-2 transition-colors"
+                  className="w-full min-h-[44px] px-4 rounded-[12px] bg-white hover:bg-[#ECEFE7] border border-[#E2E5DC] text-sm font-bold text-ink flex items-center justify-center gap-2 transition-colors"
                 >
-                  <MapPin className="w-4 h-4 text-[#123F35] shrink-0" />
+                  <MapPin className="w-4 h-4 text-brand shrink-0" />
                   <span>Xem vị trí trên bản đồ</span>
                 </button>
               )}
@@ -586,18 +586,18 @@ export default function SpotDetailModal({
                     href={googleMapsDirectionFromUserUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="min-h-[40px] px-3.5 rounded-[10px] bg-white border border-[#E2E5DC] hover:border-[#123F35] text-xs font-bold text-[#15251F] flex items-center justify-center gap-1.5 transition-colors"
+                    className="min-h-[40px] px-3.5 rounded-[10px] bg-white border border-[#E2E5DC] hover:border-brand text-xs font-bold text-ink flex items-center justify-center gap-1.5 transition-colors"
                   >
-                    <Navigation className="w-3.5 h-3.5 text-[#123F35]" />
+                    <Navigation className="w-3.5 h-3.5 text-brand" />
                     <span>Chỉ đường Google Maps</span>
                   </a>
 
                   <button
                     type="button"
                     onClick={() => onSaveSpotToGoogleMapsVault(spot)}
-                    className="min-h-[40px] px-3.5 rounded-[10px] bg-white border border-[#E2E5DC] hover:border-[#123F35] text-xs font-bold text-[#15251F] flex items-center justify-center gap-1.5 transition-colors"
+                    className="min-h-[40px] px-3.5 rounded-[10px] bg-white border border-[#E2E5DC] hover:border-brand text-xs font-bold text-ink flex items-center justify-center gap-1.5 transition-colors"
                   >
-                    <Bookmark className="w-3.5 h-3.5 text-[#123F35]" />
+                    <Bookmark className="w-3.5 h-3.5 text-brand" />
                     <span>Lưu vào Sổ tay vị trí</span>
                   </button>
                 </div>
@@ -607,20 +607,20 @@ export default function SpotDetailModal({
             {isUserPost && (
               <div className="p-3.5 rounded-xl bg-white border border-[#DDDCD4] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div className="flex items-center gap-2.5">
-                  <div className="w-9 h-9 rounded-full bg-[#E8EFE6] text-[#0E513B] flex items-center justify-center shrink-0">
+                  <div className="w-9 h-9 rounded-full bg-brand-soft text-brand flex items-center justify-center shrink-0">
                     <ShieldCheck className="w-4 h-4" />
                   </div>
                   <div>
-                    <p className="text-xs font-bold text-[#142820]">
+                    <p className="text-xs font-bold text-ink">
                       Đăng bởi: {spot.authorName}
                     </p>
-                    <p className="text-xs text-[#52605A] flex flex-wrap items-center gap-2 mt-0.5">
+                    <p className="text-xs text-ink-secondary flex flex-wrap items-center gap-2 mt-0.5">
                       <Phone className="w-3 h-3 shrink-0" />
                       {isContactUnlocked && spot.rawPhoneSecret ? (
                         <span className="inline-flex flex-wrap items-center gap-2">
                           <a
                             href={`tel:${spot.rawPhoneSecret}`}
-                            className="font-bold text-[#0E513B] underline"
+                            className="font-bold text-brand underline"
                           >
                             {spot.rawPhoneSecret} (Bấm để gọi)
                           </a>
@@ -628,7 +628,7 @@ export default function SpotDetailModal({
                             href={`https://zalo.me/${spot.rawPhoneSecret.replace(/\D/g, '')}`}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="px-2 py-0.5 rounded bg-[#E8EFE6] text-[#0E513B] text-[11px] font-bold hover:bg-[#0E513B] hover:text-white transition-colors"
+                            className="px-2 py-0.5 rounded bg-brand-soft text-brand text-[11px] font-bold hover:bg-brand hover:text-white transition-colors"
                           >
                             Nhắn Zalo
                           </a>
@@ -660,7 +660,7 @@ export default function SpotDetailModal({
 
             {spot.sightings && spot.sightings.length > 0 && (
               <div className="space-y-2">
-                <p className="text-xs font-bold uppercase tracking-wider text-[#0E513B]">
+                <p className="text-xs font-bold uppercase tracking-wider text-brand">
                   Manh mối cộng đồng báo về ({spot.sightings.length})
                 </p>
                 <div className="space-y-2">
@@ -678,17 +678,17 @@ export default function SpotDetailModal({
                       )}
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between text-[11px]">
-                          <span className="font-bold text-[#0E513B]">
+                          <span className="font-bold text-brand">
                             {st.reporterName}
                           </span>
-                          <span className="text-[#52605A] flex items-center gap-1">
+                          <span className="text-ink-secondary flex items-center gap-1">
                             <Clock className="w-3 h-3" />
                             {st.createdAt}
                           </span>
                         </div>
-                        <p className="text-xs text-[#142820] mt-1">{st.note}</p>
+                        <p className="text-xs text-ink mt-1">{st.note}</p>
                         {st.emotionTag && (
-                          <p className="text-[11px] text-[#52605A] mt-0.5">
+                          <p className="text-[11px] text-ink-secondary mt-0.5">
                             Trạng thái: {st.emotionTag}
                           </p>
                         )}
@@ -716,7 +716,7 @@ export default function SpotDetailModal({
                         setSightingReporterName(e.target.value)
                       }
                       placeholder="Tên của bạn (để người đăng biết ai hỗ trợ)..."
-                      className="w-full h-11 px-3 rounded-[10px] bg-[#F5F6F2] border border-[#E2E5DC] text-xs text-[#15251F] outline-none focus:border-[#123F35]"
+                      className="w-full h-11 px-3 rounded-[10px] bg-[#F5F6F2] border border-[#E2E5DC] text-xs text-ink outline-none focus:border-brand"
                       required
                     />
                   )}
@@ -725,14 +725,14 @@ export default function SpotDetailModal({
                     value={sightingArea}
                     onChange={(e) => setSightingArea(e.target.value)}
                     placeholder="Vị trí nhìn thấy (VD: Hẻm 12 Thảo Điền)..."
-                    className="w-full h-11 px-3 rounded-[10px] bg-[#F5F6F2] border border-[#E2E5DC] text-xs text-[#15251F] outline-none focus:border-[#123F35]"
+                    className="w-full h-11 px-3 rounded-[10px] bg-[#F5F6F2] border border-[#E2E5DC] text-xs text-ink outline-none focus:border-brand"
                   />
                   <textarea
                     value={sightingNote}
                     onChange={(e) => setSightingNote(e.target.value)}
                     rows={2}
                     placeholder="Mô tả tình trạng của bé khi bạn nhìn thấy..."
-                    className="w-full p-3 rounded-[10px] bg-[#F5F6F2] border border-[#E2E5DC] text-xs text-[#15251F] outline-none focus:border-[#123F35]"
+                    className="w-full p-3 rounded-[10px] bg-[#F5F6F2] border border-[#E2E5DC] text-xs text-ink outline-none focus:border-brand"
                     required
                   />
                   {sightingError && (
@@ -751,7 +751,7 @@ export default function SpotDetailModal({
                     <button
                       type="button"
                       onClick={() => sightingFileRef.current?.click()}
-                      className="min-h-[40px] px-3 rounded-[10px] bg-[#ECEFE7] text-xs font-semibold text-[#15251F] inline-flex items-center gap-1.5"
+                      className="min-h-[40px] px-3 rounded-[10px] bg-[#ECEFE7] text-xs font-semibold text-ink inline-flex items-center gap-1.5"
                     >
                       <Camera className="w-3.5 h-3.5" />
                       <span>
@@ -767,7 +767,7 @@ export default function SpotDetailModal({
                       <button
                         type="button"
                         onClick={() => setActiveSubPanel('NONE')}
-                        className="min-h-[40px] px-3 rounded-[10px] text-xs font-semibold text-[#53635B]"
+                        className="min-h-[40px] px-3 rounded-[10px] text-xs font-semibold text-ink-secondary"
                       >
                         Hủy
                       </button>
@@ -787,7 +787,7 @@ export default function SpotDetailModal({
                   onSubmit={handleSubmitUnlockContact}
                   className="p-4 rounded-[14px] bg-white border border-[#E2E5DC] space-y-3"
                 >
-                  <p className="text-xs font-bold text-[#123F35]">
+                  <p className="text-xs font-bold text-brand">
                     Liên hệ người đăng để hỗ trợ hoặc nhận nuôi
                   </p>
                   <div className="grid grid-cols-3 gap-1.5">
@@ -804,8 +804,8 @@ export default function SpotDetailModal({
                         }
                         className={`min-h-[38px] px-2 rounded-[10px] text-[11px] font-bold transition-colors ${
                           contactRequestType === opt.id
-                            ? 'bg-[#123F35] text-white'
-                            : 'bg-[#ECEFE7] text-[#15251F]'
+                            ? 'bg-brand text-white'
+                            : 'bg-[#ECEFE7] text-ink'
                         }`}
                       >
                         {opt.label}
@@ -817,20 +817,20 @@ export default function SpotDetailModal({
                     onChange={(e) => setContactMessage(e.target.value)}
                     rows={2}
                     placeholder="Lời nhắn gửi tới người đăng tin..."
-                    className="w-full p-3 rounded-[10px] bg-[#F5F6F2] border border-[#E2E5DC] text-xs text-[#15251F] outline-none focus:border-[#123F35]"
+                    className="w-full p-3 rounded-[10px] bg-[#F5F6F2] border border-[#E2E5DC] text-xs text-ink outline-none focus:border-brand"
                     required
                   />
                   <div className="flex justify-end gap-2">
                     <button
                       type="button"
                       onClick={() => setActiveSubPanel('NONE')}
-                      className="min-h-[40px] px-3 rounded-[10px] text-xs font-semibold text-[#53635B]"
+                      className="min-h-[40px] px-3 rounded-[10px] text-xs font-semibold text-ink-secondary"
                     >
                       Đóng
                     </button>
                     <button
                       type="submit"
-                      className="min-h-[40px] px-4 rounded-[10px] bg-[#123F35] text-white text-xs font-bold"
+                      className="min-h-[40px] px-4 rounded-[10px] bg-brand text-white text-xs font-bold"
                     >
                       Gửi &amp; Xem SĐT
                     </button>
@@ -841,7 +841,7 @@ export default function SpotDetailModal({
               {activeSubPanel === 'QR_POSTER' && (
                 <div className="p-4 rounded-[14px] bg-white border border-[#E2E5DC] space-y-3 text-center">
                   {generatingPoster ? (
-                    <p className="text-xs py-6 text-[#53635B]">
+                    <p className="text-xs py-6 text-ink-secondary">
                       Đang tạo Poster QR...
                     </p>
                   ) : (
@@ -864,7 +864,7 @@ export default function SpotDetailModal({
                           <button
                             type="button"
                             onClick={() => setActiveSubPanel('NONE')}
-                            className="min-h-[40px] px-3 rounded-[10px] text-xs font-semibold text-[#53635B]"
+                            className="min-h-[40px] px-3 rounded-[10px] text-xs font-semibold text-ink-secondary"
                           >
                             Thu gọn
                           </button>
@@ -876,12 +876,12 @@ export default function SpotDetailModal({
               )}
 
               {isAuthor && (
-                <div className="p-3.5 rounded-[14px] bg-white border border-[#123F35]/40 space-y-2.5">
+                <div className="p-3.5 rounded-[14px] bg-white border border-brand/40 space-y-2.5">
                   <div className="flex items-center justify-between gap-2">
-                    <p className="text-xs font-extrabold uppercase tracking-wider text-[#123F35]">
+                    <p className="text-xs font-extrabold uppercase tracking-wider text-brand">
                       Quản lý bài đăng của bạn
                     </p>
-                    <span className="text-[11px] font-semibold text-[#53635B]">
+                    <span className="text-[11px] font-semibold text-ink-secondary">
                       Chủ bài viết
                     </span>
                   </div>
@@ -891,7 +891,7 @@ export default function SpotDetailModal({
                       <button
                         type="button"
                         onClick={() => onEditSpot(spot)}
-                        className="flex-1 min-w-[140px] min-h-[42px] px-3.5 rounded-[10px] text-xs font-bold bg-[#123F35] hover:bg-[#0D3129] text-white inline-flex items-center justify-center gap-1.5 transition-colors"
+                        className="flex-1 min-w-[140px] min-h-[42px] px-3.5 rounded-[10px] text-xs font-bold bg-brand hover:bg-brand-hover text-white inline-flex items-center justify-center gap-1.5 transition-colors"
                       >
                         <Pencil className="w-3.5 h-3.5" />
                         <span>Chỉnh sửa bài viết</span>
@@ -902,7 +902,7 @@ export default function SpotDetailModal({
                       <button
                         type="button"
                         onClick={() => onResolveSpotToPeace(spot.id)}
-                        className="flex-1 min-w-[160px] min-h-[42px] px-3.5 rounded-[10px] text-xs font-bold bg-[#E4EDDD] hover:bg-[#D5E3CC] text-[#123F35] inline-flex items-center justify-center gap-1.5 transition-colors"
+                        className="flex-1 min-w-[160px] min-h-[42px] px-3.5 rounded-[10px] text-xs font-bold bg-brand-soft hover:bg-[#D5E3CC] text-brand inline-flex items-center justify-center gap-1.5 transition-colors"
                       >
                         <CheckCircle2 className="w-4 h-4" />
                         <span>Đánh dấu: Đã đoàn tụ</span>
@@ -926,7 +926,7 @@ export default function SpotDetailModal({
                           <button
                             type="button"
                             onClick={() => setConfirmDelete(false)}
-                            className="min-h-[42px] px-3 rounded-[10px] text-xs font-semibold text-[#53635B] bg-[#F5F6F2] border border-[#E2E5DC]"
+                            className="min-h-[42px] px-3 rounded-[10px] text-xs font-semibold text-ink-secondary bg-[#F5F6F2] border border-[#E2E5DC]"
                           >
                             Hủy
                           </button>
@@ -953,7 +953,7 @@ export default function SpotDetailModal({
                 href={spot.sourceUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex-1 min-h-[48px] px-4 rounded-[12px] bg-[#123F35] hover:bg-[#0D3129] text-white text-sm font-bold flex items-center justify-center gap-2 transition-colors shadow-sm"
+                className="flex-1 min-h-[48px] px-4 rounded-[12px] bg-brand hover:bg-brand-hover text-white text-sm font-bold flex items-center justify-center gap-2 transition-colors shadow-sm"
               >
                 <span>Đọc bài gốc ({platformBadge.shortLabel})</span>
                 <ExternalLink className="w-4 h-4 shrink-0" />
@@ -961,7 +961,7 @@ export default function SpotDetailModal({
             ) : isContactUnlocked && spot.rawPhoneSecret ? (
               <a
                 href={`tel:${spot.rawPhoneSecret}`}
-                className="flex-1 min-h-[48px] px-4 rounded-[12px] bg-[#123F35] hover:bg-[#0D3129] text-white text-sm font-bold flex items-center justify-center gap-2 transition-colors shadow-sm"
+                className="flex-1 min-h-[48px] px-4 rounded-[12px] bg-brand hover:bg-brand-hover text-white text-sm font-bold flex items-center justify-center gap-2 transition-colors shadow-sm"
               >
                 <Phone className="w-4 h-4 shrink-0" />
                 <span>Gọi ngay: {spot.rawPhoneSecret}</span>
@@ -970,7 +970,7 @@ export default function SpotDetailModal({
               <button
                 type="button"
                 onClick={() => openSubPanelAndScroll('UNLOCK_CONTACT')}
-                className="flex-1 min-h-[48px] px-4 rounded-[12px] bg-[#123F35] hover:bg-[#0D3129] text-white text-sm font-bold flex items-center justify-center gap-2 transition-colors shadow-sm"
+                className="flex-1 min-h-[48px] px-4 rounded-[12px] bg-brand hover:bg-brand-hover text-white text-sm font-bold flex items-center justify-center gap-2 transition-colors shadow-sm"
               >
                 <MessageCircle className="w-4 h-4 shrink-0" />
                 <span>

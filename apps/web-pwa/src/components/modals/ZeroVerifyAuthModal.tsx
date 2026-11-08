@@ -124,27 +124,27 @@ export default function ZeroVerifyAuthModal({
         backdropFilter: 'blur(8px)',
         WebkitBackdropFilter: 'blur(8px)',
       }}
-      className="fixed inset-0 z-[130] bg-[#142820]/55 backdrop-blur-md flex items-end sm:items-center justify-center sm:p-4"
+      className="fixed inset-0 z-[130] bg-ink/55 backdrop-blur-md flex items-end sm:items-center justify-center sm:p-4"
       role="dialog"
       aria-modal="true"
       aria-label="Đăng nhập nhanh"
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-h-[92dvh] sm:max-w-[460px] rounded-t-2xl sm:rounded-2xl bg-[#FAF7F1] text-[#142820] border border-[#DDDCD4] shadow-2xl flex flex-col overflow-hidden"
+        className="w-full max-h-[92dvh] sm:max-w-[460px] rounded-t-2xl sm:rounded-2xl bg-[#FAF7F1] text-ink border border-[#DDDCD4] shadow-2xl flex flex-col overflow-hidden"
       >
         <div className="px-5 pt-4 pb-3.5 border-b border-[#DDDCD4] flex items-start justify-between gap-3 bg-[#FAF7F1]">
           <div className="space-y-1">
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-[11px] font-bold bg-[#E8EFE6] text-[#0E513B]">
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-[11px] font-bold bg-brand-soft text-brand">
               <LogIn className="w-3 h-3 shrink-0" />
               <span>Đăng nhập nhanh</span>
             </span>
-            <h3 className="text-base sm:text-lg font-extrabold text-[#142820]">
+            <h3 className="text-base sm:text-lg font-extrabold text-ink">
               {authMode === 'register'
                 ? 'Đăng nhập nhanh & Tạo tài khoản'
                 : 'Đăng nhập tài khoản đã có'}
             </h3>
-            <p className="text-xs text-[#52605A] leading-relaxed">
+            <p className="text-xs text-ink-secondary leading-relaxed">
               {pendingActionLabel
                 ? `Cần đăng nhập để tiếp tục: ${pendingActionLabel}`
                 : 'Quản lý bài đăng cứu trợ, tìm thú lạc và lưu Nhật ký kỷ niệm của bạn.'}
@@ -154,7 +154,7 @@ export default function ZeroVerifyAuthModal({
           <button
             type="button"
             onClick={onClose}
-            className="min-w-[40px] min-h-[40px] -mr-1 rounded-[10px] bg-white border border-[#DDDCD4] hover:border-[#0E513B] text-[#142820] flex items-center justify-center shrink-0 transition-colors"
+            className="min-w-[40px] min-h-[40px] -mr-1 rounded-[10px] bg-white border border-[#DDDCD4] hover:border-brand text-ink flex items-center justify-center shrink-0 transition-colors"
             aria-label="Đóng hộp thoại đăng nhập"
           >
             <X className="w-4 h-4" />
@@ -177,8 +177,8 @@ export default function ZeroVerifyAuthModal({
               }}
               className={`min-h-[38px] px-3 rounded-[9px] text-xs font-bold flex items-center justify-center gap-1.5 transition-colors ${
                 authMode === 'register'
-                  ? 'bg-[#0E513B] text-white shadow-sm'
-                  : 'text-[#52605A] hover:text-[#142820]'
+                  ? 'bg-brand text-white shadow-sm'
+                  : 'text-ink-secondary hover:text-ink'
               }`}
             >
               <UserPlus className="w-3.5 h-3.5 shrink-0" />
@@ -195,8 +195,8 @@ export default function ZeroVerifyAuthModal({
               }}
               className={`min-h-[38px] px-3 rounded-[9px] text-xs font-bold flex items-center justify-center gap-1.5 transition-colors ${
                 authMode === 'login'
-                  ? 'bg-[#0E513B] text-white shadow-sm'
-                  : 'text-[#52605A] hover:text-[#142820]'
+                  ? 'bg-brand text-white shadow-sm'
+                  : 'text-ink-secondary hover:text-ink'
               }`}
             >
               <LogIn className="w-3.5 h-3.5 shrink-0" />
@@ -207,11 +207,11 @@ export default function ZeroVerifyAuthModal({
           <form onSubmit={handleSubmit} className="space-y-3.5">
             {authMode === 'register' && (
               <div>
-                <label className="block text-xs font-bold text-[#142820] mb-1.5">
+                <label className="block text-xs font-bold text-ink mb-1.5">
                   Tên gọi của bạn / Biệt danh
                 </label>
-                <div className="flex items-center gap-2.5 h-11 rounded-[10px] px-3.5 bg-white border border-[#DDDCD4] focus-within:border-[#0E513B] transition-colors">
-                  <User className="w-4 h-4 text-[#0E513B] shrink-0" />
+                <div className="flex items-center gap-2.5 h-11 rounded-[10px] px-3.5 bg-white border border-[#DDDCD4] focus-within:border-brand transition-colors">
+                  <User className="w-4 h-4 text-brand shrink-0" />
                   <input
                     type="text"
                     required
@@ -220,7 +220,7 @@ export default function ZeroVerifyAuthModal({
                     value={displayName}
                     onChange={(e) => setDisplayName(e.target.value)}
                     placeholder="Nhập tên hiển thị của bạn..."
-                    className="w-full bg-transparent text-xs sm:text-sm text-[#142820] placeholder:text-[#8A948E] outline-none"
+                    className="w-full bg-transparent text-xs sm:text-sm text-ink placeholder:text-[#8A948E] outline-none"
                   />
                 </div>
               </div>
@@ -228,11 +228,11 @@ export default function ZeroVerifyAuthModal({
 
             <div className="grid grid-cols-1 sm:grid-cols-5 gap-3">
               <div className="sm:col-span-3">
-                <label className="block text-xs font-bold text-[#142820] mb-1.5">
+                <label className="block text-xs font-bold text-ink mb-1.5">
                   Số điện thoại / Zalo
                 </label>
-                <div className="flex items-center gap-2.5 h-11 rounded-[10px] px-3.5 bg-white border border-[#DDDCD4] focus-within:border-[#0E513B] transition-colors">
-                  <Phone className="w-4 h-4 text-[#0E513B] shrink-0" />
+                <div className="flex items-center gap-2.5 h-11 rounded-[10px] px-3.5 bg-white border border-[#DDDCD4] focus-within:border-brand transition-colors">
+                  <Phone className="w-4 h-4 text-brand shrink-0" />
                   <input
                     type="tel"
                     inputMode="tel"
@@ -240,16 +240,16 @@ export default function ZeroVerifyAuthModal({
                     value={rawPhone}
                     onChange={(e) => setRawPhone(e.target.value)}
                     placeholder="Nhập số điện thoại..."
-                    className="w-full bg-transparent text-xs sm:text-sm text-[#142820] placeholder:text-[#8A948E] outline-none"
+                    className="w-full bg-transparent text-xs sm:text-sm text-ink placeholder:text-[#8A948E] outline-none"
                   />
                 </div>
               </div>
 
               <div className="sm:col-span-2">
-                <label className="block text-xs font-bold text-[#142820] mb-1.5">
+                <label className="block text-xs font-bold text-ink mb-1.5">
                   Mã PIN (4–6 số)
                 </label>
-                <div className="flex items-center gap-2 h-11 rounded-[10px] px-3.5 bg-white border border-[#DDDCD4] focus-within:border-[#0E513B] transition-colors">
+                <div className="flex items-center gap-2 h-11 rounded-[10px] px-3.5 bg-white border border-[#DDDCD4] focus-within:border-brand transition-colors">
                   <KeyRound className="w-4 h-4 text-[#AF421F] shrink-0" />
                   <input
                     type="password"
@@ -263,7 +263,7 @@ export default function ZeroVerifyAuthModal({
                       setPinCode(e.target.value.replace(/\D/g, '').slice(0, 6))
                     }
                     placeholder="4–6 chữ số"
-                    className="w-full bg-transparent text-xs sm:text-sm text-[#142820] placeholder:text-[#8A948E] outline-none"
+                    className="w-full bg-transparent text-xs sm:text-sm text-ink placeholder:text-[#8A948E] outline-none"
                   />
                 </div>
               </div>
@@ -286,7 +286,7 @@ export default function ZeroVerifyAuthModal({
                         setAuthMode('login');
                         setErrorMsg(null);
                       }}
-                      className="w-full py-1.5 px-3 rounded-lg bg-white border border-[#AF421F]/30 text-[#142820] hover:bg-[#FAF7F1] text-xs font-bold transition-colors text-center"
+                      className="w-full py-1.5 px-3 rounded-lg bg-white border border-[#AF421F]/30 text-ink hover:bg-[#FAF7F1] text-xs font-bold transition-colors text-center"
                     >
                       Chuyển sang tab Đăng nhập với SĐT này →
                     </button>
@@ -299,7 +299,7 @@ export default function ZeroVerifyAuthModal({
                         setAuthMode('register');
                         setErrorMsg(null);
                       }}
-                      className="w-full py-1.5 px-3 rounded-lg bg-white border border-[#AF421F]/30 text-[#142820] hover:bg-[#FAF7F1] text-xs font-bold transition-colors text-center"
+                      className="w-full py-1.5 px-3 rounded-lg bg-white border border-[#AF421F]/30 text-ink hover:bg-[#FAF7F1] text-xs font-bold transition-colors text-center"
                     >
                       Chuyển sang tab Đăng ký mới với SĐT này →
                     </button>
@@ -307,8 +307,8 @@ export default function ZeroVerifyAuthModal({
               </div>
             )}
 
-            <div className="p-3 rounded-[10px] bg-[#E8EFE6]/70 border border-[#D4E2D1] flex items-start gap-2.5 text-[11px] text-[#142820]">
-              <ShieldCheck className="w-4 h-4 text-[#0E513B] shrink-0 mt-0.5" />
+            <div className="p-3 rounded-[10px] bg-brand-soft/70 border border-[#D4E2D1] flex items-start gap-2.5 text-[11px] text-ink">
+              <ShieldCheck className="w-4 h-4 text-brand shrink-0 mt-0.5" />
               <span className="leading-relaxed">
                 Số điện thoại của bạn được bảo mật hiển thị dưới dạng{' '}
                 <strong>{liveMaskedPhone}</strong> và chỉ mở khóa khi bạn đồng ý
@@ -320,7 +320,7 @@ export default function ZeroVerifyAuthModal({
               <button
                 type="button"
                 onClick={onClose}
-                className="min-h-[44px] px-4 rounded-[10px] bg-white border border-[#DDDCD4] hover:bg-[#F2EFE7] text-xs sm:text-sm font-bold text-[#142820] transition-colors"
+                className="min-h-[44px] px-4 rounded-[10px] bg-white border border-[#DDDCD4] hover:bg-[#F2EFE7] text-xs sm:text-sm font-bold text-ink transition-colors"
               >
                 Để sau
               </button>
@@ -328,7 +328,7 @@ export default function ZeroVerifyAuthModal({
               <button
                 type="submit"
                 disabled={submitting}
-                className="flex-1 min-h-[44px] px-5 rounded-[10px] bg-[#0E513B] hover:bg-[#0A412F] disabled:opacity-60 text-white text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition-colors shadow-sm"
+                className="flex-1 min-h-[44px] px-5 rounded-[10px] bg-brand hover:bg-brand-hover disabled:opacity-60 text-white text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition-colors shadow-sm"
               >
                 <LogIn className="w-4 h-4 shrink-0" />
                 <span>

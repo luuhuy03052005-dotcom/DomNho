@@ -54,27 +54,27 @@ export default function DoubleMatchAlertModal({
           animate={{ scale: 1, y: 0, opacity: 1 }}
           exit={{ scale: 0.94, y: 16, opacity: 0 }}
           onClick={(e) => e.stopPropagation()}
-          className="w-full max-w-md rounded-2xl bg-white border border-[#DDDCD4] p-5 sm:p-6 shadow-2xl text-[#142820]"
+          className="w-full max-w-md rounded-2xl bg-white border border-[#DDDCD4] p-5 sm:p-6 shadow-2xl text-ink"
         >
           <div className="flex items-start justify-between gap-3">
             <div>
-              <span className="inline-block px-2.5 py-1 rounded-md text-[11px] font-bold bg-[#E8EFE6] text-[#0E513B]">
+              <span className="inline-block px-2.5 py-1 rounded-md text-[11px] font-bold bg-brand-soft text-brand">
                 Gợi ý bài viết tương đồng ({validMatches.length})
               </span>
-              <h3 className="text-base sm:text-lg font-bold mt-2 text-[#142820]">
+              <h3 className="text-base sm:text-lg font-bold mt-2 text-ink">
                 Phát hiện trường hợp giống {topPercent}% với bài bạn vừa đăng
               </h3>
             </div>
             <button
               type="button"
               onClick={onClose}
-              className="w-8 h-8 rounded-full border border-[#DDDCD4] flex items-center justify-center text-[#52605A] hover:bg-[#FAF7F1]"
+              className="w-8 h-8 rounded-full border border-[#DDDCD4] flex items-center justify-center text-ink-secondary hover:bg-[#FAF7F1]"
             >
               <X className="w-4 h-4" />
             </button>
           </div>
 
-          <p className="text-xs text-[#52605A] mt-1.5">
+          <p className="text-xs text-ink-secondary mt-1.5">
             Dưới đây là các bài viết trên hệ thống có đặc điểm nhận dạng rất giống với bé bạn vừa chia sẻ:
           </p>
 
@@ -91,7 +91,7 @@ export default function DoubleMatchAlertModal({
                     onOpenMatchedSpot(item.matchedSpot);
                     onClose();
                   }}
-                  className="p-3 rounded-xl bg-[#FAF7F1] border border-[#DDDCD4] hover:border-[#0E513B] flex items-center gap-3 cursor-pointer transition-colors"
+                  className="p-3 rounded-xl bg-[#FAF7F1] border border-[#DDDCD4] hover:border-brand flex items-center gap-3 cursor-pointer transition-colors"
                 >
                   <img
                     src={item.matchedSpot.images?.[0] || FALLBACK_PET_IMAGE}
@@ -106,21 +106,21 @@ export default function DoubleMatchAlertModal({
                   />
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-1.5">
-                      <span className="px-1.5 py-0.5 rounded bg-[#0E513B] text-white text-[10px] font-bold">
+                      <span className="px-1.5 py-0.5 rounded bg-brand text-white text-[10px] font-bold">
                         Trùng khớp {pct}%
                       </span>
-                      <span className="text-[11px] text-[#52605A] truncate flex items-center gap-0.5">
+                      <span className="text-[11px] text-ink-secondary truncate flex items-center gap-0.5">
                         <MapPin className="w-3 h-3 shrink-0" />
                         {item.distanceMeters > 0
                           ? `Cách ${item.distanceMeters}m • ${item.matchedSpot.areaLabel}`
                           : item.matchedSpot.areaLabel}
                       </span>
                     </div>
-                    <p className="text-xs font-bold text-[#142820] truncate mt-1">
+                    <p className="text-xs font-bold text-ink truncate mt-1">
                       {item.matchedSpot.title}
                     </p>
                     {item.commonTraits.length > 0 && (
-                      <p className="text-[11px] text-[#0E513B] truncate mt-0.5">
+                      <p className="text-[11px] text-brand truncate mt-0.5">
                         {item.commonTraits.join(' • ')}
                       </p>
                     )}
@@ -134,7 +134,7 @@ export default function DoubleMatchAlertModal({
             <button
               type="button"
               onClick={onClose}
-              className="px-4 h-10 rounded-[10px] border border-[#DDDCD4] text-xs font-semibold text-[#142820] hover:bg-[#FAF7F1]"
+              className="px-4 h-10 rounded-[10px] border border-[#DDDCD4] text-xs font-semibold text-ink hover:bg-[#FAF7F1]"
             >
               Đóng
             </button>
@@ -144,7 +144,7 @@ export default function DoubleMatchAlertModal({
                 onOpenMatchedSpot(topMatch.matchedSpot);
                 onClose();
               }}
-              className="flex-1 h-10 px-4 rounded-[10px] text-xs font-bold text-white bg-[#0E513B] hover:bg-[#0A412F] flex items-center justify-center gap-1.5 transition-colors"
+              className="flex-1 h-10 px-4 rounded-[10px] text-xs font-bold text-white bg-brand hover:bg-brand-hover flex items-center justify-center gap-1.5 transition-colors"
             >
               <span>Xem bài viết trùng khớp nhất</span>
               <ArrowRight className="w-4 h-4" />

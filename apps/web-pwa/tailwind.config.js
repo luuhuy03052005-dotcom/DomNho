@@ -10,7 +10,7 @@ module.exports = {
     extend: {
       fontFamily: {
         sans: [
-          '"Be Vietnam Pro"',
+          'var(--font-dom-sans)',
           '-apple-system',
           'BlinkMacSystemFont',
           '"Segoe UI"',
@@ -22,16 +22,16 @@ module.exports = {
         canvas: '#FAF7F1',
         surface: {
           DEFAULT: '#FFFFFF',
-          muted: '#F1EFE8',
+          muted: '#F5F6F2',
         },
         ink: {
-          DEFAULT: '#142820',
+          DEFAULT: '#15251F',
           secondary: '#52605A',
         },
         brand: {
-          DEFAULT: '#0E513B',
-          hover: '#0A412F',
-          soft: '#E8EFE6',
+          DEFAULT: '#123F35',
+          hover: '#0C3028',
+          soft: '#E4EDDD',
         },
         rescue: {
           DEFAULT: '#AF421F',
@@ -42,7 +42,7 @@ module.exports = {
           soft: '#FFF3D8',
         },
         accent: '#D8724D',
-        border: '#DDDCD4',
+        border: '#DDE2DC',
         focus: '#176CBA',
         dom: {
           morning: '#FAF7F1',

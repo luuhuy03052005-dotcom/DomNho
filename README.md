@@ -46,18 +46,15 @@
 │           │   ├── modals/              # Popup 1 (Chi tiết Đốm + QR Poster), Popup 3 (Không gian Cặp đôi & Chạm ảnh mỗi tuần), Zero-Verify Auth, Khớp lệnh 3km
 │           │   └── ios-prompt/          # Hướng dẫn "Thêm vào MH chính" cho iPhone
 │           ├── hooks/                   # useGeolocation (Radar 500m), usePushNotification (Web Push)
-│           └── lib/                     # types, themes, security (Fuzzing, Masking, Rate-limit, Match 3km), supabase, image-compressor, seed-data
+│           ├── lib/
+│           │   ├── crawl4ai-crawler.ts  # Client kết nối Crawl4AI worker
+│           │   ├── location-services.ts # Geocode địa chỉ Việt Nam
+│           │   └── ...                  # types, themes, security, Supabase
+│           └── scripts/
+│               └── run-crawl4ai.ts      # Crawler batch xuất JSON + KML
 │
 ├── services/
-│   └── crawler-worker/                  # Động cơ Bot Crawl & Phễu Lọc AI 3 Tầng (Python)
-│       ├── scrapers/                    # Playwright Scraper & dữ liệu mẫu hội nhóm cứu hộ
-│       ├── processors/
-│       │   ├── rule_filter.py           # Tầng 1: Chặn bài bán hàng, phối giống, spam thương mại
-│       │   ├── deduplicator.py          # Tầng 2: Lọc trùng văn bản (SimHash 64-bit) & hình ảnh (pHash)
-│       │   ├── gemini_extractor.py      # Tầng 3: Gemini 2.5 Flash bóc tách JSON + Che SĐT (090***456)
-│       │   └── geocoder.py              # Chuyển địa chỉ sang GPS + Làm mờ tọa độ ±200m
-│       ├── main_cron.py                 # Chạy định kỳ đẩy dữ liệu sạch lên Supabase
-│       └── requirements.txt
+│   └── crawl4ai-worker/                 # Python Crawl4AI + Chromium, CLI và HTTP API
 │
 ├── supabase/
 │   └── migrations/
@@ -83,13 +80,23 @@ npm run dev
 
 Mở trình duyệt tại `http://localhost:3000`. Ứng dụng hoạt động ngay lập tức ở chế độ **Guest Mode** với đầy đủ dữ liệu mẫu tại TP.HCM, hỗ trợ lưu vĩnh viễn mọi thao tác vào `localStorage` + `IndexedDB`, và tự động đồng bộ với Supabase khi bạn điền biến môi trường trong `.env.local`.
 
-### B. Chạy Động Cơ AI Crawler 3 Tầng (`services/crawler-worker`)
+### B. Chạy Crawl4AI Crawler
 
 ```bash
-python services/crawler-worker/main_cron.py --demo --output apps/web-pwa/public/crawled-feed.json
+python -m pip install -r services/crawl4ai-worker/requirements.txt
+crawl4ai-setup
+npm run crawler
 ```
 
-### C. Khởi Tạo Cơ Sở Dữ Liệu Supabase + PostGIS
+Crawler dùng Crawl4AI 0.9.5 và Chromium để mở trang kết quả tìm kiếm, phát hiện URL rồi đọc trực tiếp từng bài. Hệ thống không còn phụ thuộc SDK hoặc API key của dịch vụ crawler trả phí cũ.
+
+Hệ thống dùng 33 nhóm truy vấn cứu hộ/thất lạc/nhận nuôi, phủ nhiều nền tảng và cụm tỉnh thành trên toàn quốc. Một lần chạy batch chỉ cập nhật feed khi có tối thiểu **50 bài hợp lệ**; nếu không đạt, feed cũ được giữ nguyên.
+
+### C. Lịch crawl tự động hàng tháng
+
+Khi deploy thư mục `apps/web-pwa` lên Vercel, `vercel.json` gọi `GET /api/cron/monthly-crawl` vào `00:00 UTC` ngày đầu mỗi tháng (`07:00` giờ Việt Nam). Crawl4AI cần Chromium nên worker Python phải được chạy riêng từ `services/crawl4ai-worker` (có sẵn Dockerfile); cấu hình `CRAWL4AI_WORKER_URL`, `CRAWL4AI_WORKER_TOKEN`, `MONGODB_URI` và `CRON_SECRET` trên Vercel. Kết quả được lưu vào MongoDB; endpoint từ chối ghi đè nếu chưa đạt 50 bài hợp lệ.
+
+### D. Khởi Tạo Cơ Sở Dữ Liệu Supabase + PostGIS
 
 Copy toàn bộ nội dung file [`supabase/migrations/01_init_dom_nho.sql`](file:///c:/Users/luuhu/OneDrive/Desktop/Project/Đốm%20nhỏ/supabase/migrations/01_init_dom_nho.sql) vào **SQL Editor** trên Supabase Dashboard và bấm **Run**.
 

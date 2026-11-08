@@ -65,8 +65,8 @@ export default function MobileBottomNav({
               onClick={() => onChangeTab(item.id)}
               className={`min-h-[48px] min-w-[44px] px-1 py-1 rounded-[10px] flex flex-col items-center justify-center transition-colors relative ${
                 isActive
-                  ? 'bg-[#E4EDDD] text-[#123F35] font-bold'
-                  : 'text-[#52605A] hover:text-[#15251F]'
+                  ? 'bg-brand-soft text-brand font-bold'
+                  : 'text-ink-secondary hover:text-ink'
               }`}
               aria-current={isActive ? 'page' : undefined}
             >

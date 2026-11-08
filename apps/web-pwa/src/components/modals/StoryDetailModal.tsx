@@ -51,7 +51,7 @@ export default function StoryDetailModal({
   return (
     <AnimatePresence>
       <div
-        className="fixed inset-0 z-50 flex items-center justify-center p-2.5 sm:p-5 bg-[#142820]/65 backdrop-blur-sm"
+        className="fixed inset-0 z-50 flex items-center justify-center p-2.5 sm:p-5 bg-ink/65 backdrop-blur-sm"
         role="dialog"
         aria-modal="true"
         aria-labelledby="letter-modal-title"
@@ -78,7 +78,7 @@ export default function StoryDetailModal({
                 <span className="text-[10px] sm:text-[11px] font-extrabold tracking-widest uppercase text-[#AF421F] block">
                   Lá thư ngỏ • Mục đích &amp; Ý nghĩa dự án
                 </span>
-                <p className="text-xs font-semibold text-[#52605A]">
+                <p className="text-xs font-semibold text-ink-secondary">
                   Gửi đến những người thương yêu động vật khắp ba miền
                 </p>
               </div>
@@ -87,7 +87,7 @@ export default function StoryDetailModal({
             <button
               type="button"
               onClick={onClose}
-              className="w-9 h-9 rounded-full bg-white border border-[#DDDCD4] text-[#142820] flex items-center justify-center hover:bg-[#F1EFE8] transition-colors shrink-0 shadow-sm"
+              className="w-9 h-9 rounded-full bg-white border border-[#DDDCD4] text-ink flex items-center justify-center hover:bg-[#F1EFE8] transition-colors shrink-0 shadow-sm"
               aria-label="Đóng lá thư"
             >
               <X className="w-4 h-4" />
@@ -102,7 +102,7 @@ export default function StoryDetailModal({
 
             <h2
               id="letter-modal-title"
-              className="font-serif-letter text-xl sm:text-[26px] font-bold text-[#142820] leading-snug tracking-tight"
+              className="font-serif-letter text-xl sm:text-[26px] font-bold text-ink leading-snug tracking-tight"
             >
               Gửi bạn — người vừa dừng bước vì một sinh linh nhỏ,
             </h2>
@@ -113,11 +113,11 @@ export default function StoryDetailModal({
               </p>
 
               <p>
-                Chúng mình cũng vậy. Điều khiến chúng mình trăn trở nhất không phải là cuộc đời này thiếu đi những tấm lòng nhân hậu — mà là <strong className="text-[#142820] font-semibold">những tấm lòng ấy thường bị lỡ nhịp với nhau</strong>. Trên mạng xã hội rộng lớn, một lời cầu cứu khẩn cấp hay một bài tìm chó mèo lạc rất dễ bị nhấn chìm chỉ sau vài giờ đồng hồ. Đôi khi, người có thể giúp bé đang ở ngay con hẻm kế bên, cách chỉ vài trăm mét, nhưng lại chẳng bao giờ nhìn thấy bài viết ấy.
+                Chúng mình cũng vậy. Điều khiến chúng mình trăn trở nhất không phải là cuộc đời này thiếu đi những tấm lòng nhân hậu — mà là <strong className="text-ink font-semibold">những tấm lòng ấy thường bị lỡ nhịp với nhau</strong>. Trên mạng xã hội rộng lớn, một lời cầu cứu khẩn cấp hay một bài tìm chó mèo lạc rất dễ bị nhấn chìm chỉ sau vài giờ đồng hồ. Đôi khi, người có thể giúp bé đang ở ngay con hẻm kế bên, cách chỉ vài trăm mét, nhưng lại chẳng bao giờ nhìn thấy bài viết ấy.
               </p>
 
               <div className="my-5 p-4 sm:p-5 rounded-2xl bg-[#FFFDF9] border border-[#E2D9C8] shadow-sm space-y-2">
-                <p className="text-xs font-sans font-extrabold uppercase tracking-wider text-[#0E513B] flex items-center gap-1.5 not-italic">
+                <p className="text-xs font-sans font-extrabold uppercase tracking-wider text-brand flex items-center gap-1.5 not-italic">
                   <Sparkles className="w-3.5 h-3.5 text-[#AF421F]" />
                   <span>Vì sao dự án mang tên là &ldquo;Đốm Nhỏ&rdquo;?</span>
                 </p>
@@ -127,7 +127,7 @@ export default function StoryDetailModal({
               </div>
 
               <p>
-                Đó là lý do <strong className="text-[#0E513B] font-semibold">Đốm Nhỏ</strong> được sinh ra. Chúng mình không xây dựng nơi này để làm một trang mạng ồn ào, mà mong muốn tạo nên một <strong className="text-[#142820] font-semibold">nhịp cầu định vị thực tế, giản dị và minh bạch</strong> với ba sứ mệnh cốt lõi:
+                Đó là lý do <strong className="text-brand font-semibold">Đốm Nhỏ</strong> được sinh ra. Chúng mình không xây dựng nơi này để làm một trang mạng ồn ào, mà mong muốn tạo nên một <strong className="text-ink font-semibold">nhịp cầu định vị thực tế, giản dị và minh bạch</strong> với ba sứ mệnh cốt lõi:
               </p>
 
               <div className="grid grid-cols-1 gap-3 pt-1 font-sans">
@@ -136,24 +136,24 @@ export default function StoryDetailModal({
                     <MapPin className="w-4 h-4" />
                   </div>
                   <div>
-                    <h4 className="text-xs sm:text-sm font-bold text-[#142820]">
+                    <h4 className="text-xs sm:text-sm font-bold text-ink">
                       1. Kết nối theo khoảng cách gần bạn nhất
                     </h4>
-                    <p className="text-xs text-[#52605A] mt-0.5 leading-relaxed">
+                    <p className="text-xs text-ink-secondary mt-0.5 leading-relaxed">
                       Hiển thị rõ khoảng cách từ vị trí của bạn đến nơi có bé đang cần cứu trợ SOS, thú cưng đi lạc hoặc trạm cứu hộ để sự giúp đỡ đến kịp lúc nhất.
                     </p>
                   </div>
                 </div>
 
                 <div className="p-3.5 rounded-xl bg-white/80 border border-[#E2DACB] flex items-start gap-3">
-                  <div className="w-8 h-8 rounded-lg bg-[#E8EFE6] text-[#0E513B] flex items-center justify-center shrink-0 mt-0.5">
+                  <div className="w-8 h-8 rounded-lg bg-brand-soft text-brand flex items-center justify-center shrink-0 mt-0.5">
                     <ShieldCheck className="w-4 h-4" />
                   </div>
                   <div>
-                    <h4 className="text-xs sm:text-sm font-bold text-[#142820]">
+                    <h4 className="text-xs sm:text-sm font-bold text-ink">
                       2. Trân trọng sự thật — 100% thông tin có nguồn xác thực
                     </h4>
-                    <p className="text-xs text-[#52605A] mt-0.5 leading-relaxed">
+                    <p className="text-xs text-ink-secondary mt-0.5 leading-relaxed">
                       Mọi bài viết trên Đốm Nhỏ đều được tổng hợp từ các trạm cứu hộ uy tín, báo chí, cộng đồng cứu trợ thực tế kèm liên kết gốc rõ ràng, hoặc do chính người dân chụp ảnh và ghim vị trí thật.
                     </p>
                   </div>
@@ -164,10 +164,10 @@ export default function StoryDetailModal({
                     <Heart className="w-4 h-4" />
                   </div>
                   <div>
-                    <h4 className="text-xs sm:text-sm font-bold text-[#142820]">
+                    <h4 className="text-xs sm:text-sm font-bold text-ink">
                       3. Mở rộng cơ hội tìm được mái ấm bình yên
                     </h4>
-                    <p className="text-xs text-[#52605A] mt-0.5 leading-relaxed">
+                    <p className="text-xs text-ink-secondary mt-0.5 leading-relaxed">
                       Dù bạn có thể mở lòng nhận nuôi một bé, ghé qua hỗ trợ y tế, báo tin khi vô tình nhìn thấy thú lạc trên đường, hay chỉ gửi đi một lượt chia sẻ — hành động nhỏ của bạn đều mang ý nghĩa sống còn với một sinh linh.
                     </p>
                   </div>
@@ -185,10 +185,10 @@ export default function StoryDetailModal({
 
             <div className="pt-4 border-t border-dashed border-[#DFD7C8] flex flex-col sm:flex-row sm:items-end justify-between gap-4">
               <div className="font-serif-letter">
-                <p className="text-xs italic text-[#52605A]">
+                <p className="text-xs italic text-ink-secondary">
                   Thương mến và biết ơn,
                 </p>
-                <p className="text-base font-bold text-[#0E513B] mt-0.5">
+                <p className="text-base font-bold text-brand mt-0.5">
                   Đội ngũ khởi xướng &amp; Cộng đồng Đốm Nhỏ
                 </p>
                 <p className="text-[11px] text-[#68756E] font-sans mt-0.5">
@@ -196,7 +196,7 @@ export default function StoryDetailModal({
                 </p>
               </div>
 
-              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#E8EFE6]/80 border border-[#0E513B]/20 text-[#0E513B] text-xs font-bold self-start sm:self-end">
+              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-brand-soft/80 border border-brand/20 text-brand text-xs font-bold self-start sm:self-end">
                 <Heart className="w-3.5 h-3.5 text-[#AF421F] fill-[#AF421F]" />
                 <span>Vì những người bạn bốn chân</span>
               </div>
@@ -207,16 +207,16 @@ export default function StoryDetailModal({
             <button
               type="button"
               onClick={handleShare}
-              className="w-full sm:w-auto px-4 h-11 rounded-[12px] border border-[#D5CBB8] bg-white hover:bg-[#F1EFE8] text-[#142820] font-semibold text-xs sm:text-sm flex items-center justify-center gap-2 transition-colors shadow-sm"
+              className="w-full sm:w-auto px-4 h-11 rounded-[12px] border border-[#D5CBB8] bg-white hover:bg-[#F1EFE8] text-ink font-semibold text-xs sm:text-sm flex items-center justify-center gap-2 transition-colors shadow-sm"
             >
               {copied ? (
                 <>
-                  <Check className="w-4 h-4 text-[#0E513B]" />
+                  <Check className="w-4 h-4 text-brand" />
                   <span>Đã sao chép liên kết lá thư!</span>
                 </>
               ) : (
                 <>
-                  <Share2 className="w-4 h-4 text-[#0E513B]" />
+                  <Share2 className="w-4 h-4 text-brand" />
                   <span>Lan tỏa bức thư này</span>
                 </>
               )}
@@ -225,7 +225,7 @@ export default function StoryDetailModal({
             <button
               type="button"
               onClick={onClose}
-              className="w-full sm:flex-1 sm:max-w-xs h-11 px-5 rounded-[12px] bg-[#0E513B] hover:bg-[#0A412F] text-white font-bold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all shadow-sm active:scale-95"
+              className="w-full sm:flex-1 sm:max-w-xs h-11 px-5 rounded-[12px] bg-brand hover:bg-brand-hover text-white font-bold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all shadow-sm active:scale-95"
             >
               <Compass className="w-4 h-4" />
               <span>Cùng khám phá &amp; giúp các bé →</span>

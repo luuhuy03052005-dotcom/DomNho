@@ -48,24 +48,24 @@ export default function FilterModal({
         >
           <div className="p-4 sm:p-5 border-b border-[#DDDCD4] flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <SlidersHorizontal className="w-4 h-4 text-[#0E513B]" />
-              <h3 className="text-base font-bold text-[#142820]">
+              <SlidersHorizontal className="w-4 h-4 text-brand" />
+              <h3 className="text-base font-bold text-ink">
                 Bộ lọc tìm kiếm
               </h3>
             </div>
             <button
               type="button"
               onClick={onClose}
-              className="min-w-[44px] min-h-[44px] rounded-[10px] bg-[#F1EFE8] flex items-center justify-center text-[#142820] hover:bg-[#DDDCD4]"
+              className="min-w-[44px] min-h-[44px] rounded-[10px] bg-[#F1EFE8] flex items-center justify-center text-ink hover:bg-[#DDDCD4]"
               aria-label="Đóng bộ lọc"
             >
               <X className="w-4 h-4" />
             </button>
           </div>
 
-          <div className="p-4 sm:p-5 overflow-y-auto space-y-5 text-[#142820]">
+          <div className="p-4 sm:p-5 overflow-y-auto space-y-5 text-ink">
             <div>
-              <p className="text-xs font-bold uppercase tracking-wider text-[#52605A] mb-2.5">
+              <p className="text-xs font-bold uppercase tracking-wider text-ink-secondary mb-2.5">
                 1. Khu vực vùng miền
               </p>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
@@ -83,8 +83,8 @@ export default function FilterModal({
                       onClick={() => onChangeRegionFilter(r.id)}
                       className={`h-10 px-3 rounded-[10px] text-xs font-bold transition-all border ${
                         active
-                          ? 'bg-[#0E513B] text-white border-[#0E513B]'
-                          : 'bg-[#F1EFE8] text-[#142820] border-transparent hover:border-[#DDDCD4]'
+                          ? 'bg-brand text-white border-brand'
+                          : 'bg-[#F1EFE8] text-ink border-transparent hover:border-[#DDDCD4]'
                       }`}
                     >
                       {r.label}
@@ -95,7 +95,7 @@ export default function FilterModal({
             </div>
 
             <div>
-              <p className="text-xs font-bold uppercase tracking-wider text-[#52605A] mb-2.5">
+              <p className="text-xs font-bold uppercase tracking-wider text-ink-secondary mb-2.5">
                 2. Nguồn bài đăng
               </p>
               <div className="grid grid-cols-3 gap-2">
@@ -112,8 +112,8 @@ export default function FilterModal({
                       onClick={() => onChangeOriginFilter(o.id)}
                       className={`h-10 px-2 rounded-[10px] text-xs font-bold transition-all border ${
                         active
-                          ? 'bg-[#0E513B] text-white border-[#0E513B]'
-                          : 'bg-[#F1EFE8] text-[#142820] border-transparent hover:border-[#DDDCD4]'
+                          ? 'bg-brand text-white border-brand'
+                          : 'bg-[#F1EFE8] text-ink border-transparent hover:border-[#DDDCD4]'
                       }`}
                     >
                       {o.label}
@@ -125,7 +125,7 @@ export default function FilterModal({
 
             {originFilter !== 'USER_POST' && (
               <div>
-                <p className="text-xs font-bold uppercase tracking-wider text-[#52605A] mb-2.5">
+                <p className="text-xs font-bold uppercase tracking-wider text-ink-secondary mb-2.5">
                   3. Nền tảng chia sẻ
                 </p>
                 <div className="flex flex-wrap gap-2">
@@ -146,8 +146,8 @@ export default function FilterModal({
                         onClick={() => onChangePlatformFilter(p.id)}
                         className={`px-3 py-2 rounded-[10px] text-xs font-semibold transition-all border ${
                           active
-                            ? 'bg-[#0E513B] text-white border-[#0E513B]'
-                            : 'bg-[#F1EFE8] text-[#142820] border-transparent hover:border-[#DDDCD4]'
+                            ? 'bg-brand text-white border-brand'
+                            : 'bg-[#F1EFE8] text-ink border-transparent hover:border-[#DDDCD4]'
                         }`}
                       >
                         {p.label}
@@ -171,7 +171,7 @@ export default function FilterModal({
             <button
               type="button"
               onClick={onClose}
-              className="h-11 px-6 rounded-[10px] bg-[#0E513B] hover:bg-[#0A412F] text-white text-sm font-semibold flex items-center justify-center gap-1.5 shadow-sm active:scale-95 transition-all"
+              className="h-11 px-6 rounded-[10px] bg-brand hover:bg-brand-hover text-white text-sm font-semibold flex items-center justify-center gap-1.5 shadow-sm active:scale-95 transition-all"
             >
               <span>Áp dụng ({totalResultsCount} kết quả)</span>
             </button>

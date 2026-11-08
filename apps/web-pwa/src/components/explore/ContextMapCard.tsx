@@ -56,20 +56,21 @@ export default function ContextMapCard({
   }, [spots]);
 
   return (
-    <div className="bg-white rounded-[12px] border border-[#DDE2DC] p-4 space-y-3.5 shadow-[0_2px_10px_rgba(21,37,31,0.04)]">
+    <div className="bg-surface rounded-card border border-border p-4 space-y-3.5 shadow-[0_2px_10px_rgba(21,37,31,0.04)]">
       <div className="flex items-center justify-between gap-2">
-        <h3 className="text-base font-extrabold text-[#15251F]">
+        <h3 className="text-base font-extrabold text-ink">
           Vị trí các tin
         </h3>
-        <span className="text-xs font-bold text-[#123F35] bg-[#E4EDDD] px-2.5 py-0.5 rounded-full shrink-0">
+        <span className="text-xs font-bold text-brand bg-brand-soft px-2.5 py-0.5 rounded-full shrink-0">
           {pinnableSpots.length} điểm
         </span>
       </div>
 
-      <div
+      <button
+        type="button"
         onClick={onOpenFullMap}
-        className="relative w-full aspect-[16/10] rounded-[10px] overflow-hidden border border-[#DDE2DC] bg-[#F2F0E8] cursor-pointer group"
-        title="Bấm để mở bản đồ tương tác"
+        className="relative block w-full aspect-[16/10] rounded-btn overflow-hidden border border-border bg-surface-muted cursor-pointer group"
+        aria-label={`Mở bản đồ tương tác, ${pinnableSpots.length} vị trí`}
       >
         <svg
           viewBox="0 0 360 225"
@@ -148,52 +149,30 @@ export default function ContextMapCard({
             Trường Thọ
           </text>
 
-          {/* Lost Pin */}
-          <circle
-            cx="142"
-            cy="64"
-            r="13"
-            fill="#E09F24"
-            stroke="#FFFFFF"
-            strokeWidth="2.5"
-          />
-          <circle cx="142" cy="64" r="4.5" fill="#FFFFFF" />
-
-          {/* Rescue Pin */}
-          <circle
-            cx="276"
-            cy="96"
-            r="13"
-            fill="#C84B24"
-            stroke="#FFFFFF"
-            strokeWidth="2.5"
-          />
-          <path
-            d="M276 91V101M271 96H281"
-            stroke="#FFFFFF"
-            strokeWidth="2.4"
-            strokeLinecap="round"
-          />
-
-          {/* Adopt Pin */}
-          <circle
-            cx="188"
-            cy="168"
-            r="13"
-            fill="#2E6F40"
-            stroke="#FFFFFF"
-            strokeWidth="2.5"
-          />
-          <circle cx="188" cy="168" r="4.5" fill="#FFFFFF" />
+          {pinnableSpots.length > 0 && (
+            <>
+              <circle cx="142" cy="64" r="13" fill="#E09F24" stroke="#FFFFFF" strokeWidth="2.5" />
+              <circle cx="142" cy="64" r="4.5" fill="#FFFFFF" />
+              <circle cx="276" cy="96" r="13" fill="#C84B24" stroke="#FFFFFF" strokeWidth="2.5" />
+              <path d="M276 91V101M271 96H281" stroke="#FFFFFF" strokeWidth="2.4" strokeLinecap="round" />
+              <circle cx="188" cy="168" r="13" fill="#2E6F40" stroke="#FFFFFF" strokeWidth="2.5" />
+              <circle cx="188" cy="168" r="4.5" fill="#FFFFFF" />
+            </>
+          )}
         </svg>
-      </div>
+        <span className="absolute bottom-2 left-2 right-2 rounded-md bg-white/95 px-2 py-1 text-[11px] font-semibold text-ink shadow-sm">
+          {pinnableSpots.length === 0
+            ? 'Chưa có tin đủ vị trí để ghim trên bản đồ'
+            : 'Hình minh họa · Mở bản đồ để xem vị trí thật'}
+        </span>
+      </button>
 
-      <div className="grid grid-cols-3 divide-x divide-[#DDE2DC] pt-0.5 text-xs">
+      <div className="grid grid-cols-3 divide-x divide-border pt-0.5 text-xs">
         <div className="flex items-center justify-center gap-1.5 pr-2">
           <span className="w-5 h-5 rounded-full bg-[#FFF0E8] text-[#A83D20] flex items-center justify-center shrink-0">
             <LifeBuoy className="w-3 h-3" />
           </span>
-          <span className="font-semibold text-[#15251F]">
+          <span className="font-semibold text-ink">
             Cứu trợ ({categoryCounts.rescue})
           </span>
         </div>
@@ -202,7 +181,7 @@ export default function ContextMapCard({
           <span className="w-5 h-5 rounded-full bg-[#FFF0BF] text-[#775000] flex items-center justify-center shrink-0">
             <PawLegendIcon className="w-3 h-3" />
           </span>
-          <span className="font-semibold text-[#15251F]">
+          <span className="font-semibold text-ink">
             Thú lạc ({categoryCounts.lost})
           </span>
         </div>
@@ -211,7 +190,7 @@ export default function ContextMapCard({
           <span className="w-5 h-5 rounded-full bg-[#E9F2E2] text-[#275B3A] flex items-center justify-center shrink-0">
             <Home className="w-3 h-3" />
           </span>
-          <span className="font-semibold text-[#15251F]">
+          <span className="font-semibold text-ink">
             Nhận nuôi ({categoryCounts.adopt})
           </span>
         </div>
@@ -220,7 +199,7 @@ export default function ContextMapCard({
       <button
         type="button"
         onClick={onOpenFullMap}
-        className="w-full min-h-[44px] px-4 rounded-[10px] bg-[#123F35] hover:bg-[#0C3028] text-white text-sm font-bold flex items-center justify-center gap-2 transition-colors"
+        className="w-full min-h-[44px] px-4 rounded-btn bg-brand hover:bg-brand-hover text-white text-sm font-bold flex items-center justify-center gap-2 transition-colors"
       >
         <Map className="w-4 h-4 shrink-0" />
         <span>Mở bản đồ</span>

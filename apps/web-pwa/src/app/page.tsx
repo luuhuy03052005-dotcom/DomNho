@@ -255,9 +255,20 @@ export default function DomNhoHomePage() {
       try {
         const parsed = filterTrustedSpots(
           JSON.parse(savedRealSpots) as DomSpot[]
-        ).filter((s) => !isSpotDeletedOrHidden(s, deletedSpotIdsRef.current));
+        )
+          .filter((s) => !isSpotDeletedOrHidden(s, deletedSpotIdsRef.current))
+          .map((spot) => ({
+            ...spot,
+            rawPhoneSecret: undefined,
+            zaloLink: undefined,
+            isContactUnlockedForViewer: false,
+          }));
         if (parsed.length > 0) {
           setSpots(parsed);
+          window.localStorage.setItem(
+            REAL_SPOTS_STORAGE_KEY,
+            JSON.stringify(parsed)
+          );
         }
       } catch {
         window.localStorage.removeItem(REAL_SPOTS_STORAGE_KEY);
@@ -322,9 +333,15 @@ export default function DomNhoHomePage() {
         }
         if (typeof window !== 'undefined') {
           try {
+            const safeForStorage = next.map((spot) => ({
+              ...spot,
+              rawPhoneSecret: undefined,
+              zaloLink: undefined,
+              isContactUnlockedForViewer: false,
+            }));
             window.localStorage.setItem(
               REAL_SPOTS_STORAGE_KEY,
-              JSON.stringify(next)
+              JSON.stringify(safeForStorage)
             );
           } catch {
             // Bỏ qua nếu vượt hạn mức localStorage (dữ liệu chính lưu trên Supabase)
@@ -412,14 +429,6 @@ export default function DomNhoHomePage() {
           setDetailSpot((curr) =>
             curr && curr.id === deletedSpotId ? null : curr
           );
-          fetch('/api/spots', {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              action: 'SYNC_DELETE_SPOT',
-              spotId: deletedSpotId,
-            }),
-          }).catch(() => null);
           return;
         }
 
@@ -432,14 +441,6 @@ export default function DomNhoHomePage() {
             incomingSpot,
             ...prev.filter((s) => s.id !== incomingSpot.id),
           ]);
-          fetch('/api/spots', {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              action: 'SYNC_SPOT',
-              spot: incomingSpot,
-            }),
-          }).catch(() => null);
         }
         syncCommunityFeed(userSession?.id);
       }
@@ -791,7 +792,7 @@ export default function DomNhoHomePage() {
             return;
           }
 
-          const accountRateKey = session.rawPhone || session.id;
+          const accountRateKey = session.id;
           const rateCheck = checkAndIncrementDeviceRateLimit(accountRateKey);
           if (!rateCheck.allowed) {
             setIsCameraModalOpen(false);
@@ -826,8 +827,6 @@ export default function DomNhoHomePage() {
               body: JSON.stringify({
                 authorId: session.id,
                 authorName: session.displayName,
-                rawPhone: session.rawPhone,
-                pinCode: session.pinCode,
                 spotType: payload.spotType,
                 title: payload.title,
                 story: payload.story,
@@ -1038,7 +1037,6 @@ export default function DomNhoHomePage() {
                 spotId,
                 authorId: session.id,
                 authorName: session.displayName,
-                rawPhone: session.rawPhone,
                 spotType: payload.spotType,
                 title: payload.title,
                 story: payload.story,
@@ -1150,7 +1148,6 @@ export default function DomNhoHomePage() {
               action: 'DELETE_SPOT',
               spotId,
               authorId: session.id,
-              rawPhone: session.rawPhone,
             }),
           });
           const data = await res.json().catch(() => null);
@@ -1164,7 +1161,7 @@ export default function DomNhoHomePage() {
           }
 
           recordDeletedSpotIds([spotId]);
-          decrementDeviceRateLimit(session.rawPhone || session.id);
+          decrementDeviceRateLimit(session.id);
           updateSpotsAndPersist((prev) =>
             prev.filter((s) => s.id !== spotId)
           );
@@ -1227,7 +1224,6 @@ export default function DomNhoHomePage() {
               spotId: spot.id,
               requesterId: session.id,
               requesterName: session.displayName,
-              requesterPhone: session.rawPhone,
               requestType,
               message,
             }),
@@ -1420,7 +1416,6 @@ export default function DomNhoHomePage() {
             postId: myLatestSpot?.id,
             authorId: userSession?.id,
             authorName: userSession?.displayName,
-            authorPhone: userSession?.rawPhone,
             petName: snapInput.petName,
             weekNumber: nextWeek,
             imageUrl: snapInput.imageUrl,
@@ -1580,7 +1575,7 @@ export default function DomNhoHomePage() {
   );
 
   return (
-    <div className="min-h-screen bg-[#F5F6F2] text-[#15251F] flex flex-col font-sans selection:bg-[#E4EDDD] selection:text-[#123F35]">
+    <div className="min-h-screen bg-[#F5F6F2] text-ink flex flex-col font-sans selection:bg-brand-soft selection:text-brand">
       <DomNhoHeader
         activeTab={mainTab}
         onChangeTab={handleTabChange}
@@ -1614,7 +1609,6 @@ export default function DomNhoHomePage() {
           />
         ) : mainTab === 'stories' ? (
           <StoryPageView
-            onBackToExplore={() => handleTabChange('explore')}
             onOpenMap={() => handleTabChange('map')}
           />
         ) : (
@@ -1684,7 +1678,7 @@ export default function DomNhoHomePage() {
               className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 mt-0.5 ${
                 toastBanner.tone === 'error'
                   ? 'bg-[#FFF0E5] text-[#AF421F]'
-                  : 'bg-[#E8EFE6] text-[#0E513B]'
+                  : 'bg-brand-soft text-brand'
               }`}
             >
               {toastBanner.tone === 'error' ? (
@@ -1698,10 +1692,10 @@ export default function DomNhoHomePage() {
               )}
             </div>
             <div className="min-w-0 flex-1 break-words">
-              <p className="text-xs font-extrabold text-[#142820] leading-snug break-words">
+              <p className="text-xs font-extrabold text-ink leading-snug break-words">
                 {toastBanner.title}
               </p>
-              <p className="text-[11px] mt-0.5 leading-snug text-[#52605A] break-words">
+              <p className="text-[11px] mt-0.5 leading-snug text-ink-secondary break-words">
                 {toastBanner.subtitle}
               </p>
             </div>
@@ -1768,7 +1762,6 @@ export default function DomNhoHomePage() {
                 spotId,
                 reporterId: userSession?.id,
                 reporterName: sighting.reporterName,
-                reporterPhone: userSession?.rawPhone,
                 imageUrl: sighting.imageUrl,
                 note: sighting.note,
                 emotionTag: sighting.emotionTag,
